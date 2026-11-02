@@ -2,7 +2,7 @@ manifestVersion: 1
 id: patriot-pilot-logbook
 category: files
 name: Pilot Log
-version: "1.6.2"
+version: "1.7.0"
 icon: https://raw.githubusercontent.com/PatriotCrypto/umbrel-patriot-apps/main/patriot-pilot-logbook/icon.svg
 tagline: Your flight log and logbook backup, kept on your own server
 description: >-
@@ -12,13 +12,13 @@ description: >-
   Photograph your paper logbook pages and file them by date, so a lost or damaged logbook isn't the end of your records. Import your ForeFlight logbook as a CSV whenever you like (importing again only adds new flights) and export it back out in ForeFlight's own format at any time, so you can always move your data wherever you want.
 
 
-  On top of that backup is a full single-pilot logbook: a live dashboard with your totals, 90-day landing currency, flight review and medical reminders, and progress toward sport, private, instrument or commercial minimums. Track your instructor's endorsements and download a checkride packet, see when your passenger currency runs out, explore an interactive map of the airports you've flown to, run a Preflight Risk Check (live weather and runway winds against your personal minimums, plus a PAVE risk score and checklists), and track what your flying costs.
+  On top of that backup is a full single-pilot logbook: a live dashboard with your totals, 90-day landing currency, flight review and medical reminders, and progress toward sport, private, instrument or commercial minimums. Track your instructor's endorsements and download a checkride packet, see when your passenger currency runs out, keep a page for each aircraft you fly (details, equipment, photo, POH and papers, filled in from the FAA registry for U.S. aircraft), explore an interactive map of the airports you've flown to, run a Preflight Risk Check (live weather and runway winds against your personal minimums, plus a PAVE risk score and checklists), and track what your flying costs, from each flight to subscriptions, gear and fees.
 
 
   Keep your insurance, certificates, POH, notes, photos and videos in the Document Hangar, with reminders before anything expires. The current FAR and AIM are downloaded into the Hangar on first start and kept up to date. Optional phone alerts (through ntfy) and scheduled backups.
 
 
-  No accounts, no cloud, no telemetry, and your logbook never leaves your Umbrel. The only outside connections are the map tiles your browser loads on the Airports page, the airport code sent to the NOAA Aviation Weather Center when you run a Preflight Risk Check, a weekly check for new FAR and AIM editions (which you can turn off), and the expiry alerts, if you turn them on.
+  No accounts, no cloud, no telemetry, and your logbook never leaves your Umbrel. The only outside connections are the map tiles your browser loads on the Airports page, the airport code sent to the NOAA Aviation Weather Center when you run a Preflight Risk Check, a weekly check for new FAR and AIM editions (which you can turn off), the N-number sent to the FAA aircraft registry when you press Look up on the Aircraft page, and the expiry alerts, if you turn them on.
 
 
   Currency, progress, minimums and cost figures are reminders based on what you have logged, not a determination of legal currency or certificate eligibility. Keep your original logbook. Not affiliated with ForeFlight or the FAA.
@@ -33,6 +33,6 @@ path: ""
 defaultUsername: ""
 defaultPassword: ""
 releaseNotes: >-
-  The app is now called Pilot Log. Nothing else changes, and your flights, documents and settings stay as they are.
+  New Aircraft page: each aircraft you fly gets its own page with its details, equipment on board, a photo, and its POH and papers (also kept in the Document Hangar). U.S. aircraft can be filled in from the FAA registry by N-number, and the registration expiration joins your expiry reminders. Costs now pages through every flight and tracks other expenses such as subscriptions, gear, books and checkride fees, including ones that repeat every month or year. Progress shows how complete each certificate is, next to the certificate buttons.
 submitter: PatriotCrypto
 submission: https://github.com/PatriotCrypto/umbrel-patriot-apps

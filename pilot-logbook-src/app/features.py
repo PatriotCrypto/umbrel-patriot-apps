@@ -30,6 +30,15 @@ CREATE TABLE IF NOT EXISTS flight_costs (     -- one row per flight that has cos
     flight_id INTEGER PRIMARY KEY,
     aircraft_rate REAL, instructor_rate REAL, fuel_gal REAL, fuel_cost REAL, other_cost REAL
 );
+CREATE TABLE IF NOT EXISTS expenses (         -- spending that isn't tied to one flight: subscriptions, gear, fees
+    id INTEGER PRIMARY KEY,
+    date TEXT NOT NULL, category TEXT NOT NULL DEFAULT 'other', description TEXT NOT NULL,
+    amount REAL NOT NULL DEFAULT 0,
+    repeat TEXT NOT NULL DEFAULT '',          -- '', 'monthly' or 'yearly'
+    end_date TEXT,                            -- last date a repeating expense was charged (empty = still going)
+    aircraft TEXT, notes TEXT, created_at TEXT
+);
+CREATE INDEX IF NOT EXISTS expenses_date ON expenses(date);
 CREATE TABLE IF NOT EXISTS alerts_sent (      -- so each reminder goes out once per threshold
     key TEXT PRIMARY KEY, sent_at TEXT
 );
@@ -494,28 +503,137 @@ def flight_cost(r, c, rates):
             "entered": bool(c)}
 
 
+EXPENSE_CATS = [("subscription", "Subscriptions and apps"), ("gear", "Gear and equipment"),
+                ("training", "Books and training materials"), ("fees", "Tests and checkride fees"),
+                ("medical", "Medical"), ("insurance", "Insurance"), ("membership", "Memberships and dues"),
+                ("ownership", "Aircraft ownership"), ("travel", "Travel"), ("other", "Other")]
+EXPENSE_LABEL = dict(EXPENSE_CATS)
+REPEATS = [("", "One time"), ("monthly", "Every month"), ("yearly", "Every year")]
+
+
+def _add_months(d, n):
+    m = d.month - 1 + n
+    y, m = d.year + m // 12, m % 12 + 1
+    return date(y, m, min(d.day, end_of_month(date(y, m, 1)).day))
+
+
+def expense_dates(e, today=None):
+    """Every date an expense was charged, up to today. A repeating one recurs from its start date
+    every month or year until its end date, if it has one."""
+    today = today or date.today()
+    try:
+        start = _d(e["date"])
+    except (TypeError, ValueError):
+        return []
+    stop = today
+    if e["end_date"] and valid_date(e["end_date"]):
+        stop = min(stop, _d(e["end_date"]))
+    if e["repeat"] not in ("monthly", "yearly"):
+        return [start] if start <= today else []
+    step = 1 if e["repeat"] == "monthly" else 12
+    out, n = [], 0
+    while True:
+        d = _add_months(start, n * step)
+        if d > stop or n > 1200:
+            return out
+        out.append(d)
+        n += 1
+
+
+def expenses_list(db, today=None):
+    today = today or date.today()
+    out = []
+    for r in db.execute("SELECT * FROM expenses ORDER BY date DESC, id DESC"):
+        e = dict(r)
+        when = expense_dates(e, today)
+        e.update(times=len(when), spent=len(when) * (e["amount"] or 0), last=when[-1] if when else None,
+                 cat_label=EXPENSE_LABEL.get(e["category"], "Other"), future=not when,
+                 repeat_label=dict(REPEATS).get(e["repeat"], ""),
+                 next=(_add_months(when[-1], 1 if e["repeat"] == "monthly" else 12) if when and e["repeat"]
+                       and not e["end_date"] else None))
+        out.append(e)
+    return out
+
+
+def parse_expense(form):
+    """(values, errors) from the add or edit form."""
+    errors = []
+    when = (form.get("date") or "").strip()
+    if not valid_date(when):
+        errors.append("Enter the date as YYYY-MM-DD.")
+    desc = (form.get("description") or "").strip()[:200]
+    if not desc:
+        errors.append("Describe the expense, for example ForeFlight subscription or headset.")
+    raw = (form.get("amount") or "").strip().replace("$", "").replace(",", "")
+    amount = None
+    try:
+        amount = round(float(raw), 2)
+        if not 0 <= amount <= 1_000_000:
+            raise ValueError
+    except ValueError:
+        errors.append("The amount must be a number, for example 129.99.")
+    cat = form.get("category") if form.get("category") in EXPENSE_LABEL else "other"
+    rep = form.get("repeat") if form.get("repeat") in ("monthly", "yearly") else ""
+    end = (form.get("end_date") or "").strip()
+    if end and not valid_date(end):
+        errors.append("Enter the end date as YYYY-MM-DD, or leave it empty.")
+    elif end and valid_date(when) and end < when:
+        errors.append("The end date is before the start date.")
+    ac = (form.get("aircraft") or "").strip().upper()[:12]
+    return {"date": when, "category": cat, "description": desc, "amount": amount, "repeat": rep,
+            "end_date": end if rep else "", "aircraft": ac, "notes": (form.get("notes") or "").strip()[:2000]}, errors
+
+
+def save_expense(db, v, eid=None):
+    cols = ["date", "category", "description", "amount", "repeat", "end_date", "aircraft", "notes"]
+    if eid:
+        db.execute(f"UPDATE expenses SET {', '.join(c + '=?' for c in cols)} WHERE id=?", (*[v[c] for c in cols], eid))
+    else:
+        cur = db.execute(f"INSERT INTO expenses({', '.join(cols)}, created_at) VALUES ({', '.join('?' * len(cols))}, ?)",
+                         (*[v[c] for c in cols], datetime.now().isoformat(timespec="seconds")))
+        eid = cur.lastrowid
+    db.commit()
+    return eid
+
+
+def flight_costs_page(db, rates, page=1, size=10):
+    """One page of flights with their costs, newest first, plus the total number of flights."""
+    total = db.execute("SELECT COUNT(*) FROM flights").fetchone()[0]
+    rows = db.execute("SELECT * FROM flights ORDER BY date DESC, id DESC LIMIT ? OFFSET ?",
+                      (size, (page - 1) * size)).fetchall()
+    ids = [r["id"] for r in rows]
+    costs = {}
+    if ids:
+        costs = {r["flight_id"]: dict(r) for r in db.execute(
+            f"SELECT * FROM flight_costs WHERE flight_id IN ({','.join('?' * len(ids))})", ids)}
+    return [(r, flight_cost(r, costs.get(r["id"], {}), rates)) for r in rows], total
+
+
 def cost_summary(db, rates, today=None, remaining_hours=None):
-    """Spending totals. remaining_hours: flight hours still needed (for the projection)."""
+    """Spending totals. remaining_hours: flight hours still needed (for the projection).
+    "flying" is what the flights cost; "expenses" is everything else; "total" is both."""
     today = today or date.today()
     costs = {r["flight_id"]: dict(r) for r in db.execute("SELECT * FROM flight_costs")}
     rows = db.execute("SELECT * FROM flights ORDER BY date, id").fetchall()
-    t = {"aircraft": 0.0, "instructor": 0.0, "fuel": 0.0, "other": 0.0, "total": 0.0, "fuel_gal": 0.0,
-         "hours": 0.0, "fuel_hours": 0.0, "missing_rate": 0, "missing_instr": 0, "entered": 0, "flights": len(rows)}
+    t = {"aircraft": 0.0, "instructor": 0.0, "fuel": 0.0, "other": 0.0, "flying": 0.0, "expenses": 0.0, "total": 0.0,
+         "fuel_gal": 0.0, "hours": 0.0, "fuel_hours": 0.0, "missing_rate": 0, "missing_instr": 0, "entered": 0,
+         "flights": len(rows), "expense_count": 0}
     months = []
     y, m = today.year, today.month
     for _ in range(12):
         months.append({"key": f"{y:04d}-{m:02d}", "year": y, "month": m, "total": 0.0, "aircraft": 0.0,
-                       "instructor": 0.0, "fuel": 0.0, "other": 0.0})
+                       "instructor": 0.0, "fuel": 0.0, "other": 0.0, "expenses": 0.0})
         m -= 1
         if m == 0:
             y, m = y - 1, 12
     months.reverse()
     by_month = {x["key"]: x for x in months}
-    by_ac, recent = {}, []
+    by_ac = {}
     for r in rows:
         c = flight_cost(r, costs.get(r["id"], {}), rates)
-        for k in ("aircraft", "instructor", "fuel", "other", "total", "fuel_gal"):
+        for k in ("aircraft", "instructor", "fuel", "other", "fuel_gal"):
             t[k] += c[k]
+        t["flying"] += c["total"]
         t["hours"] += r["total"] or 0
         if c["fuel_gal"]:
             t["fuel_hours"] += r["total"] or 0
@@ -529,13 +647,29 @@ def cost_summary(db, rates, today=None, remaining_hours=None):
         a = by_ac.setdefault(r["aircraft"] or "?", {"ident": r["aircraft"] or "?", "hours": 0.0, "total": 0.0})
         a["hours"] += r["total"] or 0
         a["total"] += c["total"]
-        recent.append((r, c))
-    t["per_hour"] = t["total"] / t["hours"] if t["hours"] else 0.0
+    by_cat = {}
+    for e in db.execute("SELECT * FROM expenses"):
+        when = expense_dates(e, today)
+        if not when:
+            continue
+        t["expense_count"] += 1
+        amt = e["amount"] or 0
+        t["expenses"] += amt * len(when)
+        cat = by_cat.setdefault(e["category"], {"key": e["category"], "label": EXPENSE_LABEL.get(e["category"], "Other"),
+                                                "total": 0.0})
+        cat["total"] += amt * len(when)
+        for d in when:
+            mm = by_month.get(d.isoformat()[:7])
+            if mm:
+                mm["expenses"] += amt
+                mm["total"] += amt
+    t["total"] = t["flying"] + t["expenses"]
+    t["per_hour"] = t["flying"] / t["hours"] if t["hours"] else 0.0
     t["per_gal"] = t["fuel"] / t["fuel_gal"] if t["fuel_gal"] and t["fuel"] else 0.0
     t["gph"] = t["fuel_gal"] / t["fuel_hours"] if t["fuel_hours"] else 0.0
     remaining = max(0.0, 40 - t["hours"]) if remaining_hours is None else max(0.0, remaining_hours)
     return {"t": t, "months": months, "aircraft": sorted(by_ac.values(), key=lambda a: -a["total"]),
-            "recent": list(reversed(recent))[:15], "remaining_hours": remaining,
+            "categories": sorted(by_cat.values(), key=lambda c: -c["total"]), "remaining_hours": remaining,
             "projection": remaining * t["per_hour"]}
 
 
@@ -556,6 +690,11 @@ def expiring_items(db, prof, today=None):
     for r in db.execute("SELECT id, title, expires FROM documents WHERE expires IS NOT NULL AND expires!=''"):
         if valid_date(r["expires"]):
             items.append((f"doc{r['id']}", r["title"], _d(r["expires"])))
+    cols = {r[1] for r in db.execute("PRAGMA table_info(aircraft)")}
+    if "registration_expires" in cols:
+        for r in db.execute("SELECT ident, registration_expires FROM aircraft WHERE registration_expires!=''"):
+            if valid_date(r["registration_expires"]):
+                items.append((f"reg{r['ident']}", f"{r['ident']} registration", _d(r["registration_expires"])))
     for r in endorsements(db, today):
         if r["archived"]:
             continue
@@ -838,6 +977,23 @@ def _from_origin(g):
         return 0.0
     o = g["points"][0][1]
     return max((leg_nm(o, ap) for _, ap in g["points"][1:]), default=0.0)
+
+
+def progress_pct(p):
+    """How far along a certificate is: each tracked minimum counts by the share logged (capped at 100%),
+    each flight that must meet a standard counts as met or not. Returns (percent, met, total)."""
+    parts = [min(have / need, 1.0) if need else 1.0 for _, have, need, _ in p["tracked"]]
+    parts += [1.0 if c["met"] else 0.0 for c in p["checks"]]
+    if not parts:
+        return 0, 0, 0
+    met = sum(1 for x in parts if x >= 1.0)
+    pct = int(sum(parts) / len(parts) * 100)  # round down, so 100% only shows when everything is met
+    return pct, met, len(parts)
+
+
+def progress_all(db, today=None):
+    """Percent complete for every certificate, keyed by certificate."""
+    return {k: progress_pct(progress_for(db, k, today)) for k in CERT_KEYS}
 
 
 def progress_for(db, cert="private", today=None):

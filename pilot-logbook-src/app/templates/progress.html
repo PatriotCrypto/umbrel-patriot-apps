@@ -3,9 +3,17 @@
 {% block content %}
 <header class="page-head"><div><h1>Progress</h1>
   <p class="sub">Your logged flying against the minimum experience for a {{ p.title|lower }} (FAR {{ p.far }}). Your instructor decides when you are ready.</p></div></header>
-<nav class="seg" aria-label="Certificate or rating">
-  {% for k, label, far, title in certs %}<a href="/progress?cert={{ k }}"{% if k == p.cert %} aria-current="page"{% endif %}>{{ label }}</a>{% endfor %}
-</nav>
+<div class="certbar">
+  <nav class="seg" aria-label="Certificate or rating">
+    {% for k, label, far, title in certs %}<a href="/progress?cert={{ k }}"{% if k == p.cert %} aria-current="page"{% endif %}>{{ label }} <span class="segpct">{{ pct[k][0] }}%</span></a>{% endfor %}
+  </nav>
+  {% set cp = pct[p.cert] %}
+  <div class="certpct{% if cp[0] >= 100 %} done{% endif %}" role="group" aria-label="{{ p.label }} progress">
+    <svg class="ring" viewBox="0 0 36 36" aria-hidden="true"><circle class="track" cx="18" cy="18" r="15.5" pathLength="100"/>{% if cp[0] > 0 %}<circle class="fill" cx="18" cy="18" r="15.5" pathLength="100" stroke-dasharray="{{ cp[0] }} 100" transform="rotate(-90 18 18)"/>{% endif %}</svg>
+    <div><span class="big">{{ cp[0] }}%</span> <span class="lbl">complete</span>
+      <span class="hint">{{ cp[1] }} of {{ cp[2] }} {{ p.label|lower }} minimums met</span></div>
+  </div>
+</div>
 <section class="panel">
   <h2>Minimums you can track here</h2>
   {% for label, have, need, unit in p.tracked %}

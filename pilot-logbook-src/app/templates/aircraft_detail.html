@@ -1,0 +1,123 @@
+{% extends "base.html" %}
+{% block title %}{{ a.ident }}{% endblock %}
+{% block content %}
+<header class="page-head"><div><p class="crumb"><a href="/aircraft">Aircraft</a></p><h1>{{ a.ident }}</h1>
+  <p class="sub">{{ a.title }}{% if a.class_label %} &middot; {{ a.class_label }}{% endif %}</p></div>
+  <div class="actions">
+    {% if a.poh %}<a class="btn" href="/hangar/{{ a.poh[0].id }}/file" target="_blank" rel="noopener">{{ icon("book") }}Open POH</a>{% endif %}
+    <a class="btn primary" href="/aircraft/{{ a.ident }}/edit">{{ icon("edit") }}Edit details</a>
+  </div></header>
+{% if msg %}<div class="notice" role="status">{{ msg }}</div>{% endif %}
+{% if error %}<div class="notice err" role="status">{{ error }}</div>{% endif %}
+
+<section class="readout ac-readout" aria-label="Flying in {{ a.ident }}">
+  <div class="cell"><span class="lbl">Hours</span><span class="val">{{ a.hours|hrs }}</span><span class="hint">in your logbook</span></div>
+  <div class="cell"><span class="lbl">Flights</span><span class="val">{{ a.flights }}</span><span class="hint">{{ a.landings|int }} landing{{ "s" if a.landings != 1 }}</span></div>
+  <div class="cell"><span class="lbl">Last flown</span><span class="val">{% if a.last_flown %}{{ a.last_flown|short_date }}{% else %}&ndash;{% endif %}</span><span class="hint">{% if a.last_flown %}{{ a.last_flown[:4] }}{% else %}not yet{% endif %}</span></div>
+  <div class="cell"><span class="lbl">Rate</span><span class="val">{% if rate %}{{ rate|money }}{% else %}&ndash;{% endif %}</span><span class="hint">{% if rate %}per hour{% else %}<a href="/costs">set on Costs</a>{% endif %}</span></div>
+</section>
+
+<div class="ac-detail">
+  <div>
+    <section class="panel ac-hero">
+      {% if photo %}
+      <a href="/hangar/{{ photo.id }}"><img src="/hangar/{{ photo.id }}/file" alt="{{ a.ident }}"></a>
+      {% else %}
+      <div class="ac-ph big" aria-hidden="true">{{ icon("plane") }}</div>
+      {% endif %}
+      <form class="ac-photo-form" method="post" action="/aircraft/{{ a.ident }}/photo" enctype="multipart/form-data">
+        <input type="hidden" name="csrf" value="{{ csrf }}">
+        <label class="field"><span>{{ "Change photo" if photo else "Add a photo" }}</span><input type="file" name="file" accept="image/jpeg,image/png,image/webp,image/gif" required></label>
+        <button class="btn" type="submit">{{ icon("upload") }}Upload photo</button>
+      </form>
+    </section>
+
+    <section class="panel">
+      <h2>POH and documents</h2>
+      {% if docs %}
+      <ul class="ac-docs">
+        {% for d in docs %}
+        <li><a href="/hangar/{{ d.id }}"><span class="ext">{{ d.ext or "FILE" }}</span><span><b>{{ d.title }}</b><span class="muted small">{{ d.cat_label }} &middot; {{ d.size_h }}</span></span></a>
+          {% if d.kind == "file" and d.tkind == "pdf" %}<a class="btn small" href="/hangar/{{ d.id }}/file" target="_blank" rel="noopener">Open</a>{% endif %}</li>
+        {% endfor %}
+      </ul>
+      {% else %}
+      <p class="muted">Nothing attached yet. Start with the POH or AFM.</p>
+      {% endif %}
+      <form class="ac-attach" method="post" action="/aircraft/{{ a.ident }}/docs" enctype="multipart/form-data">
+        <input type="hidden" name="csrf" value="{{ csrf }}">
+        <h3 class="subhead">Attach files</h3>
+        <div class="formgrid">
+          <label class="field"><span>What is it</span><select name="category">{% for k, label in kinds %}<option value="{{ k }}"{% if k == ("aircraft" if a.poh else "manuals") %} selected{% endif %}>{{ label }}</option>{% endfor %}</select></label>
+          <label class="field"><span>Title (optional)</span><input name="title" maxlength="200" placeholder="{{ a.ident }} POH"></label>
+          <label class="field span-all"><span>Files</span><input type="file" name="files" multiple required></label>
+        </div>
+        <div class="actions"><button class="btn primary" type="submit">{{ icon("upload") }}Attach</button><a class="btn" href="/hangar?aircraft={{ a.ident }}">See in Document Hangar</a></div>
+        <p class="hint">Files you attach here are saved in the Document Hangar too, tagged {{ a.ident }}: the POH under POH and manuals, papers under Aircraft papers.</p>
+      </form>
+    </section>
+  </div>
+
+  <div>
+    <section class="panel">
+      <h2>Details</h2>
+      <dl class="kv">
+        <dt>Registration</dt><dd>{{ a.ident }}</dd>
+        {% if a.year %}<dt>Year</dt><dd>{{ a.year }}</dd>{% endif %}
+        {% if a.make %}<dt>Make</dt><dd>{{ a.make }}</dd>{% endif %}
+        {% if a.model %}<dt>Model</dt><dd>{{ a.model }}</dd>{% endif %}
+        {% if a.type_code %}<dt>Type code</dt><dd>{{ a.type_code }}</dd>{% endif %}
+        {% if a.serial %}<dt>Serial number</dt><dd>{{ a.serial }}</dd>{% endif %}
+        <dt>Class</dt><dd>{{ a.class_label or "Not set" }}</dd>
+        {% if a.gear_label %}<dt>Landing gear</dt><dd>{{ a.gear_label }}</dd>{% endif %}
+        {% if a.engine_type or a.engine %}<dt>Engine</dt><dd>{{ a.engine or "" }}{% if a.engine and a.engine_type %} &middot; {% endif %}{{ a.engine_type or "" }}</dd>{% endif %}
+        {% if a.flags %}<dt>Counts as</dt><dd>{{ a.flags|join(", ") }}</dd>{% endif %}
+        {% if a.registration_expires %}<dt>Registration expires</dt><dd>{{ a.registration_expires|pretty_date }}
+          {% if a.reg_days < 0 %}<span class="badge expired">Expired</span>{% elif a.reg_days <= 90 %}<span class="badge soon">In {{ a.reg_days }} days</span>{% endif %}</dd>{% endif %}
+      </dl>
+      {% if not a.make and not a.model %}<p class="hint">No details yet. <a href="/aircraft/{{ a.ident }}/edit">Add them</a>{% if is_n %} or look them up in the FAA registry below{% endif %}.</p>{% endif %}
+    </section>
+
+    <section class="panel">
+      <h2>Equipment</h2>
+      {% if a.equipment_list %}<ul class="equip-list">{% for x in a.equipment_list %}<li>{{ x }}</li>{% endfor %}</ul>{% endif %}
+      {% if a.equipment_notes %}<p class="prewrap">{{ a.equipment_notes }}</p>{% endif %}
+      {% if not a.equipment_list and not a.equipment_notes %}<p class="muted">Not entered yet. <a href="/aircraft/{{ a.ident }}/edit">Add the equipment on board</a>.</p>{% endif %}
+    </section>
+
+    {% if is_n %}
+    <section class="panel">
+      <h2>FAA registry</h2>
+      {% if a.faa %}
+      <dl class="kv">{% for k, v in a.faa.items() %}<dt>{{ k }}</dt><dd>{{ v }}</dd>{% endfor %}</dl>
+      <p class="hint">Checked {{ a.faa_checked|pretty_date }}. Updating fills in details you left empty and the registration expiration; it never changes what you entered.</p>
+      {% else %}
+      <p class="hint">Look {{ a.ident }} up on registry.faa.gov to fill in details you haven't entered and see its registration status.</p>
+      {% endif %}
+      <form method="post" action="/aircraft/{{ a.ident }}/lookup"><input type="hidden" name="csrf" value="{{ csrf }}">
+        <button class="btn" type="submit">{{ "Update from FAA registry" if a.faa else "Look up in FAA registry" }}</button></form>
+    </section>
+    {% endif %}
+
+    {% if a.notes %}
+    <section class="panel"><h2>Notes</h2><p class="prewrap">{{ a.notes }}</p></section>
+    {% endif %}
+
+    {% if recent %}
+    <section class="panel">
+      <h2>Recent flights</h2>
+      <ul class="statuslist">{% for r in recent %}<li><span><a href="/flights/{{ r.id }}/edit">{{ r.date|pretty_date }}</a> <span class="muted small">{{ r|route }}</span></span><span class="n">{{ r.total|hrs }} h</span></li>{% endfor %}</ul>
+      <div class="actions spaced-top"><a class="btn" href="/logbook?aircraft={{ a.ident }}">All {{ a.flights }} flight{{ "s" if a.flights != 1 }} in the logbook</a></div>
+    </section>
+    {% endif %}
+
+    {% if spent %}<p class="note">{{ spent|money }} in expenses tagged {{ a.ident }} on the <a href="/costs#expenses">Costs</a> page.</p>{% endif %}
+
+    {% if not a.flights %}
+    <form class="spaced-top" method="post" action="/aircraft/{{ a.ident }}/delete"><input type="hidden" name="csrf" value="{{ csrf }}">
+      <button class="btn danger" type="submit">Remove {{ a.ident }}</button>
+      <p class="hint">Only aircraft with no logged flights can be removed. Its documents stay in the Document Hangar.</p></form>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

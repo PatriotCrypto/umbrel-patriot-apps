@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+{% block title %}Aircraft{% endblock %}
+{% block content %}
+<header class="page-head"><div><h1>Aircraft</h1>
+  <p class="sub">Every airplane you fly, with its details, equipment, photo, POH and papers. Aircraft from your ForeFlight import and the flights you log are added automatically.</p></div>
+  <div class="actions"><a class="btn primary" href="/aircraft/new">{{ icon("plus") }}Add aircraft</a></div></header>
+{% if msg %}<div class="notice" role="status">{{ msg }}</div>{% endif %}
+
+{% if planes %}
+<div class="ac-grid">
+  {% for a in planes %}
+  <a class="ac-card" href="/aircraft/{{ a.ident }}">
+    <div class="ac-photo">{% if a.photo_doc %}<img src="/hangar/{{ a.photo_doc }}/thumb" alt="" loading="lazy">{% else %}<span class="ac-ph" aria-hidden="true">{{ icon("plane") }}</span>{% endif %}</div>
+    <div class="ac-body">
+      <div class="ac-top"><span class="ac-ident">{{ a.ident }}</span>{% if a.type_code %}<span class="muted small">{{ a.type_code }}</span>{% endif %}</div>
+      <div class="ac-title">{{ a.title }}</div>
+      <div class="ac-meta">
+        {% if a.flights %}<span><b class="num">{{ a.hours|hrs }}</b> h</span><span>{{ a.flights }} flight{{ "s" if a.flights != 1 }}</span><span>last {{ a.last_flown|short_date }}, {{ a.last_flown[:4] }}</span>{% else %}<span>Not flown yet</span>{% endif %}
+      </div>
+      <div class="ac-tags">
+        {% if a.poh %}<span class="chip cat-manuals">POH</span>{% endif %}
+        {% if a.docs|length > a.poh|length %}<span class="chip cat-aircraft">{{ a.docs|length - a.poh|length }} other file{{ "s" if a.docs|length - a.poh|length != 1 }}</span>{% endif %}
+        {% if a.reg_days is not none and a.reg_days < 0 %}<span class="badge expired">Registration expired</span>{% elif a.reg_days is not none and a.reg_days <= 90 %}<span class="badge soon">Registration due</span>{% endif %}
+        {% if not a.make and not a.model %}<span class="badge upcoming">Add details</span>{% endif %}
+      </div>
+    </div>
+  </a>
+  {% endfor %}
+</div>
+{% else %}
+<div class="panel empty">
+  <h2>No aircraft yet</h2>
+  <p class="hint">Add the airplane you fly by its N-number. U.S. registrations can be filled in from the FAA registry.</p>
+  <div class="actions"><a class="btn primary" href="/aircraft/new">{{ icon("plus") }}Add aircraft</a></div>
+</div>
+{% endif %}
+{% endblock %}

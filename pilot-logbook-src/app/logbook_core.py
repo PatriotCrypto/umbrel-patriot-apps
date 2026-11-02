@@ -371,8 +371,9 @@ def import_foreflight(db, raw_bytes, filename="logbook.csv"):
 
     for a in aircraft:
         vals = {col: (a.get(ff) or "").strip() for col, ff in AIRCRAFT_COLS}
-        db.execute(f"INSERT OR REPLACE INTO aircraft({','.join(vals)}) VALUES ({','.join('?' * len(vals))})",
-                   tuple(vals.values()))
+        sets = ", ".join(f"{k}=COALESCE(NULLIF(excluded.{k}, ''), aircraft.{k})" for k in vals if k != "ident")
+        db.execute(f"INSERT INTO aircraft({','.join(vals)}) VALUES ({','.join('?' * len(vals))}) "
+                   f"ON CONFLICT(ident) DO UPDATE SET {sets}", tuple(vals.values()))
 
     new = skipped = 0
     seen, fps, new_ids = {}, set(), []

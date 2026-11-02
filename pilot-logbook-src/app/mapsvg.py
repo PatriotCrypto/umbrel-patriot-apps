@@ -182,14 +182,16 @@ def cost_bars(months, W=640, H=232):
         x = L + i * slot + (slot - bw) / 2
         base = T + ph
         tip = (f'{MON[m["month"] - 1]} {m["year"]}: ${m["total"]:,.0f} (aircraft ${m["aircraft"]:,.0f}, '
-               f'instructor ${m["instructor"]:,.0f}, fuel ${m["fuel"]:,.0f}, other ${m["other"]:,.0f})')
+               f'instructor ${m["instructor"]:,.0f}, fuel ${m["fuel"]:,.0f}, other ${m["other"]:,.0f}, '
+               f'expenses ${m.get("expenses", 0):,.0f})')
         out.append(f'<g class="bar"><title>{escape(tip)}</title>'
                    f'<rect class="hit" x="{_x(L + i * slot)}" y="{T}" width="{_x(slot)}" height="{ph}"/>')
         if m["total"] <= 0:
             out.append(f'<rect class="c-empty" x="{_x(x)}" y="{_x(base - 2)}" width="{_x(bw)}" height="2"/>')
         y = base
-        for cls, key in (("c-dual", "aircraft"), ("c-solo", "instructor"), ("c-fuel", "fuel"), ("c-other", "other")):
-            h = ph * m[key] / ymax
+        for cls, key in (("c-dual", "aircraft"), ("c-solo", "instructor"), ("c-fuel", "fuel"), ("c-other", "other"),
+                         ("c-exp", "expenses")):
+            h = ph * m.get(key, 0) / ymax
             if h > 0:
                 y -= h
                 out.append(f'<rect class="{cls}" x="{_x(x)}" y="{_x(y)}" width="{_x(bw)}" height="{_x(h)}"/>')

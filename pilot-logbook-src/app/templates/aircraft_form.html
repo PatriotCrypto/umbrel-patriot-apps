@@ -1,0 +1,67 @@
+{% extends "base.html" %}
+{% block title %}{{ "Add aircraft" if new else "Edit " ~ f.ident }}{% endblock %}
+{% block content %}
+{% macro yes(v) %}{{ "checked" if v and (v|string|upper) in ("TRUE", "1", "YES", "ON", "Y") }}{% endmacro %}
+<header class="page-head"><div><h1>{{ "Add aircraft" if new else "Edit " ~ f.ident }}</h1>
+  <p class="sub">{% if new %}Start with the registration. For a U.S. N-number, look it up and the FAA registry fills in the year, make, model, serial number and engine.{% else %}Details, equipment and notes for this aircraft.{% endif %}</p></div></header>
+{% if msg %}<div class="notice" role="status">{{ msg }}</div>{% endif %}
+{% if errors %}<div class="errors" role="alert"><strong>Fix these before saving:</strong><ul>{% for e in errors %}<li>{{ e }}</li>{% endfor %}</ul></div>{% endif %}
+
+{% if new %}
+<form class="panel ac-lookup" method="get" action="/aircraft/new">
+  <input type="hidden" name="lookup" value="1">
+  <label class="field"><span>Registration (N-number)</span><input name="ident" value="{{ f.ident or '' }}" maxlength="12" placeholder="N12345" autocapitalize="characters" autocomplete="off" spellcheck="false" required></label>
+  <button class="btn primary" type="submit">Look up in FAA registry</button>
+  <p class="hint">Looks the number up on registry.faa.gov from your Umbrel. Nothing else is sent. Not a U.S. aircraft? Fill in the form below by hand.</p>
+</form>
+{% if found %}<div class="notice" role="status">Found {{ f.ident }} in the FAA registry{% if f.make or f.model %}: {{ f.year }} {{ f.make }} {{ f.model }}{% endif %}. Check the details below, add the equipment, and save.</div>{% endif %}
+{% if lookup_error %}<div class="notice err" role="status">{{ lookup_error }}</div>{% endif %}
+{% endif %}
+
+<form method="post" action="{{ '/aircraft/new' if new else '/aircraft/' ~ f.ident ~ '/edit' }}">
+  <input type="hidden" name="csrf" value="{{ csrf }}">
+  {% if new %}<input type="hidden" name="faa_json" value="{{ faa_json }}">{% endif %}
+  <section class="panel">
+    <h2>Aircraft</h2>
+    <div class="formgrid">
+      {% if new %}<label class="field"><span>Registration</span><input name="ident" value="{{ f.ident or '' }}" maxlength="12" placeholder="N12345" autocapitalize="characters" autocomplete="off" spellcheck="false" required></label>{% endif %}
+      <label class="field"><span>Year</span><input name="year" value="{{ f.year or '' }}" inputmode="numeric" maxlength="4" placeholder="2016"></label>
+      <label class="field"><span>Make</span><input name="make" value="{{ f.make or '' }}" maxlength="80" placeholder="Van's Aircraft"></label>
+      <label class="field"><span>Model</span><input name="model" value="{{ f.model or '' }}" maxlength="80" placeholder="RV-12iS"></label>
+      <label class="field"><span>Type code</span><input name="type_code" value="{{ f.type_code or '' }}" maxlength="10" placeholder="RV12" autocapitalize="characters"><small>The ICAO type designator, as filed in a flight plan.</small></label>
+      <label class="field"><span>Serial number</span><input name="serial" value="{{ f.serial or '' }}" maxlength="40"></label>
+      <label class="field"><span>Class</span><select name="aircraft_class">{% for k, label in classes %}<option value="{{ k }}"{% if k == (f.aircraft_class or 'airplane_single_engine_land') %} selected{% endif %}>{{ label }}</option>{% endfor %}</select></label>
+      <label class="field"><span>Landing gear</span><select name="gear_type">{% for k, label in gears %}<option value="{{ k }}"{% if k == (f.gear_type or '') %} selected{% endif %}>{{ label }}</option>{% endfor %}</select></label>
+      <label class="field"><span>Engine type</span><select name="engine_type">{% for k, label in engines %}<option value="{{ k }}"{% if k == (f.engine_type or '') %} selected{% endif %}>{{ label }}</option>{% endfor %}</select></label>
+      <label class="field"><span>Engine</span><input name="engine" value="{{ f.engine or '' }}" maxlength="120" placeholder="Rotax 912 iSc"></label>
+      <label class="field"><span>Registration expires</span><input type="date" name="registration_expires" value="{{ f.registration_expires or '' }}"><small>You'll get a reminder with your other expiry alerts.</small></label>
+    </div>
+    <fieldset class="ac-flags"><legend>Counts as</legend>
+      <label class="check"><input type="checkbox" name="complex" {{ yes(f.complex) }}> Complex</label>
+      <label class="check"><input type="checkbox" name="high_perf" {{ yes(f.high_perf) }}> High performance</label>
+      <label class="check"><input type="checkbox" name="taa" {{ yes(f.taa) }}> Technically advanced (TAA)</label>
+      <label class="check"><input type="checkbox" name="pressurized" {{ yes(f.pressurized) }}> Pressurized</label>
+      <p class="hint">Complex and TAA time counts toward the commercial certificate on the Progress page.</p>
+    </fieldset>
+  </section>
+
+  <section class="panel">
+    <h2>Equipment on board</h2>
+    <p class="hint">Tick what's installed. Add specific avionics and anything else in the box below.</p>
+    <div class="equip-groups">
+      {% for group, items in equipment %}
+      <fieldset><legend>{{ group }}</legend>
+        {% for x in items %}<label class="check"><input type="checkbox" name="equipment" value="{{ x }}"{% if x in f.equipment_list %} checked{% endif %}> {{ x }}</label>{% endfor %}
+      </fieldset>
+      {% endfor %}
+    </div>
+    <label class="field span-all spaced-top"><span>Avionics and other equipment</span><textarea name="equipment_notes" maxlength="2000" placeholder="Garmin G3X Touch, GTN 650Xi, GTX 345 ADS-B transponder, GMC 507 autopilot">{{ f.equipment_notes or '' }}</textarea></label>
+  </section>
+
+  <section class="panel">
+    <h2>Notes</h2>
+    <label class="field span-all"><span class="sr-only">Notes</span><textarea name="notes" maxlength="5000" placeholder="Fuel capacity, V-speeds, hangar location, quirks, who to call for maintenance">{{ f.notes or '' }}</textarea></label>
+  </section>
+  <div class="formactions"><button class="btn primary" type="submit">{{ "Add aircraft" if new else "Save" }}</button><a class="btn" href="{{ '/aircraft' if new else '/aircraft/' ~ f.ident }}">Cancel</a></div>
+</form>
+{% endblock %}

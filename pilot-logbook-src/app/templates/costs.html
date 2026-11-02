@@ -2,15 +2,19 @@
 {% block title %}Costs{% endblock %}
 {% block content %}
 <header class="page-head"><div><h1>Costs</h1>
-  <p class="sub">What your flying costs, from the rates you set here and the fuel and costs you enter on each flight.</p></div></header>
+  <p class="sub">What your flying costs, from the rates you set here and the fuel and costs you enter on each flight, plus everything else you spend on flying.</p></div>
+  <div class="actions"><a class="btn primary" href="#add-expense">{{ icon("plus") }}Add an expense</a></div></header>
 {% if saved %}<div class="notice" role="status">Rates saved.</div>{% endif %}
+{% if msg %}<div class="notice" role="status">{{ msg }}</div>{% endif %}
 
 <section class="readout costs" aria-label="Cost totals">
-  <div class="cell total"><span class="lbl">Total spent</span><span class="val">{{ t.total|money }}</span><span class="hint">{{ t.flights }} flight{{ "s" if t.flights != 1 }}</span></div>
+  <div class="cell total"><span class="lbl">Total spent</span><span class="val">{{ t.total|money }}</span><span class="hint">flying and other expenses</span></div>
+  <div class="cell"><span class="lbl">Flying</span><span class="val">{{ t.flying|money }}</span><span class="hint">{{ t.flights }} flight{{ "s" if t.flights != 1 }}</span></div>
   <div class="cell"><span class="lbl"><i class="dot dual"></i>Aircraft</span><span class="val">{{ t.aircraft|money }}</span><span class="hint">&nbsp;</span></div>
   <div class="cell"><span class="lbl"><i class="dot solo"></i>Instructor</span><span class="val">{{ t.instructor|money }}</span><span class="hint">&nbsp;</span></div>
   <div class="cell"><span class="lbl"><i class="dot fuel"></i>Fuel</span><span class="val">{{ t.fuel|money }}</span><span class="hint">{% if t.fuel_gal %}{{ "%.1f"|format(t.fuel_gal) }} gal{% else %}&nbsp;{% endif %}</span></div>
-  <div class="cell"><span class="lbl">Per flight hour</span><span class="val">{{ t.per_hour|money }}</span><span class="hint">{{ t.hours|hrs }} h logged</span></div>
+  <div class="cell"><span class="lbl"><i class="dot exp"></i>Other expenses</span><span class="val">{{ t.expenses|money }}</span><span class="hint">gear, subscriptions, fees</span></div>
+  <div class="cell"><span class="lbl">Per flight hour</span><span class="val">{{ t.per_hour|money }}</span><span class="hint">{{ t.hours|hrs }} h, flying only</span></div>
   <div class="cell"><span class="lbl">To the {{ cs.cert_far }} minimums</span><span class="val">{{ cs.projection|money }}</span><span class="hint">{% if cs.remaining_hours %}at least {{ cs.remaining_hours|hrs }} h more{% else %}hour minimums met{% endif %}</span></div>
 </section>
 
@@ -21,14 +25,14 @@
 <div class="widgets">
   <section class="widget w-costmonths" aria-labelledby="w-cm">
     <header><h2 id="w-cm">Spending per month</h2>
-      <div class="legend"><span><i class="dot dual"></i>Aircraft</span><span><i class="dot solo"></i>Instructor</span><span><i class="dot fuel"></i>Fuel</span><span><i class="dot"></i>Other</span></div></header>
+      <div class="legend"><span><i class="dot dual"></i>Aircraft</span><span><i class="dot solo"></i>Instructor</span><span><i class="dot fuel"></i>Fuel</span><span><i class="dot"></i>Other on a flight</span><span><i class="dot exp"></i>Expenses</span></div></header>
     <div class="chart-scroll">{{ chart }}</div>
   </section>
   <section class="widget w-costac" aria-labelledby="w-ca">
     <header><h2 id="w-ca">By aircraft</h2></header>
     {% for a in cs.aircraft[:6] %}
     <div class="ac"><span><b>{{ a.ident }}</b><span class="model">{{ a.hours|hrs }} h</span></span><span class="n">{{ a.total|money }}</span></div>
-    {% endfor %}
+    {% else %}<p class="muted">No flights yet.</p>{% endfor %}
     {% if t.fuel_gal %}
     <ul class="statuslist">
       <li><span>Average fuel price</span><span class="n">{{ t.per_gal|money2 }}/gal</span></li>
@@ -38,7 +42,72 @@
   </section>
 </div>
 
-<form class="panel spaced-top" method="post" action="/costs/rates">
+<section class="panel spaced-top" id="flight-costs">
+  <h2>Flight costs</h2>
+  {% if flights %}
+  <div class="scrollx">
+  <table class="plain"><thead><tr><th>Date</th><th>Aircraft</th><th class="n">Hours</th><th class="n">Aircraft</th><th class="n">Instructor</th><th class="n">Fuel</th><th class="n">Other</th><th class="n">Total</th><th></th></tr></thead>
+    <tbody>{% for r, c in flights %}<tr>
+      <td>{{ r.date|short_date }}, {{ r.date[:4] }}</td><td>{{ r.aircraft }}</td><td class="n">{{ r.total|hrs }}</td>
+      <td class="n">{{ c.aircraft|money }}</td><td class="n">{{ c.instructor|money }}</td><td class="n">{{ c.fuel|money }}</td><td class="n">{{ c.other|money }}</td>
+      <td class="n"><b>{{ c.total|money }}</b></td>
+      <td class="n"><a class="edit" href="/flights/{{ r.id }}/edit" aria-label="Edit costs for {{ r.date }}">{{ icon("edit") }}</a></td></tr>{% endfor %}</tbody></table>
+  </div>
+  <div class="pager">
+    <span class="muted">Showing {{ first }}&ndash;{{ last }} of {{ total_rows }} flight{{ "s" if total_rows != 1 }}</span>
+    {% if pages > 1 %}
+    <nav class="pages" aria-label="Pages">
+      {% if page > 1 %}<a href="/costs?per={{ per }}&amp;page=1#flight-costs" aria-label="First page">&laquo;</a><a href="/costs?per={{ per }}&amp;page={{ page - 1 }}#flight-costs">Newer</a>{% endif %}
+      {% for n in range([1, page - 2]|max, [pages, page + 2]|min + 1) %}<a href="/costs?per={{ per }}&amp;page={{ n }}#flight-costs"{% if n == page %} aria-current="page"{% endif %}>{{ n }}</a>{% endfor %}
+      {% if page < pages %}<a href="/costs?per={{ per }}&amp;page={{ page + 1 }}#flight-costs">Older</a><a href="/costs?per={{ per }}&amp;page={{ pages }}#flight-costs" aria-label="Last page">&raquo;</a>{% endif %}
+    </nav>
+    {% endif %}
+    <nav class="per" aria-label="Flights per page"><span class="muted">Show</span>{% for n in per_choices %}<a href="/costs?per={{ n }}#flight-costs"{% if n == per %} aria-current="true"{% endif %}>{{ "All" if n == "all" else n }}</a>{% endfor %}</nav>
+  </div>
+  <p class="note">Enter fuel, other costs or a different rate on any flight under "Cost and fuel" on its edit page. The minimums figure is the most hours still missing from any one requirement on the <a href="/progress">Progress</a> page, priced at your average per flight hour; most students fly more than the minimums.</p>
+  {% else %}
+  <p class="muted">No flights logged yet.</p>
+  {% endif %}
+</section>
+
+<section class="panel" id="expenses">
+  <h2>Other expenses</h2>
+  <p class="hint">Spending that isn't part of one flight: subscriptions, headsets and gear, books, test and checkride fees, your medical, renter's insurance, memberships. A repeating expense counts once for every month or year since it started, until you give it an end date.</p>
+  {% if cs.categories %}
+  <ul class="exp-cats" aria-label="Spent by category">{% for c in cs.categories %}<li><span>{{ c.label }}</span> <b class="num">{{ c.total|money }}</b></li>{% endfor %}</ul>
+  {% endif %}
+  {% if expenses %}
+  <div class="scrollx">
+  <table class="plain"><thead><tr><th>Date</th><th>Expense</th><th>Category</th><th>Repeats</th><th class="n">Amount</th><th class="n">Spent so far</th><th></th></tr></thead>
+    <tbody>{% for e in (expenses if xall else expenses[:10]) %}<tr{% if e.future %} class="muted"{% endif %}>
+      <td>{{ e.date|short_date }}, {{ e.date[:4] }}</td>
+      <td><b>{{ e.description }}</b>{% if e.aircraft %} <span class="muted small">{{ e.aircraft }}</span>{% endif %}</td>
+      <td>{{ e.cat_label }}</td>
+      <td>{% if e.repeat %}{{ e.repeat_label }}{% if e.end_date %}<span class="muted small"> until {{ e.end_date|short_date }}, {{ e.end_date[:4] }}</span>{% elif e.next %}<span class="muted small"> &middot; next {{ e.next.strftime("%b %-d") }}</span>{% endif %}{% elif e.future %}Not yet{% else %}&ndash;{% endif %}</td>
+      <td class="n">{{ e.amount|money2 }}</td>
+      <td class="n"><b>{{ e.spent|money }}</b>{% if e.times > 1 %}<span class="muted small"> ({{ e.times }}&times;)</span>{% endif %}</td>
+      <td class="n"><a class="edit" href="/costs/expenses/{{ e.id }}" aria-label="Edit {{ e.description }}">{{ icon("edit") }}</a></td></tr>{% endfor %}</tbody></table>
+  </div>
+  {% if expenses|length > 10 %}
+  <div class="pager"><span class="muted">{% if xall %}All {{ expenses|length }} expenses{% else %}Showing the 10 newest of {{ expenses|length }}{% endif %}</span>
+    <nav class="per"><a href="/costs?xall={{ 0 if xall else 1 }}#expenses">{{ "Show fewer" if xall else "Show all" }}</a></nav></div>
+  {% endif %}
+  {% endif %}
+  <form class="expense-add" id="add-expense" method="post" action="/costs/expenses">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    <h3 class="subhead">Add an expense</h3>
+    <div class="formgrid exp-grid">
+      <label class="field"><span>Date</span><input type="date" name="date" value="{{ today }}" required></label>
+      <label class="field"><span>What was it</span><input name="description" maxlength="200" placeholder="ForeFlight subscription, headset, written test" required></label>
+      <label class="field"><span>Amount ($)</span><input name="amount" inputmode="decimal" placeholder="0.00" required></label>
+      <label class="field"><span>Category</span><select name="category">{% for k, label in cats %}<option value="{{ k }}">{{ label }}</option>{% endfor %}</select></label>
+      <label class="field"><span>Repeats</span><select name="repeat">{% for k, label in repeats %}<option value="{{ k }}">{{ label }}</option>{% endfor %}</select></label>
+    </div>
+    <div class="actions"><button class="btn primary" type="submit">{{ icon("plus") }}Add expense</button></div>
+  </form>
+</section>
+
+<form class="panel" method="post" action="/costs/rates">
   <input type="hidden" name="csrf" value="{{ csrf }}">
   <h2>Default rates</h2>
   <p class="hint">Used for every flight that doesn't have its own rate, including flights imported from ForeFlight. Wet rates (fuel included) work best; if you also enter fuel costs on a flight, they're added on top.</p>
@@ -50,19 +119,4 @@
   </div>
   <div class="actions"><button class="btn primary" type="submit">Save rates</button></div>
 </form>
-
-{% if cs.recent %}
-<section class="panel">
-  <h2>Recent flights</h2>
-  <div class="scrollx">
-  <table class="plain"><thead><tr><th>Date</th><th>Aircraft</th><th class="n">Aircraft</th><th class="n">Instructor</th><th class="n">Fuel</th><th class="n">Other</th><th class="n">Total</th><th></th></tr></thead>
-    <tbody>{% for r, c in cs.recent %}<tr>
-      <td>{{ r.date|short_date }}, {{ r.date[:4] }}</td><td>{{ r.aircraft }}</td>
-      <td class="n">{{ c.aircraft|money }}</td><td class="n">{{ c.instructor|money }}</td><td class="n">{{ c.fuel|money }}</td><td class="n">{{ c.other|money }}</td>
-      <td class="n"><b>{{ c.total|money }}</b></td>
-      <td class="n"><a class="edit" href="/flights/{{ r.id }}/edit" aria-label="Edit costs for {{ r.date }}">{{ icon("edit") }}</a></td></tr>{% endfor %}</tbody></table>
-  </div>
-  <p class="note">Enter fuel, other costs or a different rate on any flight under "Cost and fuel" on its edit page. The minimums figure is the most hours still missing from any one requirement on the <a href="/progress">Progress</a> page, priced at your average per hour; most students fly more than the minimums.</p>
-</section>
-{% endif %}
 {% endblock %}

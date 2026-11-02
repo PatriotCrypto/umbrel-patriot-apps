@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+{% block title %}Edit expense{% endblock %}
+{% block content %}
+<header class="page-head"><div><h1>Edit expense</h1><p class="sub">{{ e.description }}</p></div></header>
+{% if errors %}<div class="errors" role="alert"><strong>Fix these before saving:</strong><ul>{% for x in errors %}<li>{{ x }}</li>{% endfor %}</ul></div>{% endif %}
+<form method="post" action="/costs/expenses/{{ e.id }}">
+  <input type="hidden" name="csrf" value="{{ csrf }}">
+  <section class="panel">
+    <div class="formgrid">
+      <label class="field"><span>Date</span><input type="date" name="date" value="{{ e.date or '' }}" required><small>For a repeating expense, the first charge.</small></label>
+      <label class="field span-2"><span>What was it</span><input name="description" value="{{ e.description or '' }}" maxlength="200" required></label>
+      <label class="field"><span>Amount ($)</span><input name="amount" value="{{ '%.2f'|format(e.amount|float) if e.amount not in (none, '') else '' }}" inputmode="decimal" required><small>Each time, for a repeating expense.</small></label>
+      <label class="field"><span>Category</span><select name="category">{% for k, label in cats %}<option value="{{ k }}"{% if k == e.category %} selected{% endif %}>{{ label }}</option>{% endfor %}</select></label>
+      <label class="field"><span>Repeats</span><select name="repeat">{% for k, label in repeats %}<option value="{{ k }}"{% if k == (e.repeat or '') %} selected{% endif %}>{{ label }}</option>{% endfor %}</select></label>
+      <label class="field"><span>Ended on (optional)</span><input type="date" name="end_date" value="{{ e.end_date or '' }}"><small>When you cancelled a repeating expense.</small></label>
+      <label class="field"><span>Aircraft (optional)</span><select name="aircraft"><option value="">None</option>{% for t in tails %}<option{% if t == e.aircraft %} selected{% endif %}>{{ t }}</option>{% endfor %}</select></label>
+      <label class="field span-all"><span>Notes (optional)</span><textarea name="notes" maxlength="2000">{{ e.notes or '' }}</textarea></label>
+    </div>
+  </section>
+  <div class="formactions"><button class="btn primary" type="submit">Save</button><a class="btn" href="/costs#expenses">Cancel</a></div>
+</form>
+<form class="danger-zone" method="post" action="/costs/expenses/{{ e.id }}/delete">
+  <input type="hidden" name="csrf" value="{{ csrf }}">
+  <button class="btn danger" type="submit">Delete this expense</button>
+</form>
+{% endblock %}

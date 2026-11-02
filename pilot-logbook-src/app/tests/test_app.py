@@ -908,7 +908,8 @@ def test_progress_certificates(client):
     import features
     for k in features.CERT_KEYS:
         html = client.get(f"/progress?cert={k}").text
-        assert 'aria-current="page">' + dict((a, b) for a, b, *_ in features.CERTS)[k] + "<" in html
+        assert re.search(r'aria-current="page">' + dict((a, b) for a, b, *_ in features.CERTS)[k] + r' <span class="segpct">\d+%</span>', html)
+        assert "% </span>" not in html and "complete</span>" in html
     assert "61.65(d)" in client.get("/progress?cert=instrument").text
     dash = client.get("/").text
     assert "Instrument rating progress" in dash, re.findall(r'id="w-prog">[^<]*', dash)  # dashboard follows the last choice
@@ -1043,6 +1044,196 @@ def test_foreflight_changes_and_sync_reminder(client):
     c.close()
     assert [tuple(x) for x in left] == [(new_id, 1.3)] and cost[0] == 42.0
     assert "last ForeFlight import was 21 days ago" in client.get("/").text
+
+
+def test_progress_percent():
+    import features
+    assert features.progress_pct({"tracked": [("a", 20, 40, "hrs"), ("b", 50, 10, "hrs")], "checks": [{"met": False}, {"met": True}]}) == (62, 2, 4)
+    assert features.progress_pct({"tracked": [], "checks": []}) == (0, 0, 0)
+    c = main.connect()
+    pct = features.progress_all(c)
+    c.close()
+    assert set(pct) == set(features.CERT_KEYS) and all(0 <= p[0] <= 100 for p in pct.values())
+
+
+def test_expenses_repeat_and_totals(client):
+    import features
+    from datetime import date as d
+    e = {"date": "2026-01-31", "repeat": "monthly", "end_date": "", "amount": 10}
+    assert [x.isoformat() for x in features.expense_dates(e, d(2026, 4, 15))] == ["2026-01-31", "2026-02-28", "2026-03-31"]
+    assert len(features.expense_dates({**e, "repeat": "yearly", "date": "2024-02-29"}, d(2026, 3, 1))) == 3
+    assert features.expense_dates({**e, "repeat": "", "date": "2099-01-01"}, d(2026, 1, 1)) == []
+    assert len(features.expense_dates({**e, "end_date": "2026-02-28"}, d(2026, 6, 1))) == 2
+    t = token(client)
+    bad = client.post("/costs/expenses", data={"csrf": t, "date": "nope", "description": "", "amount": "x"})
+    assert bad.status_code == 422
+    start = (date.today().replace(day=1)).isoformat()
+    r = client.post("/costs/expenses", data={"csrf": t, "date": start, "description": "EFB subscription", "amount": "$19.99",
+                                             "category": "subscription", "repeat": "monthly"})
+    assert r.status_code == 303
+    client.post("/costs/expenses", data={"csrf": t, "date": date.today().isoformat(), "description": "Headset",
+                                         "amount": "1,099", "category": "gear"})
+    html = client.get("/costs").text
+    assert "EFB subscription" in html and "Headset" in html and "Other expenses" in html and "Every month" in html
+    assert "$1,119" in html  # 19.99 once so far + 1099
+    c = main.connect()
+    eid = c.execute("SELECT id FROM expenses WHERE description='Headset'").fetchone()[0]
+    cs = features.cost_summary(c, features.rates_get(core.profile_get(c)))
+    c.close()
+    assert round(cs["t"]["expenses"], 2) == 1118.99 and round(cs["t"]["total"] - cs["t"]["flying"], 2) == 1118.99
+    assert any(m["expenses"] for m in cs["months"]) and {x["key"] for x in cs["categories"]} == {"subscription", "gear"}
+    assert "Headset" in client.get(f"/costs/expenses/{eid}").text
+    assert client.post(f"/costs/expenses/{eid}", data={"csrf": t, "date": "2026-13-01", "description": "x", "amount": "1"}).status_code == 422
+    assert client.post(f"/costs/expenses/{eid}", data={"csrf": t, "date": date.today().isoformat(), "description": "Headset (used)",
+                                                       "amount": "600", "category": "gear"}).status_code == 303
+    assert "Headset (used)" in client.get("/costs").text
+    assert client.post(f"/costs/expenses/{eid}/delete", data={"csrf": t}).status_code == 303
+    assert "Headset (used)" not in client.get("/costs").text
+    assert client.get("/costs/expenses/999999").status_code == 404
+
+
+def test_costs_paging(client):
+    for i in range(12):
+        _flight(client, comments=f"paging {i}")
+    page1 = client.get("/costs?per=10").text
+    assert "Showing 1&ndash;10 of" in page1 and 'aria-label="Pages"' in page1
+    page2 = client.get("/costs?per=10&page=2").text
+    assert "Showing 11&ndash;" in page2
+    everything = client.get("/costs?per=all").text
+    c = main.connect()
+    n = c.execute("SELECT COUNT(*) FROM flights").fetchone()[0]
+    c.close()
+    assert len(re.findall(r'aria-label="Edit costs for', everything)) == n
+
+
+REGISTRY_HTML = """<html><body><p>N812PG is Assigned</p>
+<table class="devkit-table"><caption class="devkit-table-title">Aircraft Description</caption>
+<tr><td>Serial Number</td><td>120184</td><td>Status</td><td>Valid</td></tr>
+<tr><td>Manufacturer Name</td><td>VANS AIRCRAFT INC</td><td>Certificate Issue Date</td><td>05/02/2024</td></tr>
+<tr><td>Model</td><td>RV-12IS</td><td>Expiration Date</td><td>05/31/2031</td></tr>
+<tr><td>Type Aircraft</td><td>Fixed Wing Single-Engine</td><td>Type Engine</td><td>Reciprocating</td></tr>
+<tr><td>Mfr Year</td><td>2024</td><td>Type Registration</td><td>Individual</td></tr>
+<tr><td>Mode S Code (Base 16 / Hex)</td><td>AB12CD</td><td>Fractional Owner</td><td>NO</td></tr></table>
+<table class="devkit-table"><caption class="devkit-table-title">Registered Owner</caption>
+<tr><td>Name</td><td>DOE JOHN Q</td></tr><tr><td>City</td><td>SUNMAN</td><td>State</td><td>INDIANA</td></tr></table>
+<table class="devkit-table"><caption class="devkit-table-title">Engine Manufacturer</caption>
+<tr><td>Engine Manufacturer</td><td>ROTAX</td><td>Engine Model</td><td>912 ISC</td></tr></table>
+</body></html>"""
+
+
+def test_registry_parse_and_lookup(monkeypatch):
+    import fleet
+    vals, summary = fleet.registry_fields(fleet.parse_registry(REGISTRY_HTML))
+    assert vals == {"make": "Vans Aircraft Inc", "model": "RV-12IS", "year": "2024", "serial": "120184",
+                    "aircraft_class": "airplane_single_engine_land", "engine_type": "Piston", "engine": "Rotax 912 ISC",
+                    "registration_expires": "2031-05-31"}
+    assert summary["Status"] == "Valid" and summary["Registered owner"] == "Doe John Q" and summary["Owner state"] == "Indiana"
+    with pytest.raises(LookupError):
+        fleet.registry_fields(fleet.parse_registry("<html><p>not assigned</p></html>"))
+    assert fleet.is_n_number("N812PG") and fleet.is_n_number("12345") and not fleet.is_n_number("C-GABC")
+    assert not fleet.is_n_number("N0123") and not fleet.is_n_number("N123IO")
+    with pytest.raises(LookupError, match="Only U.S."):
+        fleet.lookup("C-GABC")
+
+    class Resp(io.BytesIO):
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *a):
+            return False
+    seen = []
+    vals2, _ = fleet.lookup("N812PG", opener=lambda req, timeout: seen.append(req.full_url) or Resp(REGISTRY_HTML.encode()))
+    assert vals2["model"] == "RV-12IS" and seen[0].endswith("nNumberTxt=812PG")
+
+    def down(req, timeout):
+        raise OSError("no route")
+    with pytest.raises(LookupError, match="Couldn't reach"):
+        fleet.lookup("N812PG", opener=down)
+
+
+def test_aircraft_pages(client, monkeypatch):
+    import features
+    import fleet
+    t = token(client)
+    assert 'href="/aircraft"' in client.get("/").text
+    monkeypatch.setattr(fleet, "lookup", lambda ident, **kw: fleet.registry_fields(fleet.parse_registry(REGISTRY_HTML)))
+    form = client.get("/aircraft/new?ident=n812pg&lookup=1").text
+    assert "Found N812PG in the FAA registry" in form and 'value="Vans Aircraft Inc"' in form and 'value="2031-05-31"' in form
+    faa = re.search(r'name="faa_json" value="([^"]*)"', form).group(1).replace("&#34;", '"').replace("&quot;", '"')
+    assert client.post("/aircraft/new", data={"csrf": t, "ident": "N8!", "year": "19"}).status_code == 422
+    r = client.post("/aircraft/new", data={"csrf": t, "ident": "N812PG", "year": "2024", "make": "Vans Aircraft Inc",
+                                           "model": "RV-12IS", "aircraft_class": "airplane_single_engine_land",
+                                           "equipment": ["ADS-B Out", "Autopilot", "Not a real option"], "faa_json": faa,
+                                           "equipment_notes": "Garmin G3X Touch", "registration_expires": "2031-05-31"})
+    assert r.status_code == 303 and r.headers["location"].startswith("/aircraft/N812PG")
+    assert client.post("/aircraft/new", data={"csrf": t, "ident": "N812PG"}).status_code == 422  # already there
+    assert client.get("/aircraft/new?ident=N812PG").status_code == 303
+    page = client.get("/aircraft/N812PG").text
+    assert "Garmin G3X Touch" in page and "ADS-B Out" in page and "Not a real option" not in page
+    assert "Registered owner" in page and "Update from FAA registry" in page and "Remove N812PG" in page
+    # a photo and the POH, which also show up in the Document Hangar
+    r = client.post("/aircraft/N812PG/photo", data={"csrf": t}, files={"file": ("plane.png", PNG, "image/png")})
+    assert r.status_code == 303 and "Photo saved" in r.headers["location"].replace("+", " ")
+    assert client.post("/aircraft/N812PG/photo", data={"csrf": t}, files={"file": ("poh.pdf", b"%PDF-1.4", "application/pdf")}).headers["location"].count("error=")
+    r = client.post("/aircraft/N812PG/docs", data={"csrf": t, "category": "manuals"},
+                    files=[("files", ("rv12is-poh.pdf", b"%PDF-1.4 test", "application/pdf"))])
+    assert r.status_code == 303
+    page = client.get("/aircraft/N812PG").text
+    assert "Open POH" in page and "N812PG POH" in page and "/thumb" not in page and 'alt="N812PG"' in page
+    hangar_page = client.get("/hangar?cat=manuals&aircraft=N812PG").text
+    assert "N812PG POH" in hangar_page
+    c = main.connect()
+    did = c.execute("SELECT id FROM documents WHERE title='N812PG POH'").fetchone()[0]
+    c.close()
+    assert 'href="/aircraft/N812PG"' in client.get(f"/hangar/{did}").text
+    lst = client.get("/aircraft").text
+    assert "N812PG" in lst and "POH" in lst and "/thumb" in lst
+    # editing keeps the registry data and the registration feeds expiry alerts
+    edit = client.get("/aircraft/N812PG/edit").text
+    assert 'value="ADS-B Out" checked' in edit
+    assert client.post("/aircraft/N812PG/edit", data={"csrf": t, "year": "abcd"}).status_code == 422
+    r = client.post("/aircraft/N812PG/edit", data={"csrf": t, "year": "2024", "make": "Van's Aircraft", "model": "RV-12iS",
+                                                   "aircraft_class": "airplane_single_engine_land", "taa": "on",
+                                                   "registration_expires": date.today().isoformat(), "equipment": "Autopilot"})
+    assert r.status_code == 303
+    page = client.get("/aircraft/N812PG").text
+    assert "Van&#39;s Aircraft" in page and "Technically advanced" in page and "ADS-B Out" not in page
+    c = main.connect()
+    assert any(x["key"] == "regN812PG" for x in features.expiring_items(c, core.profile_get(c)))
+    # an update from the registry fills blanks only
+    c.execute("UPDATE aircraft SET serial='' WHERE ident='N812PG'")
+    c.commit()
+    c.close()
+    assert client.post("/aircraft/N812PG/lookup", data={"csrf": t}).status_code == 303
+    c = main.connect()
+    row = c.execute("SELECT make, serial, registration_expires FROM aircraft WHERE ident='N812PG'").fetchone()
+    c.close()
+    assert tuple(row) == ("Van's Aircraft", "120184", "2031-05-31")
+    # not deletable once flown
+    _flight(client, aircraft="N812PG", comments="first RV flight")
+    assert "Remove N812PG" not in client.get("/aircraft/N812PG").text
+    assert "error=" in client.post("/aircraft/N812PG/delete", data={"csrf": t}).headers["location"]
+    assert client.get("/aircraft/NOPE1").status_code == 404
+    # an unflown aircraft can be removed
+    client.post("/aircraft/new", data={"csrf": t, "ident": "C-GABC", "aircraft_class": "airplane_single_engine_land"})
+    assert "Look up in FAA registry" not in client.get("/aircraft/C-GABC").text
+    assert client.post("/aircraft/C-GABC/delete", data={"csrf": t}).status_code == 303
+    assert client.get("/aircraft/C-GABC").status_code == 404
+
+
+def test_foreflight_reimport_keeps_aircraft_details(client):
+    c = main.connect()
+    c.execute("UPDATE aircraft SET equipment_notes='GNS 430W', serial='17255', make='' WHERE ident='N1TEST'")
+    c.commit()
+    c.close()
+    rows = [{"Date": "2026-08-01", "AircraftID": "N1TEST", "From": "KAAA", "To": "KAAA", "TotalTime": "0.7",
+             "PilotComments": "reimport keeps details"}]
+    r = client.post("/data/import", data={"csrf": token(client)}, files={"file": ("ff.csv", make_csv(rows), "text/csv")})
+    assert r.status_code == 303
+    c = main.connect()
+    row = c.execute("SELECT equipment_notes, serial, make, model FROM aircraft WHERE ident='N1TEST'").fetchone()
+    c.close()
+    assert tuple(row) == ("GNS 430W", "17255", "Cessna Aircraft", "172 Skyhawk")
 
 
 def test_delete_all_requires_phrase(client):

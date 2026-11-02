@@ -4,7 +4,7 @@
 {% block content %}
 <header class="page-head">
   <div><h1>{{ doc.title }}</h1>
-    <p class="sub doc-sub">{{ catchip(doc) }}{% if doc.aircraft %}<span class="chip">{{ doc.aircraft }}</span>{% endif %}{{ badge(doc.exp) }}<span>{{ doc.type_label }}{% if doc.kind == "file" %}, {{ doc.size_h }}{% endif %}, added {{ doc.when|pretty_date }}</span></p></div>
+    <p class="sub doc-sub">{{ catchip(doc) }}{% if doc.aircraft %}{% if doc.aircraft in tails %}<a class="chip" href="/aircraft/{{ doc.aircraft }}">{{ doc.aircraft }}</a>{% else %}<span class="chip">{{ doc.aircraft }}</span>{% endif %}{% endif %}{{ badge(doc.exp) }}<span>{{ doc.type_label }}{% if doc.kind == "file" %}, {{ doc.size_h }}{% endif %}, added {{ doc.when|pretty_date }}</span></p></div>
   <div class="actions">
     <a class="btn" href="/hangar">All documents</a>
     {% if doc.kind == "file" and doc.exists %}<a class="btn" href="/hangar/{{ doc.id }}/file?download=1">{{ icon("download") }}Download</a>{% endif %}

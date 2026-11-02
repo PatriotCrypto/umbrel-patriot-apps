@@ -34,6 +34,7 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 import charts
 import checkride
 import features
+import fleet
 import hangar
 import logbook_core as core
 import mapsvg
@@ -107,6 +108,7 @@ def ensure_all(c):
     features.ensure_schema(c)
     preflight.ensure_schema(c)
     reports.ensure_schema(c)
+    fleet.ensure_schema(c)
 
 
 with db() as _c:
@@ -151,6 +153,7 @@ NAV = [("dash", "/", "Dashboard", "grid"), ("logbook", "/logbook", "Logbook", "b
        ("reports", "/reports", "Reports", "file"),
        ("training", "/training", "Endorsements", "award"), ("currency", "/currency", "Currency", "clock"),
        ("airports", "/airports", "Airports", "map"), ("costs", "/costs", "Costs", "dollar"),
+       ("aircraft", "/aircraft", "Aircraft", "plane"),
        ("preflight", "/preflight", "Preflight Risk Check", "shield"),
        ("hangar", "/hangar", "Document Hangar", "folder"),
        ("settings", "/settings", "Settings", "sliders")]
@@ -267,6 +270,8 @@ ICONS = {
     "award": '<circle cx="12" cy="8" r="6"/><path d="M15.48 12.89 17 22l-5-3-5 3 1.52-9.11"/>',
     "clock": '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',
     "map": '<path d="M9 4 3 6v14l6-2 6 2 6-2V4l-6 2-6-2Z"/><path d="M9 4v14M15 6v14"/>',
+    "plane": '<path d="M17.8 19.2 16 11l3.5-3.5C21 6 21.5 4 21 3c-1-.5-3 0-4.5 1.5L13 8 4.8 6.2c-.5-.1-.9.1-1.1.5l-.3.5'
+             'c-.2.5-.1 1 .3 1.3L9 12l-2 3H4l-1 1 3 2 2 3 1-1v-3l3-2 3.5 5.3c.3.4.8.5 1.3.3l.5-.2c.4-.3.6-.7.5-1.2z"/>',
     "dollar": '<path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>',
     "shield": '<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10Z"/><path d="m9 12 2 2 4-4"/>',
     "bell": '<path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/>',
@@ -616,7 +621,8 @@ def progress(request: Request, cert: str = ""):
     with db() as c:
         _, _, tf = settings_ctx(c)
         p = features.progress_for(c, cert)
-    resp = render(request, "progress.html", p=p, checks=p["checks"], tf=tf, certs=features.CERTS)
+        pct = features.progress_all(c)
+    resp = render(request, "progress.html", p=p, checks=p["checks"], tf=tf, certs=features.CERTS, pct=pct)
     if cert != request.cookies.get("hl_cert"):
         resp.set_cookie("hl_cert", cert, max_age=31536000, samesite="strict")
     return resp
@@ -1012,6 +1018,208 @@ def hangar_thumb(did: int):
         if not src.is_file() or not hangar.make_thumb(src, thumb):
             raise HTTPException(404)
     return FileResponse(thumb, media_type="image/jpeg")
+
+
+# ----------------------------------------------------------------------------- aircraft
+
+AIRCRAFT_DOC_KINDS = [("manuals", "POH or manual"), ("aircraft", "Aircraft papers"),
+                      ("insurance", "Insurance"), ("photos", "Photo"), ("other", "Other")]
+
+
+def _aircraft_or_404(c, ident):
+    a = fleet.get(c, ident.upper())
+    if not a:
+        raise HTTPException(404, "That aircraft isn't in your list.")
+    return a
+
+
+def _aircraft_form_ctx(**extra):
+    return dict(classes=fleet.CLASSES, gears=fleet.GEAR, engines=fleet.ENGINES, equipment=fleet.EQUIPMENT, **extra)
+
+
+def _faa_hidden(form):
+    """The registry summary carried through the add form, if it is a plain dict of strings."""
+    try:
+        v = json.loads(form.get("faa_json") or "{}")
+    except ValueError:
+        return {}
+    return {str(k)[:60]: str(x)[:200] for k, x in v.items()} if isinstance(v, dict) else {}
+
+
+@app.get("/aircraft")
+def aircraft_list(request: Request, msg: str = ""):
+    with db() as c:
+        planes = fleet.listing(c)
+        _, _, tf = settings_ctx(c)
+    return render(request, "aircraft.html", planes=planes, msg=msg, tf=tf)
+
+
+@app.get("/aircraft/new")
+def aircraft_new(request: Request, ident: str = "", lookup: int = 0):
+    ident = ident.strip().upper().replace(" ", "")[:12]
+    f = {"ident": ident, "aircraft_class": "airplane_single_engine_land", "equipment_list": []}
+    found, summary, error = False, {}, ""
+    with db() as c:
+        if ident and c.execute("SELECT 1 FROM aircraft WHERE ident=?", (ident,)).fetchone():
+            return back(f"/aircraft/{ident}/edit", msg=f"{ident} is already in your list. You can edit it here.")
+    if lookup and ident:
+        try:
+            vals, summary = fleet.lookup(ident)
+            f.update(vals)
+            found = True
+        except LookupError as e:
+            error = str(e)
+    return render(request, "aircraft_form.html", f=f, new=True, errors=[], found=found, summary=summary,
+                  lookup_error=error, faa_json=json.dumps(summary), **_aircraft_form_ctx())
+
+
+@app.post("/aircraft/new")
+async def aircraft_create(request: Request):
+    form = await request.form()
+    check_csrf(request, form.get("csrf", ""))
+    v, errors = fleet.parse_form(form, new=True)
+    summary = _faa_hidden(form)
+    with db() as c:
+        if not errors and c.execute("SELECT 1 FROM aircraft WHERE ident=?", (v["ident"],)).fetchone():
+            errors.append(f"{v['ident']} is already in your list.")
+        if errors:
+            f = {**dict(form), "equipment_list": form.getlist("equipment")}
+            return render(request, "aircraft_form.html", status=422, f=f, new=True, errors=errors, found=bool(summary),
+                          summary=summary, lookup_error="", faa_json=json.dumps(summary), **_aircraft_form_ctx())
+        if summary:
+            v["faa_json"] = json.dumps(summary)
+            v["faa_checked"] = date.today().isoformat()
+        ident = fleet.save(c, v)
+    return back(f"/aircraft/{ident}", msg="Aircraft added. Add a photo, the POH and its papers below.")
+
+
+@app.get("/aircraft/{ident}")
+def aircraft_detail(request: Request, ident: str, msg: str = "", error: str = ""):
+    with db() as c:
+        a = _aircraft_or_404(c, ident)
+        _, _, tf = settings_ctx(c)
+        rates = features.rates_get(core.profile_get(c))
+        spent = sum(e["spent"] for e in features.expenses_list(c) if e["aircraft"] == a["ident"])
+        recent = c.execute("SELECT * FROM flights WHERE aircraft=? ORDER BY date DESC, id DESC LIMIT 5",
+                           (a["ident"],)).fetchall()
+    photo = next((d for d in a["docs"] if d["id"] == a.get("photo_doc")), None)
+    docs = [hangar.decorate(d, DOCS) for d in a["docs"]]
+    return render(request, "aircraft_detail.html", a=a, photo=photo, docs=docs, msg=msg, error=error, tf=tf,
+                  recent=recent, rate=rates["aircraft"].get(a["ident"]), kinds=AIRCRAFT_DOC_KINDS,
+                  is_n=fleet.is_n_number(a["ident"]), spent=spent)
+
+
+@app.get("/aircraft/{ident}/edit")
+def aircraft_edit(request: Request, ident: str, msg: str = ""):
+    with db() as c:
+        a = _aircraft_or_404(c, ident)
+    f = dict(a)
+    f["equipment_list"] = a["equipment_list"]
+    return render(request, "aircraft_form.html", f=f, new=False, errors=[], found=False, summary=a["faa"],
+                  lookup_error="", faa_json="", msg=msg, **_aircraft_form_ctx())
+
+
+@app.post("/aircraft/{ident}/edit")
+async def aircraft_save(request: Request, ident: str):
+    form = await request.form()
+    check_csrf(request, form.get("csrf", ""))
+    with db() as c:
+        a = _aircraft_or_404(c, ident)
+        v, errors = fleet.parse_form(form)
+        if errors:
+            f = {**dict(form), "ident": a["ident"], "equipment_list": form.getlist("equipment")}
+            return render(request, "aircraft_form.html", status=422, f=f, new=False, errors=errors, found=False,
+                          summary=a["faa"], lookup_error="", faa_json="", **_aircraft_form_ctx())
+        fleet.save(c, v, a["ident"])
+    return back(f"/aircraft/{a['ident']}", msg="Saved.")
+
+
+@app.post("/aircraft/{ident}/lookup")
+async def aircraft_lookup(request: Request, ident: str):
+    """Refresh the FAA registry details. Fills in fields you left empty and never overwrites your own."""
+    form = await request.form()
+    check_csrf(request, form.get("csrf", ""))
+    with db() as c:
+        a = _aircraft_or_404(c, ident)
+        try:
+            vals, summary = fleet.lookup(a["ident"])
+        except LookupError as e:
+            return back(f"/aircraft/{a['ident']}", error=str(e))
+        fill = {k: v for k, v in vals.items() if not a.get(k) or k == "registration_expires"}
+        fill.update(faa_json=json.dumps(summary), faa_checked=date.today().isoformat())
+        c.execute(f"UPDATE aircraft SET {', '.join(k + '=?' for k in fill)} WHERE ident=?", (*fill.values(), a["ident"]))
+        c.commit()
+    return back(f"/aircraft/{a['ident']}", msg="Updated from the FAA registry.")
+
+
+async def _store_aircraft_files(c, ident, files, category, title=""):
+    added, skipped = [], []
+    chosen = [f for f in files if f and f.filename]
+    for f in chosen:
+        orig = Path(f.filename).name[:200]
+        t = hangar.type_of(orig)
+        if not t:
+            skipped.append(f"{orig} (this file type isn't supported)")
+            continue
+        try:
+            name, size = await store_upload(f, Path(orig).suffix.lower())
+        except ValueError as e:
+            skipped.append(f"{orig} ({e})")
+            continue
+        except OSError:
+            skipped.append(f"{orig} (couldn't be saved, the disk may be full)")
+            continue
+        nice = Path(orig).stem.replace("_", " ").strip() or orig
+        if title and len(chosen) == 1:
+            nice = title
+        elif category == "manuals" and len(chosen) == 1:
+            nice = f"{ident} POH"
+        added.append(hangar.create(c, title=nice[:200], category=category, notes="", filename=name,
+                                   original_name=orig, mime=t[1], size=size, aircraft=ident, expires=None))
+    return added, skipped
+
+
+@app.post("/aircraft/{ident}/photo")
+async def aircraft_photo(request: Request, ident: str, csrf: str = Form(""), file: UploadFile = File(None)):
+    check_csrf(request, csrf)
+    with db() as c:
+        a = _aircraft_or_404(c, ident)
+        if not file or not file.filename or (hangar.type_of(file.filename) or ("",))[0] != "image":
+            return back(f"/aircraft/{a['ident']}", error="Choose a JPEG, PNG, WebP or GIF photo.")
+        added, skipped = await _store_aircraft_files(c, a["ident"], [file], "photos", title=f"{a['ident']} photo")
+        if not added:
+            return back(f"/aircraft/{a['ident']}", error="; ".join(skipped))
+        c.execute("UPDATE aircraft SET photo_doc=? WHERE ident=?", (added[0], a["ident"]))
+        c.commit()
+    return back(f"/aircraft/{a['ident']}", msg="Photo saved. It's also in your Document Hangar under Photos.")
+
+
+@app.post("/aircraft/{ident}/docs")
+async def aircraft_docs(request: Request, ident: str, csrf: str = Form(""), files: list[UploadFile] = File(None),
+                        category: str = Form("manuals"), title: str = Form("")):
+    check_csrf(request, csrf)
+    cat = category if category in dict(AIRCRAFT_DOC_KINDS) else "other"
+    with db() as c:
+        a = _aircraft_or_404(c, ident)
+        if not files or not any(f.filename for f in files):
+            return back(f"/aircraft/{a['ident']}", error="Choose a file to attach.")
+        added, skipped = await _store_aircraft_files(c, a["ident"], files, cat, title.strip())
+    msg = (f"Attached {len(added)} file{'s' if len(added) != 1 else ''}. "
+           "You'll also find them in the Document Hangar.") if added else ""
+    return back(f"/aircraft/{a['ident']}", msg=msg, error=("Skipped: " + "; ".join(skipped) + ".") if skipped else "")
+
+
+@app.post("/aircraft/{ident}/delete")
+async def aircraft_delete(request: Request, ident: str):
+    form = await request.form()
+    check_csrf(request, form.get("csrf", ""))
+    with db() as c:
+        a = _aircraft_or_404(c, ident)
+        if a["flights"]:
+            return back(f"/aircraft/{a['ident']}", error="Aircraft with logged flights can't be removed.")
+        c.execute("DELETE FROM aircraft WHERE ident=?", (a["ident"],))
+        c.commit()
+    return back("/aircraft", msg=f"{a['ident']} removed. Its documents stay in the Document Hangar.")
 
 
 # ----------------------------------------------------------------------------- data: import / export / backup
@@ -1539,8 +1747,10 @@ async def minimums_save(request: Request):
 # ----------------------------------------------------------------------------- costs
 
 @app.get("/costs")
-def costs_page(request: Request, saved: int = 0):
+def costs_page(request: Request, saved: int = 0, page: int = 1, per: str = "", xall: int = 0, msg: str = ""):
     cert = cert_of(request)
+    per = per if per in PER_PAGE_CHOICES else "10"
+    size = 10 ** 9 if per == "all" else int(per)
     with db() as c:
         prof, _, tf = settings_ctx(c)
         rates = features.rates_get(prof)
@@ -1549,10 +1759,74 @@ def costs_page(request: Request, saved: int = 0):
         remaining = max([need - have for _, have, need, unit in prog if unit == "hrs"] + [0])
         cs = features.cost_summary(c, rates, remaining_hours=remaining)
         cs["cert_far"] = pg["far"]
+        total_rows = c.execute("SELECT COUNT(*) FROM flights").fetchone()[0]
+        pages = max(1, -(-total_rows // size))
+        page = min(max(page, 1), pages)
+        flights, _ = features.flight_costs_page(c, rates, page, size)
+        expenses = features.expenses_list(c)
         tails = [r[0] for r in c.execute("SELECT DISTINCT aircraft FROM flights WHERE aircraft!='' "
                                          "UNION SELECT ident FROM aircraft ORDER BY 1")]
     return render(request, "costs.html", cs=cs, t=cs["t"], rates=rates, tails=tails, tf=tf, saved=bool(saved),
-                  chart=mapsvg.cost_bars(cs["months"]), errors=[])
+                  chart=mapsvg.cost_bars(cs["months"]), errors=[], flights=flights, page=page, pages=pages, per=per,
+                  per_choices=PER_PAGE_CHOICES, total_rows=total_rows, first=(page - 1) * size + 1 if flights else 0,
+                  last=(page - 1) * size + len(flights), expenses=expenses, xall=bool(xall), msg=msg,
+                  cats=features.EXPENSE_CATS, repeats=features.REPEATS, today=date.today().isoformat())
+
+
+@app.post("/costs/expenses")
+async def expense_add(request: Request):
+    form = await request.form()
+    check_csrf(request, form.get("csrf", ""))
+    v, errors = features.parse_expense(form)
+    if errors:
+        raise HTTPException(422, " ".join(errors))
+    with db() as c:
+        features.save_expense(c, v)
+    return RedirectResponse("/costs?msg=Expense+added.#expenses", status_code=303)
+
+
+def _expense_or_404(c, eid):
+    r = c.execute("SELECT * FROM expenses WHERE id=?", (eid,)).fetchone()
+    if not r:
+        raise HTTPException(404, "That expense doesn't exist.")
+    return dict(r)
+
+
+def _expense_ctx(c):
+    return {"cats": features.EXPENSE_CATS, "repeats": features.REPEATS,
+            "tails": [r[0] for r in c.execute("SELECT ident FROM aircraft ORDER BY 1")]}
+
+
+@app.get("/costs/expenses/{eid}")
+def expense_edit(request: Request, eid: int):
+    with db() as c:
+        e = _expense_or_404(c, eid)
+        ctx = _expense_ctx(c)
+    return render(request, "expense.html", e=e, errors=[], **ctx)
+
+
+@app.post("/costs/expenses/{eid}")
+async def expense_save(request: Request, eid: int):
+    form = await request.form()
+    check_csrf(request, form.get("csrf", ""))
+    v, errors = features.parse_expense(form)
+    with db() as c:
+        _expense_or_404(c, eid)
+        if errors:
+            ctx = _expense_ctx(c)
+            return render(request, "expense.html", status=422, e={**dict(form), "id": eid}, errors=errors, **ctx)
+        features.save_expense(c, v, eid)
+    return RedirectResponse("/costs?msg=Expense+saved.#expenses", status_code=303)
+
+
+@app.post("/costs/expenses/{eid}/delete")
+async def expense_delete(request: Request, eid: int):
+    form = await request.form()
+    check_csrf(request, form.get("csrf", ""))
+    with db() as c:
+        c.execute("DELETE FROM expenses WHERE id=?", (eid,))
+        c.commit()
+    return RedirectResponse("/costs?msg=Expense+deleted.#expenses", status_code=303)
 
 
 @app.post("/costs/rates")
