@@ -61,7 +61,11 @@ Umbrel re-checks community stores every so often, so a new app or update can tak
 - Monthly bank reconciliation: upload a CSV or OFX/QFX statement and ZeroDollar matches it to what you entered by amount, date and payee, suggests tips and fees, and locks the month once the ending balance agrees.
 - Sinking funds with goals, bill due dates, split transactions and transfers.
 - Debt snowball or avalanche payoff planner.
-- Reports for spending, income, net worth and top payees, plus backup, restore and CSV export.
+- Paycheck Planning: your income and bills laid out by date with a running balance, a buffer, and a risk-of-overspending check.
+- Insights: spending by group and item, monthly income, and income vs. spent over any period.
+- Net worth tracker with goals and history, plus a Bitcoin wallet tracker for public addresses and xpubs (point it at your own Mempool app to keep lookups private).
+- Import a month from EveryDollar's Budget Items CSV. Every item and group is editable.
+- A Due this week list on the Budget page, plus backup, restore and CSV export.
 - Four looks.
 
 *An independent community app. Not affiliated with or endorsed by Ramsey Solutions, EveryDollar or Umbrel, and it does not give financial advice.* · [Details](zerodollar-src/README.md)

@@ -11,6 +11,7 @@ export async function render(root, ctx) {
   const month = S.month;
   let b = await api.get(`/budget/${month}?today=${todayLocal()}`);
   const txs = await api.get(`/transactions?month=${month}&limit=80`);
+  const due = await api.get(`/due-week?today=${todayLocal()}`);
   const noHistory = S.meta.counts.transactions === 0 && !b.previousMonth;
 
   if (!b.initialized) {
@@ -85,7 +86,7 @@ export async function render(root, ctx) {
     }
   }
 
-  function catRow(c) {
+  function catRow(c, list) {
     const income = c.type === 'income';
     const input = h('input', { class: 'plan num', inputMode: 'decimal', 'aria-label': `${c.name} planned`, placeholder: '0.00',
       onfocus: (e) => e.target.select(),
@@ -96,14 +97,13 @@ export async function render(root, ctx) {
     const sub = !income && (c.type === 'fund' || c.debt) ? h('span', { class: 'muted', style: { fontSize: '12px' } }) : null;
     const rem = h('div', { class: 'rem num' });
     refs.set(c.id, { input, bar, barWrap, rem, sub });
-    const nameBtn = editMode
-      ? h('button', { class: 'link', style: { textAlign: 'left', fontWeight: 500, color: 'var(--text)' }, onclick: () => editCategory(c, ctx) }, c.name, ' ', icon('edit', 'ico'))
-      : h('b', null, c.name,
-          c.dueDay ? h('span', { class: 'pill', title: 'Due day' }, `Due ${ord(c.dueDay)}`) : null,
-          c.type === 'fund' ? h('span', { class: 'pill good' }, 'Fund') : null);
-    if (editMode && nameBtn.firstChild) nameBtn.firstChild.style && void 0;
+    const nameBtn = h('button', { class: 'nm', title: 'Edit this item', onclick: () => editCategory(c, ctx) },
+      c.name,
+      c.dueDay ? h('span', { class: 'pill', title: 'Due day' }, `Due ${ord(c.dueDay)}`) : null,
+      income && c.payDays?.length ? h('span', { class: 'pill', title: 'Pay days' }, `Paid ${c.payDays.map(ord).join(', ')}`) : null,
+      c.type === 'fund' ? h('span', { class: 'pill good' }, 'Fund') : null);
     return h('div', { class: 'cat' },
-      h('div', { class: 'name' }, nameBtn, income ? null : barWrap, sub),
+      h('div', { class: 'name' }, h('div', { class: 'row', style: { gap: '8px' } }, nameBtn, editMode ? mover(c.id, list) : null), income ? null : barWrap, sub),
       input, rem);
   }
 
@@ -115,25 +115,49 @@ export async function render(root, ctx) {
       h('header', null,
         h('h3', null, g.name),
         totalEl,
-        editMode && !isIncome ? h('button', { class: 'btn ghost sm', 'aria-label': `Rename ${g.name}`, onclick: () => renameGroup(g, ctx) }, icon('edit')) : null),
+        editMode && !isIncome ? groupMover(g) : null,
+        h('button', { class: 'btn ghost sm', 'aria-label': `Edit ${g.name}`, title: 'Edit group', onclick: () => renameGroup(g, ctx) }, icon('edit'))),
       isIncome ? null : h('div', { class: 'cat head' }, h('span', null, 'Category'), h('span', null, 'Planned'), h('span', null, 'Left')),
       isIncome ? h('div', { class: 'cat head' }, h('span', null, 'Income'), h('span', null, 'Expected'), h('span', null, 'Received')) : null,
-      g.cats.map(catRow),
+      g.cats.map((c) => catRow(c, g.cats)),
       !g.cats.length ? h('div', { class: 'muted', style: { padding: '14px 18px' } }, 'No categories yet.') : null,
       addInline(g, ctx));
     return card;
   }
 
+  const mover = (id, list) => {
+    const i = list.findIndex((x) => x.id === id);
+    const go = async (n) => {
+      const ids = list.map((x) => x.id);
+      [ids[i], ids[i + n]] = [ids[i + n], ids[i]];
+      if (await guard(() => api.put('/categories-order', { ids }))) { await loadMeta(); ctx.refresh(); }
+    };
+    return h('span', { class: 'reorder' },
+      h('button', { disabled: i <= 0, 'aria-label': 'Move up', onclick: () => go(-1) }, icon('up')),
+      h('button', { disabled: i >= list.length - 1, 'aria-label': 'Move down', onclick: () => go(1) }, icon('down')));
+  };
+  const groupMover = (g) => {
+    const ids = b.groups.map((x) => x.id);
+    const i = ids.indexOf(g.id);
+    const go = async (n) => {
+      [ids[i], ids[i + n]] = [ids[i + n], ids[i]];
+      if (await guard(() => api.put('/groups-order', { ids }))) { await loadMeta(); ctx.refresh(); }
+    };
+    return h('span', { class: 'reorder' },
+      h('button', { disabled: i <= 0, 'aria-label': 'Move group up', onclick: () => go(-1) }, icon('up')),
+      h('button', { disabled: i >= ids.length - 1, 'aria-label': 'Move group down', onclick: () => go(1) }, icon('down')));
+  };
+
   const left = h('div', { class: 'stack', style: { gap: '18px' } });
   left.append(heroEl);
   if (noHistory || !b.income.cats.some((c) => c.planned)) {
     left.append(h('div', { class: 'card pad row wrap' }, h('div', { style: { flex: 1, minWidth: '220px' } }, h('b', null, 'Welcome to ZeroDollar'),
-      h('div', { class: 'muted' }, 'Type your expected paychecks in the Income box, then plan each category until “Left to budget” reaches zero. Adjust the starter categories anytime with Edit.'))));
+      h('div', { class: 'muted' }, 'Type your expected paychecks in the Income box, then plan each category until “Left to budget” reaches zero. Click an item’s name to rename it, set its due date, or remove it.'))));
   }
   left.append(groupCard(b.income), ...b.groups.map(groupCard),
     h('div', { class: 'row' },
       h('button', { class: 'btn', onclick: () => addGroup(ctx) }, icon('plus'), 'Add group'),
-      h('button', { class: 'btn ghost', onclick: () => { editMode = !editMode; ctx.refresh(); } }, icon('edit'), editMode ? 'Done editing' : 'Edit categories')));
+      h('button', { class: 'btn ghost', onclick: () => { editMode = !editMode; ctx.refresh(); } }, icon('edit'), editMode ? 'Done reordering' : 'Reorder')));
 
   // right column: this month's transactions + bills
   const newOnes = txs.transactions.filter((t) => t.type !== 'transfer' && !t.catId && !t.splits?.length);
@@ -146,6 +170,7 @@ export async function render(root, ctx) {
     txs.transactions.length === newOnes.length ? null : h('div', { class: 'day' }, 'Categorized'),
     txs.transactions.filter((t) => !newOnes.includes(t)).slice(0, 25).map((t) => miniTx(t, ctx)),
     !txs.transactions.length ? h('div', { class: 'empty' }, h('h3', null, 'Nothing spent yet'), 'Press + to log your first purchase.') : null));
+  side.append(dueWeekCard(due));
   if (b.bills?.length) {
     side.append(h('section', { class: 'card' },
       h('header', { style: { padding: '14px 16px 6px' } }, h('h3', { style: { fontSize: '15px' } }, 'Bills this month')),
@@ -156,6 +181,19 @@ export async function render(root, ctx) {
 
   root.append(h('div', { class: 'budget' }, left, side));
   paint();
+}
+
+function dueWeekCard(due) {
+  const short = (d) => dayLabel(d, S.meta.settings.locale);
+  return h('section', { class: 'card due-week' },
+    h('header', { class: 'row between', style: { padding: '14px 16px 6px' } },
+      h('h3', { style: { fontSize: '15px' } }, 'Due this week'),
+      due.items.length ? h('span', { class: 'muted num', style: { fontSize: '13px' } }, fmt(due.total)) : null),
+    due.items.length
+      ? due.items.map((i) => h('div', { class: 'txmini', style: { cursor: 'default' } },
+          h('div', { class: 'who' }, h('b', null, i.name), h('span', { style: i.overdue ? { color: 'var(--bad)' } : null }, i.overdue ? `Overdue · was due ${short(i.date)}` : short(i.date))),
+          h('span', { class: 'amt num' }, fmt(i.amount))))
+      : h('div', { class: 'muted', style: { padding: '4px 16px 16px', fontSize: '13.5px' } }, 'Nothing due in the next 7 days. Set due days on your bills (Edit) and they will show up here.'));
 }
 
 const stat = (label, value) => h('div', null, h('b', { class: 'num' }, value), h('span', null, label));
@@ -175,7 +213,8 @@ function startCard(b, ctx, first) {
     h('p', null, first ? 'Your starter categories are ready. Begin with a blank plan, then enter your income and give every dollar a job.' : 'Every month gets its own plan. Copy last month to save time, or start fresh.'),
     h('div', { class: 'row', style: { justifyContent: 'center' } },
       b.previousMonth ? h('button', { class: 'btn primary', onclick: () => go('previous') }, `Copy ${monthLabel(b.previousMonth, S.meta.settings.locale)}`) : null,
-      h('button', { class: b.previousMonth ? 'btn' : 'btn primary', onclick: () => go('blank') }, 'Start from scratch')));
+      h('button', { class: b.previousMonth ? 'btn' : 'btn primary', onclick: () => go('blank') }, 'Start from scratch'),
+      h('a', { class: 'btn', href: '#/settings' }, icon('upload'), 'Import from EveryDollar')));
 }
 
 function addInline(g, ctx) {
@@ -205,7 +244,7 @@ function renameGroup(g, ctx) {
   const m = modal({
     title: 'Edit group', body: h('label', { class: 'f' }, 'Name', name),
     footer: [
-      h('button', { class: 'btn danger', style: { marginRight: 'auto' }, onclick: async () => {
+      g.kind === 'income' ? null : h('button', { class: 'btn danger', style: { marginRight: 'auto' }, onclick: async () => {
         if (!(await confirmDialog(`Remove the “${g.name}” group? It must be empty.`, { ok: 'Remove', danger: true }))) return;
         if (await guard(() => api.del('/groups/' + g.id))) { await loadMeta(); m.close(); ctx.refresh(); }
       } }, 'Remove group'),
@@ -229,22 +268,30 @@ export function editCategory(c, ctx) {
   const sync = () => (fundBox.style.display = kind.value === 'fund' ? '' : 'none');
   kind.addEventListener('change', sync);
   sync();
-  const locked = full.type === 'income' || full.type === 'debt';
+  const income = full.type === 'income';
+  const debt = full.type === 'debt';
+  const locked = income || debt;
+  const payDays = h('input', { placeholder: 'e.g. 5, 20', value: (full.payDays || []).join(', ') });
+  const parsePayDays = () => payDays.value.split(/[\s,]+/).filter(Boolean).map(Number);
   const m = modal({
     title: 'Edit category',
     body: [
       h('label', { class: 'f' }, 'Name', name),
-      h('div', { class: 'grid2' }, h('label', { class: 'f' }, 'Group', group), locked ? null : h('label', { class: 'f' }, 'Bill due on day', due)),
+      h('div', { class: 'grid2' }, income ? null : h('label', { class: 'f' }, 'Group', group), income ? null : h('label', { class: 'f' }, 'Bill due on day', due)),
+      income ? h('label', { class: 'f' }, 'Paid on these days of the month', payDays, h('span', { class: 'muted', style: { fontSize: '12.5px' } }, 'Used by Paycheck Planning to split this income across paychecks.')) : null,
+      debt ? h('p', { class: 'muted', style: { margin: 0, fontSize: '13px' } }, h('a', { href: '#/debt', onclick: () => m.close() }, 'Balance, interest rate and minimum payment are on the Debt page.')) : null,
       locked ? null : h('label', { class: 'f' }, 'Type', kind),
       locked ? null : fundBox
     ],
     footer: [
-      full.type === 'debt' ? null : h('button', { class: 'btn danger', style: { marginRight: 'auto' }, onclick: async () => {
+      debt ? null : h('button', { class: 'btn danger', style: { marginRight: 'auto' }, onclick: async () => {
         if (!(await confirmDialog(`Remove “${full.name}”? If it has history it is hidden instead of deleted.`, { ok: 'Remove', danger: true }))) return;
         if (await guard(() => api.del('/categories/' + full.id))) { await loadMeta(); m.close(); ctx.refresh(); }
       } }, 'Remove'),
       h('button', { class: 'btn primary', onclick: async () => {
         const body = { name: name.value, groupId: group.value };
+        if (income) { delete body.groupId; body.payDays = parsePayDays(); }
+        if (debt) body.dueDay = due.value ? parseInt(due.value, 10) : null;
         if (!locked) {
           body.dueDay = due.value ? parseInt(due.value, 10) : null;
           body.type = kind.value;

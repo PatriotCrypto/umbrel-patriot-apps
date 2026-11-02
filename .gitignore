@@ -3,3 +3,4 @@ __pycache__/
 .pytest_cache/
 ipod-sync-src/helper/ipodsync
 .DS_Store
+node_modules/

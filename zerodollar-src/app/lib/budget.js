@@ -1,4 +1,4 @@
-import { monthOf, monthEnd, addMonths } from './util.js';
+import { monthOf, monthEnd, addMonths, uid } from './util.js';
 
 /* All money is integer cents. Expenses are stored positive with type "expense". */
 
@@ -73,7 +73,7 @@ export function debtBalance(state, debt, upToDate = null) {
   let paid = 0;
   const asOf = debt.asOf || '0000-00-00';
   for (const t of state.transactions) {
-    if (!debt.catId || t.date < asOf) continue;
+    if (!debt.catId || t.date < asOf || String(t.source || '').startsWith('everydollar:')) continue; // imported month totals are already inside the balance
     if (upToDate && t.date > upToDate) continue;
     for (const p of partsOf(t)) {
       if (p.catId === debt.catId) paid += t.type === 'expense' ? p.amount : -p.amount;
@@ -194,3 +194,15 @@ export function upcomingBills(state, month, todayDate) {
 }
 
 export { addMonths };
+
+
+/** The group that holds debt categories (created on demand). */
+export function ensureDebtGroup(state, name = 'Debt') {
+  let g = state.groups.find((x) => x.name.toLowerCase() === String(name).toLowerCase() && x.kind !== 'income' && !x.archived);
+  if (!g) g = state.groups.find((x) => x.name === 'Debt' && x.kind !== 'income' && !x.archived);
+  if (!g) {
+    g = { id: uid('g_'), name, kind: 'expense', sort: Math.max(-1, ...state.groups.map((x) => x.sort)) + 1 };
+    state.groups.push(g);
+  }
+  return g;
+}

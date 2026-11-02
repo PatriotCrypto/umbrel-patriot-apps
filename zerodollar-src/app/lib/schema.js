@@ -1,6 +1,6 @@
 import { uid } from './util.js';
 
-export const SCHEMA_VERSION = 1;
+export const SCHEMA_VERSION = 2;
 
 export const ACCOUNT_TYPES = ['checking', 'savings', 'credit', 'cash'];
 export const CATEGORY_TYPES = ['expense', 'income', 'fund', 'debt'];
@@ -37,7 +37,9 @@ export function defaultState() {
       locale: 'en-US',
       matchWindowDays: 5,
       dateOrder: 'mdy',
-      householdName: ''
+      householdName: '',
+      btcLookups: true,
+      btcApi: 'https://mempool.space/api'
     },
     accounts: [{ id: uid('a_'), name: 'Checking', type: 'checking', openingBalance: 0, archived: false }],
     groups,
@@ -46,8 +48,15 @@ export function defaultState() {
     transactions: [],
     debts: [],
     statements: [],
-    payeeRules: {}
+    payeeRules: {},
+    wallets: [],
+    btc: { price: null, priceAt: null },
+    networth: defaultNetWorth()
   };
+}
+
+export function defaultNetWorth() {
+  return { assets: [], liabilities: [], history: [], goals: [], include: { accounts: true, bitcoin: true, debts: true } };
 }
 
 /** Bring older or imported data up to the current shape; never throws on missing keys. */
@@ -61,6 +70,11 @@ export function migrate(s) {
   }
   if (!out.months || typeof out.months !== 'object') out.months = {};
   if (!out.payeeRules || typeof out.payeeRules !== 'object') out.payeeRules = {};
+  if (!Array.isArray(out.wallets)) out.wallets = [];
+  if (!out.btc || typeof out.btc !== 'object') out.btc = { price: null, priceAt: null };
+  const nw = out.networth && typeof out.networth === 'object' ? out.networth : {};
+  out.networth = { ...defaultNetWorth(), ...nw, include: { ...defaultNetWorth().include, ...(nw.include || {}) } };
+  for (const k of ['assets', 'liabilities', 'history', 'goals']) if (!Array.isArray(out.networth[k])) out.networth[k] = [];
   // If an import has no data at all, keep the starter plan.
   if (!out.groups.length && !out.categories.length) {
     out.groups = d.groups;

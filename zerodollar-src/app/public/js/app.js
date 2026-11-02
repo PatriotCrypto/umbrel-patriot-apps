@@ -6,12 +6,15 @@ const ROUTES = {
   budget: { title: 'Budget', icon: 'budget', month: true, load: () => import('./views/budget.js') },
   transactions: { title: 'Transactions', icon: 'list', month: true, load: () => import('./views/transactions.js') },
   reconcile: { title: 'Reconcile', icon: 'check', load: () => import('./views/reconcile.js') },
+  paycheck: { title: 'Paycheck Planning', icon: 'paycheck', month: true, load: () => import('./views/paycheck.js') },
   funds: { title: 'Funds', icon: 'funds', month: true, load: () => import('./views/funds.js') },
   debt: { title: 'Debt', icon: 'debt', load: () => import('./views/debt.js') },
-  reports: { title: 'Reports', icon: 'chart', month: true, load: () => import('./views/reports.js') },
+  insights: { title: 'Insights', icon: 'insights', load: () => import('./views/insights.js') },
+  networth: { title: 'Net worth', icon: 'networth', load: () => import('./views/networth.js') },
+  bitcoin: { title: 'Bitcoin', icon: 'bitcoin', load: () => import('./views/bitcoin.js') },
   settings: { title: 'Settings', icon: 'gear', load: () => import('./views/settings.js') }
 };
-const PRIMARY = ['budget', 'transactions', 'reconcile', 'funds'];
+const PRIMARY = ['budget', 'transactions', 'paycheck', 'insights'];
 
 const app = document.getElementById('app');
 let route = 'budget';
@@ -52,7 +55,7 @@ function shell() {
 }
 
 function openMore() {
-  const body = h('div', { class: 'stack' }, ['debt', 'reports', 'settings'].map((id) => h('a', { class: 'btn', href: '#/' + id, onclick: () => m.close() }, icon(ROUTES[id].icon), ROUTES[id].title)));
+  const body = h('div', { class: 'stack' }, Object.keys(ROUTES).filter((id) => !PRIMARY.includes(id)).map((id) => h('a', { class: 'btn', href: '#/' + id, onclick: () => m.close() }, icon(ROUTES[id].icon), ROUTES[id].title)));
   const m = modal({ title: 'More', body });
 }
 

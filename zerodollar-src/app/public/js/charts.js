@@ -65,3 +65,84 @@ export function lineChart(points, { color = 'var(--accent)', short, label }) {
   });
   return svg;
 }
+
+/* ---------- Insights charts ---------- */
+export const PALETTE = ['#2f9e6b', '#3b82c4', '#e0953a', '#9b59b6', '#d6504a', '#17a2b8', '#7aa33a', '#c2569b', '#5c6bc0', '#a1887f', '#26a69a', '#c9a227'];
+export const colorFor = (i) => PALETTE[i % PALETTE.length];
+
+/** Donut. slices: [{label, value, color}] */
+export function pieChart(slices, { fmt, label }) {
+  const S = 220, R = 100, r = 58, c = S / 2;
+  const total = slices.reduce((n, x) => n + x.value, 0);
+  const svg = el('svg', { viewBox: `0 0 ${S} ${S}`, class: 'chart pie', role: 'img', 'aria-label': label });
+  if (!total) {
+    svg.append(el('circle', { cx: c, cy: c, r: (R + r) / 2, fill: 'none', 'stroke-width': R - r, style: 'stroke:var(--surface2)' }));
+    return svg;
+  }
+  let a0 = -Math.PI / 2;
+  for (const s of slices) {
+    if (s.value <= 0) continue;
+    const frac = s.value / total;
+    const a1 = a0 + Math.min(frac, 0.99999) * 2 * Math.PI;
+    const big = a1 - a0 > Math.PI ? 1 : 0;
+    const P = (rad, a) => `${(c + rad * Math.cos(a)).toFixed(2)} ${(c + rad * Math.sin(a)).toFixed(2)}`;
+    const d = `M${P(R, a0)}A${R} ${R} 0 ${big} 1 ${P(R, a1)}L${P(r, a1)}A${r} ${r} 0 ${big} 0 ${P(r, a0)}Z`;
+    svg.append(el('path', { d, style: `fill:${s.color}`, stroke: 'var(--surface)', 'stroke-width': 1.5 }, [el('title', {}, [document.createTextNode(`${s.label}: ${fmt(s.value)} (${Math.round(frac * 100)}%)`)])]));
+    a0 = a1;
+  }
+  return svg;
+}
+
+function axes(svg, { W, H, L, T, R, B }, max, short) {
+  for (let i = 0; i <= 4; i++) {
+    const y = T + ((H - T - B) * i) / 4;
+    svg.append(el('line', { x1: L, x2: W - R, y1: y, y2: y, class: 'gl' }), txt(L - 8, y + 4, short(max * (1 - i / 4)), { 'text-anchor': 'end' }));
+  }
+}
+
+/** Stacked monthly bars with an optional dotted average line. series: [{name,color,values}] */
+export function stackedBars(labels, series, { short, label, avg = null }) {
+  const g = { W: 640, H: 250, L: 58, T: 14, R: 10, B: 26 };
+  const totals = labels.map((_, i) => series.reduce((n, s) => n + Math.max(0, s.values[i] || 0), 0));
+  const max = niceMax(Math.max(1, avg || 0, ...totals));
+  const svg = el('svg', { viewBox: `0 0 ${g.W} ${g.H}`, class: 'chart', role: 'img', 'aria-label': label });
+  axes(svg, g, max, short);
+  const slot = (g.W - g.L - g.R) / labels.length;
+  const bw = Math.min(34, slot - 8);
+  const Y = (v) => g.T + ((g.H - g.T - g.B) * (max - v)) / max;
+  labels.forEach((lb, i) => {
+    let acc = 0;
+    const x = g.L + slot * i + (slot - bw) / 2;
+    for (const s of series) {
+      const v = Math.max(0, s.values[i] || 0);
+      if (!v) continue;
+      svg.append(el('rect', { x, y: Y(acc + v), width: bw, height: Math.max(1, Y(acc) - Y(acc + v)), style: `fill:${s.color}` }, [el('title', {}, [document.createTextNode(`${lb} · ${s.name}: ${short(v)}`)])]));
+      acc += v;
+    }
+    svg.append(txt(x + bw / 2, g.H - 8, lb, { 'text-anchor': 'middle' }));
+  });
+  if (avg) {
+    svg.append(el('line', { x1: g.L, x2: g.W - g.R, y1: Y(avg), y2: Y(avg), 'stroke-width': 2, 'stroke-dasharray': '2 4', 'stroke-linecap': 'round', style: 'stroke:#e0b72f' }));
+    svg.append(el('rect', { x: g.L + 4, y: Y(avg) - 10, width: 86, height: 18, rx: 9, style: 'fill:#f6d55c' }), txt(g.L + 47, Y(avg) + 3, `${short(avg)} avg`, { 'text-anchor': 'middle', style: 'fill:#4a3b00;font-weight:600' }));
+  }
+  return svg;
+}
+
+/** Several lines on one scale, with an optional dotted average. series: [{name,color,values}] */
+export function multiLine(labels, series, { short, label, avg = null }) {
+  const g = { W: 640, H: 240, L: 58, T: 14, R: 14, B: 26 };
+  const max = niceMax(Math.max(1, avg || 0, ...series.flatMap((s) => s.values.map((v) => Math.max(0, v)))));
+  const svg = el('svg', { viewBox: `0 0 ${g.W} ${g.H}`, class: 'chart', role: 'img', 'aria-label': label });
+  axes(svg, g, max, short);
+  const X = (i) => g.L + ((g.W - g.L - g.R) * i) / Math.max(1, labels.length - 1);
+  const Y = (v) => g.T + ((g.H - g.T - g.B) * (max - Math.max(0, v))) / max;
+  if (avg) svg.append(el('line', { x1: g.L, x2: g.W - g.R, y1: Y(avg), y2: Y(avg), 'stroke-width': 2, 'stroke-dasharray': '2 4', 'stroke-linecap': 'round', style: 'stroke:#e0b72f' }));
+  for (const s of series) {
+    const d = s.values.map((v, i) => `${i ? 'L' : 'M'}${X(i).toFixed(1)} ${Y(v).toFixed(1)}`).join('');
+    svg.append(el('path', { d, fill: 'none', 'stroke-width': 2.4, 'stroke-linejoin': 'round', style: `stroke:${s.color}` }));
+    s.values.forEach((v, i) => svg.append(el('circle', { cx: X(i), cy: Y(v), r: 3, style: `fill:${s.color}` }, [el('title', {}, [document.createTextNode(`${labels[i]} · ${s.name}: ${short(v)}`)])])));
+  }
+  const step = Math.ceil(labels.length / 12);
+  labels.forEach((lb, i) => (i % step === 0 || i === labels.length - 1) && svg.append(txt(X(i), g.H - 8, lb, { 'text-anchor': 'middle' })));
+  return svg;
+}

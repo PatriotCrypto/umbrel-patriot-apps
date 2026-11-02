@@ -1,17 +1,22 @@
 {
   "name": "zerodollar",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Self-hosted zero-based budget for Umbrel: plan every dollar, quick-add spending, reconcile against bank statements.",
   "type": "module",
   "main": "server.js",
   "license": "MIT",
   "private": true,
-  "engines": { "node": ">=20" },
+  "engines": {
+    "node": ">=20"
+  },
   "scripts": {
     "start": "node server.js",
     "test": "node --test"
   },
   "dependencies": {
+    "@noble/hashes": "^1.8.0",
+    "@scure/base": "^1.2.6",
+    "@scure/bip32": "^1.7.0",
     "express": "^4.21.2"
   }
 }

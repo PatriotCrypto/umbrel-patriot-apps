@@ -1,6 +1,6 @@
 import { h, icon, modal, toast, guard, confirmDialog } from '../ui.js';
 import { api } from '../api.js';
-import { S, fmt, loadMeta, THEMES, setTheme, currentTheme } from '../state.js';
+import { S, fmt, loadMeta, THEMES, setTheme, currentTheme, setMonth } from '../state.js';
 import { parseMoney } from '../money.js';
 
 const CURRENCIES = ['USD', 'CAD', 'EUR', 'GBP', 'AUD', 'NZD', 'MXN', 'JPY', 'CHF', 'SEK', 'NOK', 'DKK', 'INR', 'BRL', 'ZAR'];
@@ -50,6 +50,13 @@ export async function render(root, ctx) {
     if (await guard(() => api.post('/import', data))) { await loadMeta(); toast('Backup restored'); location.hash = '#/budget'; ctx.refresh(); }
   } });
 
+  const edIn = h('input', { type: 'file', accept: '.csv,text/csv', class: 'sr', id: 'ed-file', onchange: async () => {
+    const f = edIn.files[0];
+    edIn.value = '';
+    if (!f) return;
+    openEveryDollar(await f.text(), f.name, ctx);
+  } });
+
   root.append(h('div', { class: 'page', style: { maxWidth: '820px' } },
     section('Look', 'Pick the one that suits you. It is remembered on this device.', looks),
     section('Accounts', 'Where your money lives. The opening balance is what the account held before your first transaction here.',
@@ -59,6 +66,8 @@ export async function render(root, ctx) {
       h('div', { class: 'grid2' }, h('label', { class: 'f' }, 'Currency', cur), h('label', { class: 'f' }, 'Number format (locale)', loc),
         h('label', { class: 'f' }, 'Statement date order', ord), h('label', { class: 'f' }, 'Match window (days either side)', win), h('label', { class: 'f' }, 'Household name', hh)),
       h('div', null, h('button', { class: 'btn primary', onclick: savePrefs }, 'Save preferences'))),
+    section('Import from EveryDollar', 'Bring a month of your budget across. In EveryDollar, open the month and choose Download CSV (the Budget Items file, named like 10-2026-EveryDollar-BudgetItems.csv). Do one month at a time, oldest first, to fill in Insights.',
+      h('div', { class: 'row wrap' }, h('label', { class: 'btn', for: 'ed-file', tabIndex: 0 }, icon('upload'), 'Choose Budget Items CSV…'), edIn)),
     section('Your data', 'Everything lives in one file on your Umbrel. A daily snapshot is kept for two weeks.',
       h('div', { class: 'row wrap' },
         h('a', { class: 'btn', href: '/api/export', download: '' }, 'Download full backup (.json)'),
@@ -98,4 +107,54 @@ function acctForm(a, ctx) {
         if (ok) { await loadMeta(); m.close(); ctx.refresh(); }
       } }, 'Save')]
   });
+}
+
+async function openEveryDollar(csv, fileName, ctx) {
+  const fm = /(?:^|\D)(\d{1,2})-(\d{4})(?:\D|$)/.exec(fileName);
+  const guess = fm && +fm[1] >= 1 && +fm[1] <= 12 ? `${fm[2]}-${String(fm[1]).padStart(2, '0')}` : S.month;
+  const opts = { csv, fileName, debts: true, spent: false, groupTypes: {}, month: guess, accountId: undefined };
+  let pv = await guard(() => api.post('/import/everydollar/preview', opts));
+  if (!pv) return;
+  opts.month = pv.month;
+  const TYPES = [['income', 'Income'], ['expense', 'Regular spending'], ['fund', 'Savings fund'], ['debt', 'Debt']];
+  const body = h('div', { class: 'stack' });
+  const m = modal({ title: 'Import from EveryDollar', wide: true, body, footer: [h('button', { class: 'btn', onclick: () => m.close() }, 'Cancel'), h('button', { class: 'btn primary', id: 'ed-go', onclick: apply }, 'Import')] });
+
+  async function reload() {
+    const r = await guard(() => api.post('/import/everydollar/preview', opts));
+    if (r) { pv = r; paint(); }
+  }
+  async function apply() {
+    const r = await guard(() => api.post('/import/everydollar/apply', opts));
+    if (!r) return;
+    await loadMeta();
+    setMonth(r.month);
+    m.close();
+    toast(`Imported ${r.planned} items for ${r.month}${r.debts ? `, ${r.debts} new debts` : ''}${r.transactions ? `, ${r.transactions} spending totals` : ''}.`);
+    location.hash = '#/budget';
+    ctx.refresh();
+  }
+  function paint() {
+    const month = h('input', { type: 'month', value: opts.month || '', onchange: (e) => { opts.month = e.target.value; reload(); } });
+    const acct = h('select', { onchange: (e) => { opts.accountId = e.target.value; } }, pv.accounts.map((a) => h('option', { value: a.id }, a.name)));
+    if (opts.accountId) acct.value = opts.accountId;
+    const c = pv.counts;
+    body.replaceChildren(...[
+      h('div', { class: 'grid2' }, h('label', { class: 'f' }, 'This budget is for', month),
+        h('div', { class: 'muted', style: { fontSize: '13.5px', alignSelf: 'end' } }, `${c.items} items in ${c.groups} groups. ${c.newItems} new, ${c.items - c.newItems} already here.${pv.monthExists ? ` Planned amounts for ${pv.month} will be updated.` : ''}${c.overwritten ? ` ${c.overwritten} existing amounts will change.` : ''}`)),
+      h('div', { class: 'row wrap', style: { gap: '18px' } },
+        h('span', null, 'Income ', h('b', { class: 'num' }, fmt(pv.totals.plannedIncome))),
+        h('span', null, 'Planned ', h('b', { class: 'num' }, fmt(pv.totals.plannedOut))),
+        h('span', null, 'Left to budget ', h('b', { class: 'num', style: { color: pv.totals.leftToBudget === 0 ? 'var(--good)' : 'var(--warn)' } }, fmt(pv.totals.leftToBudget)))),
+      h('div', { class: 'card', style: { maxHeight: '300px', overflow: 'auto', boxShadow: 'none' } }, pv.groups.map((g) => h('div', null,
+        h('div', { class: 'row between', style: { padding: '8px 14px', background: 'var(--surface2)', position: 'sticky', top: 0 } }, h('b', null, g.name, g.exists ? null : h('span', { class: 'pill good', style: { marginLeft: '8px' } }, 'new')),
+          (() => { const sel = h('select', { style: { width: 'auto', padding: '4px 8px' }, 'aria-label': `${g.name} type`, onchange: (e) => { opts.groupTypes[g.name] = e.target.value; reload(); } }, TYPES.map(([v, l]) => h('option', { value: v }, l))); sel.value = g.type; return sel; })()),
+        g.items.map((i) => h('div', { class: 'txmini', style: { cursor: 'default' } }, h('div', { class: 'who' }, h('b', null, i.name), h('span', null, [i.exists ? 'already here' : 'new', i.debt === 'new' ? `new debt, balance ${fmt(i.balance)}` : i.debt === 'update' ? `updates debt balance to ${fmt(i.balance)}` : ''].filter(Boolean).join(' · '))), h('span', { class: 'amt num' }, fmt(i.planned))))))),
+      h('label', { class: 'row' }, h('input', { type: 'checkbox', checked: opts.debts, onchange: (e) => { opts.debts = e.target.checked; reload(); } }), 'Turn Debt items with a balance into tracked debts'),
+      h('label', { class: 'row' }, h('input', { type: 'checkbox', checked: opts.spent, onchange: (e) => { opts.spent = e.target.checked; if (opts.spent && !opts.accountId) opts.accountId = pv.accounts[0]?.id; reload(); } }), 'Also record what was spent as one total per item (for Insights)'),
+      opts.spent ? h('label', { class: 'f' }, 'Record spending in account', acct) : null,
+      pv.warnings.length ? h('div', { class: 'stack', style: { gap: '4px' } }, pv.warnings.map((w) => h('div', { class: 'muted', style: { fontSize: '13px' } }, '• ' + w))) : null,
+      h('p', { class: 'muted', style: { margin: 0, fontSize: '12.5px' } }, 'Nothing is deleted. Importing the same file again only updates planned amounts. Due days are not in EveryDollar’s file: click an item on the Budget page to set them.')].filter(Boolean));
+  }
+  paint();
 }

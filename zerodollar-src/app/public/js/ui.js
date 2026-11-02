@@ -44,6 +44,12 @@ const ICONS = {
   x: '<path d="M6 6l12 12M18 6 6 18"/>',
   link: '<path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1"/>',
   dots: '<circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/>',
+  paycheck: '<rect x="3.5" y="5" width="17" height="15" rx="2.5"/><path d="M3.5 10h17M8 3v4M16 3v4M8 14.5h3"/>',
+  insights: '<path d="M12 3v9h9"/><path d="M20.5 15A9 9 0 1 1 9 3.5"/>',
+  networth: '<path d="M3 20h18M6 20V11M12 20V6M18 20v-6"/><path d="m4 8 5-4 4 3 7-4"/>',
+  bitcoin: '<circle cx="12" cy="12" r="9"/><path d="M9.5 7.5v9M9.5 7.5h3.2a2 2 0 0 1 0 4H9.5m0 0h3.7a2.2 2.2 0 0 1 0 4.5H9.5M11 6v1.5M11 16.5V18M13.5 6v1.5M13.5 16.5V18"/>',
+  up: '<path d="m6 15 6-6 6 6"/>',
+  down: '<path d="m6 9 6 6 6-6"/>',
   split: '<path d="M6 3v6a6 6 0 0 0 6 6h6M18 15l-3-3m3 3-3 3M6 21v-3"/>'
 };
 export function icon(name, cls = 'ico') {

@@ -12,6 +12,11 @@ import { accountBalance, byId, computeBudget, initMonth, upcomingBills, debtBala
 import { parseStatement } from './lib/parsers.js';
 import * as S from './lib/statements.js';
 import { simulate } from './lib/debt.js';
+import { paycheckPlan, dueThisWeek, cleanPaychecks, autoPaychecks, splitEvenly } from './lib/paycheck.js';
+import { classifyInput, scanXpub, lookupAddress, fetchPrice, normalizeApi } from './lib/bitcoin.js';
+import { netWorthNow, snapshotMonth, goalProgress, cleanAsset, cleanLiability, cleanGoal, btcValue, csvRows, ASSET_CATS, LIABILITY_CATS } from './lib/networth.js';
+import { insights, resolveRange } from './lib/insights.js';
+import { parseEveryDollar, planImport, applyImport, monthFromFileName } from './lib/everydollar.js';
 import { spendingByCategory, monthlyTrend, topPayees, netWorthSeries } from './lib/reports.js';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -184,6 +189,253 @@ export function createApp({ dataDir = process.env.DATA_DIR || '/data', publicDir
     res.json({ ok: true });
   });
 
+  /* ------------------------------------------------------ paycheck planning */
+  api.get('/paycheck/:month', (req, res) => res.json(paycheckPlan(st(), needMonth(req.params.month), isDate(req.query.today) ? req.query.today : todayStr())));
+  const monthRec = (s, m) => {
+    const r = s.months[needMonth(m)];
+    if (!r) throw bad('Plan this month first');
+    return r;
+  };
+  api.put('/paycheck/:month/buffer', (req, res) => {
+    store.update((s) => {
+      monthRec(s, req.params.month).buffer = asCents(req.body?.amount ?? 0, { name: 'Buffer' });
+    });
+    res.json(paycheckPlan(st(), req.params.month, todayStr()));
+  });
+  api.put('/paycheck/:month/paychecks', (req, res) => {
+    store.update((s) => {
+      const r = monthRec(s, req.params.month);
+      const catId = req.body?.catId;
+      const list = cleanPaychecks(s, req.params.month, catId, req.body?.paychecks ?? []);
+      r.paychecks = (r.paychecks || []).filter((p) => p.catId !== catId).concat(list);
+      if (!r.paychecks.length) delete r.paychecks;
+    });
+    res.json(paycheckPlan(st(), req.params.month, todayStr()));
+  });
+  api.post('/paycheck/:month/split', (req, res) => {
+    store.update((s) => {
+      const r = monthRec(s, req.params.month);
+      const c = s.categories.find((x) => x.id === req.body?.catId && x.type === 'income');
+      if (!c) throw bad('Pick an income item');
+      const days = (Array.isArray(req.body?.days) ? req.body.days : []).filter((d) => Number.isInteger(d) && d >= 1 && d <= 31);
+      if (!days.length || days.length > 8) throw bad('Give 1 to 8 pay days');
+      const plan = r.planned?.[c.id] || 0;
+      if (!plan) throw bad('Plan an amount for this income first');
+      const list = autoPaychecks(req.params.month, { ...c, payDays: days }, plan).map((p) => ({ date: p.date, amount: p.amount }));
+      r.paychecks = (r.paychecks || []).filter((p) => p.catId !== c.id).concat(cleanPaychecks(s, req.params.month, c.id, list));
+      if (req.body?.remember) c.payDays = [...new Set(days)].sort((a, b) => a - b);
+    });
+    res.json(paycheckPlan(st(), req.params.month, todayStr()));
+  });
+  api.put('/paycheck/:month/due', (req, res) => {
+    store.update((s) => {
+      const r = monthRec(s, req.params.month);
+      const c = s.categories.find((x) => x.id === req.body?.catId && x.type !== 'income');
+      if (!c) throw bad('Unknown item');
+      const day = req.body?.day;
+      r.dueOverride = r.dueOverride || {};
+      if (day == null) delete r.dueOverride[c.id];
+      else if (Number.isInteger(day) && day >= 1 && day <= 31) r.dueOverride[c.id] = day;
+      else throw bad('Day must be 1 to 31');
+      if (req.body?.always) {
+        if (day == null) delete c.dueDay;
+        else c.dueDay = day;
+        delete r.dueOverride[c.id];
+      }
+      if (!Object.keys(r.dueOverride).length) delete r.dueOverride;
+    });
+    res.json(paycheckPlan(st(), req.params.month, todayStr()));
+  });
+
+  /* ------------------------------------------------------ EveryDollar import */
+  const edOpts = (b) => {
+    const parsed = parseEveryDollar(b?.csv);
+    const inferredMonth = monthFromFileName(b?.fileName);
+    const groupTypes = b?.groupTypes && typeof b.groupTypes === 'object' ? b.groupTypes : {};
+    return { parsed, opts: { month: b?.month, inferredMonth, groupTypes, debts: b?.debts !== false, spent: !!b?.spent, accountId: b?.accountId } };
+  };
+  api.post('/import/everydollar/preview', (req, res) => {
+    const { parsed, opts } = edOpts(req.body);
+    res.json({ ...planImport(st(), parsed, opts), accounts: st().accounts.filter((a) => !a.archived).map((a) => ({ id: a.id, name: a.name })) });
+  });
+  api.post('/import/everydollar/apply', (req, res) => {
+    const { parsed, opts } = edOpts(req.body);
+    const out = store.update((s) => applyImport(s, parsed, opts));
+    res.json(out);
+  });
+
+  /* -------------------------------------------------------------- bitcoin */
+  const walletView = (w) => ({ id: w.id, name: w.name, kind: w.xpub ? 'xpub' : w.address ? 'address' : 'manual', script: w.script, hint: w.xpub ? w.xpub.slice(0, 8) + '…' + w.xpub.slice(-6) : w.address ? w.address.slice(0, 8) + '…' + w.address.slice(-6) : '', manualSats: w.manualSats || 0, last: w.last || null });
+  const btcView = () => {
+    const v = btcValue(st());
+    return { wallets: st().wallets.map(walletView), price: v.price, currency: v.currency, priceAt: v.priceAt, sats: v.sats, cents: v.cents, hasPrice: v.hasPrice, lookups: st().settings.btcLookups, api: st().settings.btcApi };
+  };
+  api.get('/btc', (_req, res) => res.json(btcView()));
+  api.post('/btc/wallets', (req, res) => {
+    const name = clampStr(req.body?.name, 40);
+    if (!name) throw bad('Give the wallet a name');
+    const w = { id: uid('w_'), name };
+    if (req.body?.manualSats !== undefined && !req.body?.input) {
+      const n = req.body.manualSats;
+      if (!Number.isInteger(n) || n < 0 || n > 21_000_000 * 100_000_000) throw bad('Enter the amount in satoshis (whole number)');
+      w.manualSats = n;
+    } else {
+      const c = classifyInput(req.body?.input);
+      if (c.kind === 'xpub') {
+        w.xpub = c.value;
+        w.script = c.script;
+      } else w.address = c.value;
+      if (st().wallets.some((x) => (x.xpub || x.address) === c.value)) throw new HttpError(409, 'That wallet is already tracked');
+    }
+    store.update((s) => s.wallets.push(w));
+    res.status(201).json(btcView());
+  });
+  api.patch('/btc/wallets/:id', (req, res) => {
+    store.update((s) => {
+      const w = s.wallets.find((x) => x.id === req.params.id);
+      if (!w) throw notFound('Wallet not found');
+      if (req.body?.name !== undefined) {
+        const n = clampStr(req.body.name, 40);
+        if (!n) throw bad('Give the wallet a name');
+        w.name = n;
+      }
+      if (req.body?.manualSats !== undefined) {
+        const n = req.body.manualSats;
+        if (!Number.isInteger(n) || n < 0 || n > 21_000_000 * 100_000_000) throw bad('Enter the amount in satoshis (whole number)');
+        w.manualSats = n;
+      }
+    });
+    res.json(btcView());
+  });
+  api.delete('/btc/wallets/:id', (req, res) => {
+    store.update((s) => {
+      if (!s.wallets.some((x) => x.id === req.params.id)) throw notFound('Wallet not found');
+      s.wallets = s.wallets.filter((x) => x.id !== req.params.id);
+    });
+    res.json(btcView());
+  });
+  api.post('/btc/refresh', async (_req, res, next) => {
+    try {
+    const set = st().settings;
+    if (!set.btcLookups) throw bad('Lookups are turned off. Turn them on in Bitcoin settings, or enter amounts by hand.');
+    const fetchImpl = app.locals.fetch || fetch;
+    const jobs = st().wallets.filter((w) => w.xpub || w.address);
+    const results = await Promise.all(jobs.map(async (w) => {
+      try {
+        const r = w.xpub ? await scanXpub(set.btcApi, w.xpub, w.script, { fetch: fetchImpl }) : await lookupAddress(set.btcApi, w.address, { fetch: fetchImpl });
+        return [w.id, { confirmed: r.confirmed, pending: r.pending, txCount: r.txCount, at: new Date().toISOString() }];
+      } catch (e) {
+        return [w.id, { ...(w.last || {}), error: e.message, errorAt: new Date().toISOString() }];
+      }
+    }));
+    let price = null;
+    let priceError = null;
+    try {
+      price = await fetchPrice(set.btcApi, { fetch: fetchImpl });
+    } catch (e) {
+      priceError = e.message;
+    }
+    store.update((s) => {
+      for (const [id, last] of results) {
+        const w = s.wallets.find((x) => x.id === id);
+        if (w) w.last = last;
+      }
+      if (price) s.btc = { price, priceAt: new Date().toISOString() };
+    });
+    res.json({ ...btcView(), priceError });
+    } catch (e) {
+      next(e);
+    }
+  });
+
+  /* ------------------------------------------------------------ net worth */
+  const nwView = () => {
+    const s = st();
+    const now = netWorthNow(s);
+    const month = todayStr().slice(0, 7);
+    if (snapshotMonth(s, month, now)) store.update((x) => snapshotMonth(x, month));
+    return {
+      assets: now.assets,
+      liabilities: now.liabilities,
+      totals: now.totals,
+      history: st().networth.history,
+      goals: st().networth.goals.map((g) => ({ ...g, ...goalProgress(g, now.totals) })),
+      include: st().networth.include,
+      btc: { sats: now.btc.sats, hasPrice: now.btc.hasPrice },
+      assetCategories: ASSET_CATS,
+      liabilityCategories: LIABILITY_CATS
+    };
+  };
+  const nwList = (key, clean) => {
+    api.post(`/networth/${key}`, (req, res) => {
+      store.update((s) => s.networth[key].push(clean(req.body || {})));
+      res.status(201).json(nwView());
+    });
+    api.patch(`/networth/${key}/:id`, (req, res) => {
+      store.update((s) => {
+        const i = s.networth[key].findIndex((x) => x.id === req.params.id);
+        if (i < 0) throw notFound('Not found');
+        s.networth[key][i] = clean(req.body || {}, s.networth[key][i]);
+      });
+      res.json(nwView());
+    });
+    api.delete(`/networth/${key}/:id`, (req, res) => {
+      store.update((s) => {
+        if (!s.networth[key].some((x) => x.id === req.params.id)) throw notFound('Not found');
+        s.networth[key] = s.networth[key].filter((x) => x.id !== req.params.id);
+      });
+      res.json(nwView());
+    });
+  };
+  nwList('assets', cleanAsset);
+  nwList('liabilities', cleanLiability);
+  nwList('goals', cleanGoal);
+  api.get('/networth', (_req, res) => res.json(nwView()));
+  api.put('/networth/include', (req, res) => {
+    store.update((s) => {
+      for (const k of ['accounts', 'bitcoin', 'debts']) if (req.body?.[k] !== undefined) s.networth.include[k] = !!req.body[k];
+    });
+    res.json(nwView());
+  });
+  api.put('/networth/history/:month', (req, res) => {
+    const month = needMonth(req.params.month);
+    store.update((s) => {
+      const rec = { month, assets: asCents(req.body?.assets ?? 0, { name: 'Assets' }), liabilities: asCents(req.body?.liabilities ?? 0, { name: 'Liabilities' }), manual: true };
+      s.networth.history = s.networth.history.filter((h) => h.month !== month).concat(rec).sort((a, b) => a.month.localeCompare(b.month));
+    });
+    res.json(nwView());
+  });
+  api.delete('/networth/history/:month', (req, res) => {
+    const month = needMonth(req.params.month);
+    store.update((s) => {
+      s.networth.history = s.networth.history.filter((h) => h.month !== month);
+    });
+    res.json(nwView());
+  });
+  api.get('/networth.csv', (_req, res) => {
+    const esc = (v) => {
+      let x = String(v ?? '');
+      if (/^[=+\-@\t\r]/.test(x)) x = "'" + x;
+      return /[",\n\r]/.test(x) ? `"${x.replace(/"/g, '""')}"` : x;
+    };
+    res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+    res.setHeader('Content-Disposition', `attachment; filename="zerodollar-net-worth-${todayStr()}.csv"`);
+    res.send(csvRows(st()).map((r) => r.map(esc).join(',')).join('\n') + '\n');
+  });
+
+  /* ------------------------------------------------------------- insights */
+  api.get('/insights', (req, res) => {
+    const today = isDate(req.query.today) ? req.query.today : todayStr();
+    const r = resolveRange(String(req.query.range || 'ytd'), today);
+    if (!r) throw bad('Unknown range');
+    res.json(insights(st(), r.from, r.to, { savings: req.query.savings !== '0' }));
+  });
+
+  api.get('/due-week', (req, res) => {
+    const today = isDate(req.query.today) ? req.query.today : todayStr();
+    res.json(dueThisWeek(st(), today, 7));
+  });
+
   /* ------------------------------------------------------- groups & cats */
   api.post('/groups', (req, res) => {
     const name = clampStr(req.body?.name, 40);
@@ -241,6 +493,17 @@ export function createApp({ dataDir = process.env.DATA_DIR || '/data', publicDir
       if (!g) throw bad('Unknown group');
       if ((g.kind === 'income') !== (c.type === 'income')) throw bad('Income categories live in the Income group');
       c.groupId = g.id;
+    }
+    if (c.type === 'debt' && body.name !== undefined) {
+      const d = s.debts.find((x) => x.id === c.debtId);
+      if (d) d.name = c.name;
+    }
+    if (body.payDays !== undefined) {
+      if (c.type !== 'income') throw bad('Pay days only apply to income items');
+      const days = Array.isArray(body.payDays) ? body.payDays : [];
+      if (days.length > 8 || days.some((d) => !Number.isInteger(d) || d < 1 || d > 31)) throw bad('Pay days must be day-of-month numbers, 1 to 31');
+      if (days.length) c.payDays = [...new Set(days)].sort((a, b) => a - b);
+      else delete c.payDays;
     }
     if (body.type !== undefined && body.type !== c.type) {
       if (!['expense', 'fund'].includes(body.type) || !['expense', 'fund'].includes(c.type)) throw bad('Only expense and fund categories can switch type');
@@ -624,6 +887,8 @@ export function createApp({ dataDir = process.env.DATA_DIR || '/data', publicDir
         if (!['mdy', 'dmy'].includes(b.dateOrder)) throw bad('Date order must be mdy or dmy');
         s.settings.dateOrder = b.dateOrder;
       }
+      if (b.btcLookups !== undefined) s.settings.btcLookups = !!b.btcLookups;
+      if (b.btcApi !== undefined) s.settings.btcApi = normalizeApi(b.btcApi);
       if (b.householdName !== undefined) s.settings.householdName = clampStr(b.householdName, 40);
       return s.settings;
     });
@@ -701,6 +966,7 @@ export function createApp({ dataDir = process.env.DATA_DIR || '/data', publicDir
   // eslint-disable-next-line no-unused-vars
   app.use((err, req, res, _next) => {
     if (err instanceof HttpError) return res.status(err.status).json({ error: err.message });
+    if (err.status === 400 && err.message) return res.status(400).json({ error: err.message }); // validation errors from lib/bitcoin.js
     if (err.type === 'entity.too.large') return res.status(413).json({ error: 'That file is too large' });
     if (err instanceof SyntaxError && 'body' in err) return res.status(400).json({ error: 'Invalid JSON' });
     console.error(err);
@@ -720,3 +986,4 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
 }
 
 void normPayee;
+void splitEvenly;
