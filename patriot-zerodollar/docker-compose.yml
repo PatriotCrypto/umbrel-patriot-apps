@@ -1,0 +1,15 @@
+version: "3.7"
+services:
+  app_proxy:
+    environment:
+      APP_HOST: patriot-zerodollar_web_1
+      APP_PORT: 3973
+  web:
+    image: ghcr.io/patriotcrypto/zerodollar:0.1.0
+    restart: on-failure
+    stop_grace_period: 15s
+    environment:
+      DATA_DIR: /data
+      PORT: 3973
+    volumes:
+      - ${APP_DATA_DIR}/data:/data

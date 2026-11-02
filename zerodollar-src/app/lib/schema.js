@@ -1,0 +1,72 @@
+import { uid } from './util.js';
+
+export const SCHEMA_VERSION = 1;
+
+export const ACCOUNT_TYPES = ['checking', 'savings', 'credit', 'cash'];
+export const CATEGORY_TYPES = ['expense', 'income', 'fund', 'debt'];
+
+/** A starter plan so the first run is not an empty page. Everything is editable. */
+const TEMPLATE = [
+  { name: 'Income', kind: 'income', cats: [['Paycheck 1', 'income'], ['Paycheck 2', 'income'], ['Other income', 'income']] },
+  { name: 'Giving', cats: [['Charity', 'expense']] },
+  { name: 'Savings', cats: [['Emergency fund', 'fund'], ['Car repairs', 'fund'], ['Annual bills', 'fund'], ['Vacation', 'fund']] },
+  { name: 'Housing', cats: [['Rent / mortgage', 'expense', 1], ['Electric', 'expense'], ['Water', 'expense'], ['Internet', 'expense'], ['Phone', 'expense']] },
+  { name: 'Transportation', cats: [['Gas', 'expense'], ['Car insurance', 'expense']] },
+  { name: 'Food', cats: [['Groceries', 'expense'], ['Restaurants', 'expense']] },
+  { name: 'Personal', cats: [['Clothing', 'expense'], ['Fun money', 'expense'], ['Subscriptions', 'expense']] },
+  { name: 'Health', cats: [['Medical', 'expense'], ['Pharmacy', 'expense']] }
+];
+
+export function defaultState() {
+  const groups = [];
+  const categories = [];
+  TEMPLATE.forEach((g, gi) => {
+    const group = { id: uid('g_'), name: g.name, kind: g.kind === 'income' ? 'income' : 'expense', sort: gi };
+    groups.push(group);
+    g.cats.forEach(([name, type, dueDay], ci) => {
+      const c = { id: uid('c_'), groupId: group.id, name, type, sort: ci };
+      if (dueDay) c.dueDay = dueDay;
+      categories.push(c);
+    });
+  });
+  return {
+    version: SCHEMA_VERSION,
+    createdAt: new Date().toISOString(),
+    settings: {
+      currency: 'USD',
+      locale: 'en-US',
+      matchWindowDays: 5,
+      dateOrder: 'mdy',
+      householdName: ''
+    },
+    accounts: [{ id: uid('a_'), name: 'Checking', type: 'checking', openingBalance: 0, archived: false }],
+    groups,
+    categories,
+    months: {},
+    transactions: [],
+    debts: [],
+    statements: [],
+    payeeRules: {}
+  };
+}
+
+/** Bring older or imported data up to the current shape; never throws on missing keys. */
+export function migrate(s) {
+  if (!s || typeof s !== 'object' || Array.isArray(s)) throw new Error('not a ZeroDollar data file');
+  const d = defaultState();
+  const out = { ...d, ...s };
+  out.settings = { ...d.settings, ...(s.settings || {}) };
+  for (const k of ['accounts', 'groups', 'categories', 'transactions', 'debts', 'statements']) {
+    if (!Array.isArray(out[k])) out[k] = [];
+  }
+  if (!out.months || typeof out.months !== 'object') out.months = {};
+  if (!out.payeeRules || typeof out.payeeRules !== 'object') out.payeeRules = {};
+  // If an import has no data at all, keep the starter plan.
+  if (!out.groups.length && !out.categories.length) {
+    out.groups = d.groups;
+    out.categories = d.categories;
+  }
+  if (!out.accounts.length) out.accounts = d.accounts;
+  out.version = SCHEMA_VERSION;
+  return out;
+}

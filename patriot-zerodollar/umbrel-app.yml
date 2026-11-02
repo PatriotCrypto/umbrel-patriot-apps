@@ -1,0 +1,44 @@
+manifestVersion: 1.1
+id: patriot-zerodollar
+category: finance
+name: ZeroDollar
+version: "0.1.0"
+tagline: Zero-based budgeting that lives on your node
+icon: https://raw.githubusercontent.com/PatriotCrypto/umbrel-patriot-apps/main/patriot-zerodollar/icon.png
+description: >-
+  ZeroDollar is a private zero-based budget. Plan your income, give every dollar a job until "Left to budget" hits zero, and log spending in seconds with a one-line quick add.
+
+
+  Once a month, upload your bank statement (CSV or OFX/QFX). ZeroDollar matches what you entered to what the bank shows by amount, date and payee, offers suggestions for tips and fees, and lets you add anything you missed or match the rest by hand. It checks your balance against the bank's ending balance and locks the month when you finish.
+
+
+  Includes sinking funds with goals, bill due dates, a debt snowball or avalanche payoff planner, split transactions, transfers, reports for spending, income and net worth, four looks, backup and restore, and CSV export. Everything stays on your Umbrel. No accounts, no subscription, no telemetry.
+
+
+  ZeroDollar is an independent community app and is not affiliated with or endorsed by Ramsey Solutions, EveryDollar or Umbrel. It does not give financial advice.
+developer: PatriotCrypto
+website: https://github.com/PatriotCrypto/umbrel-patriot-apps
+dependencies: []
+repo: https://github.com/PatriotCrypto/umbrel-patriot-apps
+support: https://github.com/PatriotCrypto/umbrel-patriot-apps/issues
+port: 3973
+gallery: []
+path: ""
+defaultUsername: ""
+defaultPassword: ""
+submitter: PatriotCrypto
+submission: https://github.com/PatriotCrypto/umbrel-patriot-apps
+releaseNotes: >-
+  First release. Monthly zero-based budget, quick add, bank statement reconcile (CSV and OFX/QFX) with auto-match and manual match, funds, debt payoff planner, reports, four looks, backup and restore, home-screen widget.
+widgets:
+  - id: left
+    type: text-with-progress
+    refresh: 5m
+    endpoint: /widgets/left
+    example:
+      type: text-with-progress
+      link: ""
+      title: Left to budget
+      text: "$0.00"
+      progressLabel: $4,505.00 of $4,505.00 planned
+      progress: 1
