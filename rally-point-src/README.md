@@ -14,7 +14,7 @@ Private preparedness and homestead planner for Umbrel. Independent community app
 - Four looks, offline library of guides, backup and restore
 
 ## Install
-Umbrel Settings → App Store → ⋯ → Community App Stores → add `https://github.com/PatriotCrypto/umbrel-rally-point`.
+Umbrel Settings → App Store → ⋯ → Community App Stores → add `https://github.com/PatriotCrypto/umbrel-patriot-apps`.
 
 ## Security notes
 - All data stays on your Umbrel in `${APP_DATA_DIR}/data`. No telemetry. The only optional network features are the ntfy digest and Open Food Facts lookup, both off by default.

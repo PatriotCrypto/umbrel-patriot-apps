@@ -44,8 +44,8 @@ Put it full screen on a spare monitor and leave it running.
 
 1. In your Umbrel, open the **App Store**, click the **⋯** menu at the top right and choose
    **Community App Stores**.
-2. Paste `https://github.com/PatriotCrypto/umbrel-skywatch` and click **Add**.
-3. Open the **Skywatch** store and install **Skywatch Radar**.
+2. Paste `https://github.com/PatriotCrypto/umbrel-patriot-apps` and click **Add**.
+3. Open the **Patriot Apps** store and install **Skywatch Radar**.
 
 ## Set up
 

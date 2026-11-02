@@ -42,7 +42,7 @@ jobs:
           context: ./ipod-sync-src
           platforms: linux/amd64,linux/arm64
           push: true
-          tags: ghcr.io/${{ env.OWNER }}/umbrel-ipod-sync:${{ inputs.version }}
+          tags: ghcr.io/${{ env.OWNER }}/upod:${{ inputs.version }}
 
       - name: Show the image line to use
         run: |
@@ -52,8 +52,8 @@ jobs:
             echo "Run this in your checkout of the repository:"
             echo
             echo '```'
-            echo "./scripts/set-image.sh ghcr.io/${OWNER}/umbrel-ipod-sync:${{ inputs.version }}@${{ steps.build.outputs.digest }}"
+            echo "./scripts/set-image.sh ghcr.io/${OWNER}/upod:${{ inputs.version }}@${{ steps.build.outputs.digest }}"
             echo '```'
             echo
-            echo "Then make the package public: GitHub profile -> Packages -> umbrel-ipod-sync -> Package settings -> Change visibility -> Public."
+            echo "Then make the package public: GitHub profile -> Packages -> upod -> Package settings -> Change visibility -> Public."
           } >> "$GITHUB_STEP_SUMMARY"

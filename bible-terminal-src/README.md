@@ -23,7 +23,7 @@ The KJV text was read from 66 Ordinals inscriptions on Bitcoin (transaction ids 
 
 ## Install on Umbrel
 
-1. In Umbrel, open **App Store → ⋯ → Community App Stores** and add `https://github.com/PatriotCrypto/umbrel-bible-terminal`.
+1. In Umbrel, open **App Store → ⋯ → Community App Stores** and add `https://github.com/PatriotCrypto/umbrel-patriot-apps`.
 2. Install **Bible Terminal** from that store.
 3. Optional: in **Settings** inside the app, enter your Ollama address and model to turn on Ask.
 

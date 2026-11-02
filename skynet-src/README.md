@@ -36,7 +36,7 @@ The screenshots show fictional demo stations.
 
 ## Install
 
-1. In Umbrel, open the App Store, tap the three dots, choose **Community App Stores**, and add `https://github.com/PatriotCrypto/umbrel-skynet`.
+1. In Umbrel, open the App Store, tap the three dots, choose **Community App Stores**, and add `https://github.com/PatriotCrypto/umbrel-patriot-apps`.
 2. Install **Skynet** from that store.
 
 ## Connect your Meshtastic node

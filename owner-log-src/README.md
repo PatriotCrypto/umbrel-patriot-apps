@@ -64,22 +64,20 @@ Updates keep your data. Only uninstalling removes it.
 
 ### How a release works
 
-This repository holds the source and builds the container image. The store
-listing — `hangar-owner-log/umbrel-app.yml` and its `docker-compose.yml` — lives
-in the
-[pilot-logbook-umbrel](https://github.com/PatriotCrypto/umbrel-patriot-apps)
-repository, because a community app store cannot share an id with another one.
+The source lives in `owner-log-src/` and the store listing (`umbrel-app.yml` and
+`docker-compose.yml`) in `patriot-owner-log/`, both in this repository.
 
-1. Here: tag `vX.Y.Z` and push it. GitHub Actions builds
-   `ghcr.io/PatriotCrypto/hangar-owner-log:X.Y.Z` for amd64 and arm64.
-2. In the store repository: bump `version` in `umbrel-app.yml` and the image tag
-   in `docker-compose.yml`, then push.
+1. Build and push the image for amd64 and arm64:
+   `docker buildx build --platform linux/amd64,linux/arm64 -t ghcr.io/patriotcryptous/hangar-owner-log:X.Y.Z --push owner-log-src`
+2. In `patriot-owner-log/`, bump `version` in `umbrel-app.yml` and the image tag
+   (and digest) in `docker-compose.yml`, then push. Umbrel re-checks community
+   stores every few minutes, and the app then offers an update.
 
 ## Run it without Umbrel
 
 ```bash
 git clone https://github.com/PatriotCrypto/umbrel-patriot-apps
-cd owner-log-umbrel
+cd umbrel-patriot-apps/owner-log-src
 pip install -r requirements.txt
 OWL_DATA_DIR=./data python -m uvicorn app.main:app --port 8080
 ```

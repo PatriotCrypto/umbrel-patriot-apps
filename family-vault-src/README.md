@@ -62,7 +62,7 @@ Your passports, insurance policies, tax returns, wills and medical records stay 
 
 ## Install on Umbrel
 
-In Umbrel: App Store, three-dot menu, Community App Stores, add `https://github.com/PatriotCrypto/umbrel-family-vault`. Then install Family Vault.
+In Umbrel: App Store, three-dot menu, Community App Stores, add `https://github.com/PatriotCrypto/umbrel-patriot-apps`. Then install Family Vault.
 
 ## Upgrading from an older version
 

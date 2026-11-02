@@ -428,7 +428,7 @@ def test_reserve_balance_and_withdrawal(client):
 
 
 def test_co_owner_shares(client):
-    post(client, "/people/add", data={"name": "Wyley", "role": "Owner", "share": "50"})
+    post(client, "/people/add", data={"name": "Test Owner", "role": "Owner", "share": "50"})
     post(client, "/people/add", data={"name": "Dad", "role": "Co-owner", "share": "50"})
     post(client, "/costs/add", data={"spent_on": date.today().isoformat(),
                                      "amount": "1000", "category": "Maintenance",
@@ -517,7 +517,7 @@ def test_compliance_and_cost_pdfs(client):
 
 
 def test_csv_exports(client):
-    post(client, "/people/add", data={"name": "Wyley", "role": "Owner"})
+    post(client, "/people/add", data={"name": "Test Owner", "role": "Owner"})
     post(client, "/flights/add", data={"flew_on": days_ago(3), "hours": "1.5",
                                        "route": "KHAO local", "person_id": "1"})
     post(client, "/squawks/add", data={"title": "Test squawk", "severity": "medium"})

@@ -565,7 +565,7 @@ async function renderSettings(v) {
   if (view.name !== 'settings') return;
   v.innerHTML = `<h2>⚙️ Settings</h2>
   <h3>Theme</h3><div class="list"><div class="themes">${THEMES.map((t) => `<button class="theme-opt ${curTheme() === t.id ? 'on' : ''}" data-t="${t.id}"><div class="sw">${t.sw.map((c) => `<i style="background:${c}"></i>`).join('')}</div><div class="nm">${t.name}</div></button>`).join('')}</div></div>
-  <h3>Family</h3><div class="list"><div class="row" style="cursor:default;display:block"><label style="margin:0">Family name (shown on the home page)<input id="fn" maxlength="60" value="${esc(st.familyName || '')}" placeholder="e.g. Gump Family"></label><div class="btns"><button id="fns">Save</button></div></div></div>
+  <h3>Family</h3><div class="list"><div class="row" style="cursor:default;display:block"><label style="margin:0">Family name (shown on the home page)<input id="fn" maxlength="60" value="${esc(st.familyName || '')}" placeholder="e.g. The Smith Family"></label><div class="btns"><button id="fns">Save</button></div></div></div>
   <h3>Categories</h3><div class="list" id="catlist">${CATS.map((c) => `<div class="row" style="cursor:default"><span class="th plain">${esc(CAT_ICON[c])}</span><div class="grow"><div class="t">${esc(c)}</div><div class="s">${db.items.filter((i) => i.category === c).length} items</div></div>${PROTECTED_CATS.includes(c) ? '<span class="pill">built in</span>' : `<button class="small" data-ren="${esc(c)}">Rename</button><button class="small danger" data-delc="${esc(c)}">Delete</button>`}</div>`).join('')}
     <div class="row" id="addcat"><span class="th plain">➕</span><div class="grow"><div class="t">Add a category</div><div class="s">For anything that doesn't fit the built-in ones, e.g. Medical, Pets, School.</div></div></div></div>
   <h3>Security</h3><div class="list"><div class="row" style="cursor:default"><div class="grow"><div class="t">Auto-lock</div><div class="s">Lock this browser after this much inactivity.</div></div>
@@ -706,7 +706,7 @@ function downloadText(name, text) {
 const IMPORTS = {
   passwords: {
     title: 'Import passwords', file: 'family-vault-passwords-template.csv', noun: 'login',
-    template: 'Title,Website,Username,Password,Notes,Belongs to,Expires\nNetflix,https://netflix.com,family@example.com,CHANGE-ME,Shared family account,,\nBank of Example,https://bank.example.com,wyley,CHANGE-ME,Security question hint: first pet,Wyley,\n',
+    template: 'Title,Website,Username,Password,Notes,Belongs to,Expires\nNetflix,https://netflix.com,family@example.com,CHANGE-ME,Shared family account,,\nBank of Example,https://bank.example.com,wyley,CHANGE-ME,Security question hint: first pet,Alex,\n',
     cols: { title: ['title', 'name', 'accountname', 'site', 'sitename', 'account', 'label'], url: ['website', 'url', 'loginuri', 'siteurl', 'weburl', 'link', 'web'], username: ['username', 'loginusername', 'user', 'login', 'userid', 'email'], password: ['password', 'loginpassword', 'pass'], notes: ['notes', 'note', 'comments', 'extra', 'loginnotes'], person: ['belongsto', 'person', 'owner', 'familymember', 'for'], expires: ['expires', 'expiry', 'expirationdate', 'expirydate'] },
     warn: 'This file holds passwords in plain text. Delete it (and empty your trash) as soon as the import is done.',
   },

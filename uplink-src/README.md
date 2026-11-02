@@ -73,7 +73,7 @@ You need two Umbrels, one for each person, and the free [Tailscale](https://tail
 In the Umbrel App Store, open the **⋯** menu, choose **Community App Stores**, add this address and install **Uplink**:
 
 ```
-https://github.com/PatriotCrypto/umbrel-uplink
+https://github.com/PatriotCrypto/umbrel-patriot-apps
 ```
 
 Both people do this.

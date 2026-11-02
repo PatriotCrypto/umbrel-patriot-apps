@@ -575,7 +575,7 @@ def test_pdf_report_renders(client):
 
 
 def test_backup_and_restore_round_trip(client):
-    post(client, "/settings/project", data={"name": "Gump RV-12iS", "model": "RV-12iS"})
+    post(client, "/settings/project", data={"name": "Test RV-12iS", "model": "RV-12iS"})
     post(client, "/log/new", data={"work_date": "2026-03-01", "title": "Keep me", "hours": "6"})
     post(client, "/photos/upload", files={"photos": ("keep.png", png_bytes(), "image/png")})
 
@@ -600,7 +600,7 @@ def test_backup_and_restore_round_trip(client):
     summary = client.get("/api/summary").json()
     assert summary["entries"] == 1
     assert summary["total_hours"] == 6.0
-    assert summary["project"]["name"] == "Gump RV-12iS"
+    assert summary["project"]["name"] == "Test RV-12iS"
     assert "Keep me" in client.get("/log").text
 
 
@@ -654,7 +654,7 @@ def test_project_settings_and_dashboard_estimate(client):
         client,
         "/settings/project",
         data={
-            "name": "Gump RV-12iS",
+            "name": "Test RV-12iS",
             "model": "RV-12iS",
             "kit_number": "120999",
             "builder": "Test Pilot",
@@ -665,7 +665,7 @@ def test_project_settings_and_dashboard_estimate(client):
         },
     )
     html = client.get("/").text
-    assert "Gump RV-12iS" in html
+    assert "Test RV-12iS" in html
     assert "700" in html
     settings = client.get("/settings").text
     assert "N12WG" in settings and "120999" in settings
