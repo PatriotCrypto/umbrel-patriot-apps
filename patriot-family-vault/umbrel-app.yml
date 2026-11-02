@@ -18,15 +18,15 @@ description: >-
   including the server it runs on, can read your documents while the vault is locked. If you forget the passphrase, your documents cannot
   be recovered, so keep it somewhere safe. A one-click encrypted backup is included.
 developer: PatriotCrypto
-website: https://github.com/PatriotCrypto/umbrel-ipod-sync
-repo: https://github.com/PatriotCrypto/umbrel-ipod-sync
-support: https://github.com/PatriotCrypto/umbrel-ipod-sync/issues
+website: https://github.com/PatriotCrypto/umbrel-patriot-apps
+repo: https://github.com/PatriotCrypto/umbrel-patriot-apps
+support: https://github.com/PatriotCrypto/umbrel-patriot-apps/issues
 port: 3921
 gallery: []
 path: ""
 releaseNotes: >-
   Fixes the Net worth tile so its text is easy to read in the Retro 95 theme.
 submitter: PatriotCrypto
-submission: https://github.com/PatriotCrypto/umbrel-ipod-sync
+submission: https://github.com/PatriotCrypto/umbrel-patriot-apps
 dependencies: []
-icon: https://raw.githubusercontent.com/PatriotCrypto/umbrel-ipod-sync/main/patriot-family-vault/icon.svg
+icon: https://raw.githubusercontent.com/PatriotCrypto/umbrel-patriot-apps/main/patriot-family-vault/icon.svg

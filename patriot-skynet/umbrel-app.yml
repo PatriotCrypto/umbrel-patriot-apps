@@ -19,10 +19,10 @@ description: >-
 
   Independent hobby project. Not affiliated with or endorsed by Meshtastic, Baofeng, CHIRP or Umbrel.
 developer: PatriotCrypto
-website: https://github.com/PatriotCrypto/umbrel-ipod-sync
+website: https://github.com/PatriotCrypto/umbrel-patriot-apps
 dependencies: []
-repo: https://github.com/PatriotCrypto/umbrel-ipod-sync
-support: https://github.com/PatriotCrypto/umbrel-ipod-sync/issues
+repo: https://github.com/PatriotCrypto/umbrel-patriot-apps
+support: https://github.com/PatriotCrypto/umbrel-patriot-apps/issues
 port: 3959
 gallery: []
 path: ""
@@ -31,6 +31,6 @@ defaultPassword: ""
 releaseNotes: >-
   Removed all sound effects. The app is now completely silent.
 submitter: PatriotCrypto
-submission: https://github.com/PatriotCrypto/umbrel-ipod-sync
+submission: https://github.com/PatriotCrypto/umbrel-patriot-apps
 
-icon: https://raw.githubusercontent.com/PatriotCrypto/umbrel-ipod-sync/main/skynet-src/app/public/icon.svg
+icon: https://raw.githubusercontent.com/PatriotCrypto/umbrel-patriot-apps/main/skynet-src/app/public/icon.svg

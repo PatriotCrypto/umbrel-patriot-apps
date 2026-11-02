@@ -33,10 +33,10 @@ description: >-
   Before the first sync, the nano 5th generation must have been synced once with iTunes (or
   Apple Devices or Finder) so the iPod's database signature is learned.
 developer: PatriotCrypto
-website: https://github.com/PatriotCrypto/umbrel-ipod-sync
+website: https://github.com/PatriotCrypto/umbrel-patriot-apps
 dependencies: []
-repo: https://github.com/PatriotCrypto/umbrel-ipod-sync
-support: https://github.com/PatriotCrypto/umbrel-ipod-sync/issues
+repo: https://github.com/PatriotCrypto/umbrel-patriot-apps
+support: https://github.com/PatriotCrypto/umbrel-patriot-apps/issues
 port: 8741
 gallery: []
 path: ""
@@ -47,4 +47,4 @@ releaseNotes: >-
   be used, and lets you narrow a wide library down. Playback stops after a few songs it cannot
   play instead of racing through the queue, and two names for one file are no longer offered
   as duplicates.
-icon: https://raw.githubusercontent.com/PatriotCrypto/umbrel-ipod-sync/main/patriot-ipod-sync/icon.svg
+icon: https://raw.githubusercontent.com/PatriotCrypto/umbrel-patriot-apps/main/patriot-ipod-sync/icon.svg

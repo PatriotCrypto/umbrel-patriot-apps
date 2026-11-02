@@ -3,7 +3,7 @@ id: patriot-pilot-logbook
 category: files
 name: Pilot Log
 version: "1.6.2"
-icon: https://raw.githubusercontent.com/PatriotCrypto/umbrel-ipod-sync/main/patriot-pilot-logbook/icon.svg
+icon: https://raw.githubusercontent.com/PatriotCrypto/umbrel-patriot-apps/main/patriot-pilot-logbook/icon.svg
 tagline: Your flight log and logbook backup, kept on your own server
 description: >-
   Your logbook is a record of every hour you've worked for, and it deserves a backup you control. Pilot Log keeps a complete copy on your own umbrelOS device: a safe home for your paper logbook, and your own copy of your ForeFlight logbook, so your records don't live only in someone else's cloud account or subscription.
@@ -23,10 +23,10 @@ description: >-
 
   Currency, progress, minimums and cost figures are reminders based on what you have logged, not a determination of legal currency or certificate eligibility. Keep your original logbook. Not affiliated with ForeFlight or the FAA.
 developer: PatriotCrypto
-website: https://github.com/PatriotCrypto/umbrel-ipod-sync
+website: https://github.com/PatriotCrypto/umbrel-patriot-apps
 dependencies: []
-repo: https://github.com/PatriotCrypto/umbrel-ipod-sync
-support: https://github.com/PatriotCrypto/umbrel-ipod-sync/issues
+repo: https://github.com/PatriotCrypto/umbrel-patriot-apps
+support: https://github.com/PatriotCrypto/umbrel-patriot-apps/issues
 port: 8080
 gallery: []
 path: ""
@@ -35,4 +35,4 @@ defaultPassword: ""
 releaseNotes: >-
   The app is now called Pilot Log. Nothing else changes, and your flights, documents and settings stay as they are.
 submitter: PatriotCrypto
-submission: https://github.com/PatriotCrypto/umbrel-ipod-sync
+submission: https://github.com/PatriotCrypto/umbrel-patriot-apps

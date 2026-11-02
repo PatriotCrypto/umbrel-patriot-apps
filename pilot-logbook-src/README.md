@@ -29,7 +29,7 @@ Your logbook is the record of every hour you've earned, and it should have a bac
 ## Install on umbrelOS
 
 1. Open the App Store, find **Community App Stores** (the menu location differs between umbrelOS versions), and add:
-   `https://github.com/PatriotCrypto/umbrel-ipod-sync`
+   `https://github.com/PatriotCrypto/umbrel-patriot-apps`
 2. Install **Pilot Log** from the "Hangar" store.
 3. Open the app, go to **Import & backup**, and upload your ForeFlight CSV.
 
@@ -37,7 +37,7 @@ The app has no login of its own. It relies on umbrelOS's app proxy.
 
 ## Support
 
-Found a bug or have an idea? [Open an issue](https://github.com/PatriotCrypto/umbrel-ipod-sync/issues/new/choose). Please don't attach your logbook, exports or documents: this repository is public.
+Found a bug or have an idea? [Open an issue](https://github.com/PatriotCrypto/umbrel-patriot-apps/issues/new/choose). Please don't attach your logbook, exports or documents: this repository is public.
 
 ## Disclaimer
 

@@ -23,9 +23,9 @@ description: >-
 
   Files sent to you land in an Uplink folder in your Umbrel Files, which Uplink creates the first time it starts.
 developer: PatriotCrypto
-website: https://github.com/PatriotCrypto/umbrel-ipod-sync
-repo: https://github.com/PatriotCrypto/umbrel-ipod-sync
-support: https://github.com/PatriotCrypto/umbrel-ipod-sync/issues
+website: https://github.com/PatriotCrypto/umbrel-patriot-apps
+repo: https://github.com/PatriotCrypto/umbrel-patriot-apps
+support: https://github.com/PatriotCrypto/umbrel-patriot-apps/issues
 port: 3947
 gallery: []
 path: ""
@@ -41,5 +41,5 @@ folderAccess:
 releaseNotes: >-
   Security update from a full audit. Fixes a malformed request that could crash Uplink, checks who is sending before reading any data, limits unknown devices and turns away repeat offenders, only lets a linked station move to another Tailscale address (and notes it in the chat), adds per-station message, rate and storage limits with cleanup of half-finished files, blocks replays after a restart, lengthens the safety number (compare it again with your contact), updates the web framework to fix known issues, and pins the build. Also fixes the link up-time readout.
 submitter: PatriotCrypto
-submission: https://github.com/PatriotCrypto/umbrel-ipod-sync
-icon: https://raw.githubusercontent.com/PatriotCrypto/umbrel-ipod-sync/main/patriot-uplink/icon.svg
+submission: https://github.com/PatriotCrypto/umbrel-patriot-apps
+icon: https://raw.githubusercontent.com/PatriotCrypto/umbrel-patriot-apps/main/patriot-uplink/icon.svg

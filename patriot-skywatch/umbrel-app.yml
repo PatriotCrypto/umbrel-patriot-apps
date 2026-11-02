@@ -4,7 +4,7 @@ category: automation
 name: Skywatch Radar
 version: "0.3.8"
 tagline: A live radar screen for the aircraft around your home
-icon: https://raw.githubusercontent.com/PatriotCrypto/umbrel-ipod-sync/main/skywatch-src/app/public/img/icon.svg
+icon: https://raw.githubusercontent.com/PatriotCrypto/umbrel-patriot-apps/main/skywatch-src/app/public/img/icon.svg
 description: >-
   Skywatch turns any monitor into a radar scope for the sky around your home, using live
   ADS-B data from the Wingbits network.
@@ -41,19 +41,19 @@ releaseNotes: >-
   leaking a little drawing state on every frame. Also lighter on the graphics card (cached glows,
   static grain and a separately drawn steel cabinet).
 developer: PatriotCrypto
-website: https://github.com/PatriotCrypto/umbrel-ipod-sync
+website: https://github.com/PatriotCrypto/umbrel-patriot-apps
 dependencies: []
-repo: https://github.com/PatriotCrypto/umbrel-ipod-sync
-support: https://github.com/PatriotCrypto/umbrel-ipod-sync/issues
+repo: https://github.com/PatriotCrypto/umbrel-patriot-apps
+support: https://github.com/PatriotCrypto/umbrel-patriot-apps/issues
 port: 3928
 gallery:
-  - https://raw.githubusercontent.com/PatriotCrypto/umbrel-ipod-sync/main/skywatch-src/gallery/1.png
-  - https://raw.githubusercontent.com/PatriotCrypto/umbrel-ipod-sync/main/skywatch-src/gallery/2.png
-  - https://raw.githubusercontent.com/PatriotCrypto/umbrel-ipod-sync/main/skywatch-src/gallery/3.png
-  - https://raw.githubusercontent.com/PatriotCrypto/umbrel-ipod-sync/main/skywatch-src/gallery/4.png
-  - https://raw.githubusercontent.com/PatriotCrypto/umbrel-ipod-sync/main/skywatch-src/gallery/5.png
+  - https://raw.githubusercontent.com/PatriotCrypto/umbrel-patriot-apps/main/skywatch-src/gallery/1.png
+  - https://raw.githubusercontent.com/PatriotCrypto/umbrel-patriot-apps/main/skywatch-src/gallery/2.png
+  - https://raw.githubusercontent.com/PatriotCrypto/umbrel-patriot-apps/main/skywatch-src/gallery/3.png
+  - https://raw.githubusercontent.com/PatriotCrypto/umbrel-patriot-apps/main/skywatch-src/gallery/4.png
+  - https://raw.githubusercontent.com/PatriotCrypto/umbrel-patriot-apps/main/skywatch-src/gallery/5.png
 path: ""
 defaultUsername: ""
 defaultPassword: ""
 submitter: PatriotCrypto
-submission: https://github.com/PatriotCrypto/umbrel-ipod-sync
+submission: https://github.com/PatriotCrypto/umbrel-patriot-apps

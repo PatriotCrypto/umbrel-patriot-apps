@@ -4,7 +4,7 @@ category: files
 name: Bible Terminal
 version: "0.2.2"
 tagline: A study desk for the King James Bible, read straight from Bitcoin
-icon: https://raw.githubusercontent.com/PatriotCrypto/umbrel-ipod-sync/main/patriot-bible-terminal/icon.svg
+icon: https://raw.githubusercontent.com/PatriotCrypto/umbrel-patriot-apps/main/patriot-bible-terminal/icon.svg
 description: >-
   Bible Terminal is a quiet, terminal-style study desk for the King James Bible that runs entirely on your Umbrel.
 
@@ -23,9 +23,9 @@ description: >-
 
   No accounts, no tracking, no outside services unless you choose them. Not affiliated with any publisher, church or ministry.
 developer: PatriotCrypto
-website: https://github.com/PatriotCrypto/umbrel-ipod-sync
-repo: https://github.com/PatriotCrypto/umbrel-ipod-sync
-support: https://github.com/PatriotCrypto/umbrel-ipod-sync/issues
+website: https://github.com/PatriotCrypto/umbrel-patriot-apps
+repo: https://github.com/PatriotCrypto/umbrel-patriot-apps
+support: https://github.com/PatriotCrypto/umbrel-patriot-apps/issues
 port: 3953
 gallery: []
 path: ""
@@ -35,4 +35,4 @@ dependencies: []
 releaseNotes: >-
   First release: reader, search, Strong's, timeline, reading plans, bookmarks and notes, memorize, Ask with a local model, on-chain Verify, and the Pi Zero hotspot image builder.
 submitter: PatriotCrypto
-submission: https://github.com/PatriotCrypto/umbrel-ipod-sync
+submission: https://github.com/PatriotCrypto/umbrel-patriot-apps

@@ -24,9 +24,9 @@ description: >-
 
   Only rip discs you own, for your own use. Not affiliated with MakeMKV, IMDb or TVmaze.
 developer: PatriotCrypto
-website: https://github.com/PatriotCrypto/umbrel-ipod-sync
-repo: https://github.com/PatriotCrypto/umbrel-ipod-sync
-support: https://github.com/PatriotCrypto/umbrel-ipod-sync/issues
+website: https://github.com/PatriotCrypto/umbrel-patriot-apps
+repo: https://github.com/PatriotCrypto/umbrel-patriot-apps
+support: https://github.com/PatriotCrypto/umbrel-patriot-apps/issues
 port: 3926
 gallery: []
 path: ""
@@ -43,6 +43,6 @@ folderAccess:
 releaseNotes: >-
   The drive on the main screen is now a real-time 3D model with metal reflections and a shadow. The tray slides out toward you with a disc on it when your drive opens, and the progress bar and time remaining run across the front. Falls back to a simpler drawing if your browser cannot do 3D. Includes three.js (MIT license).
 submitter: PatriotCrypto
-submission: https://github.com/PatriotCrypto/umbrel-ipod-sync
+submission: https://github.com/PatriotCrypto/umbrel-patriot-apps
 dependencies: []
-icon: https://raw.githubusercontent.com/PatriotCrypto/umbrel-ipod-sync/main/patriot-disc-ripper/icon.svg
+icon: https://raw.githubusercontent.com/PatriotCrypto/umbrel-patriot-apps/main/patriot-disc-ripper/icon.svg

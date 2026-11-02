@@ -49,21 +49,21 @@ description: >-
   Nothing in this app contacts the internet. Your log, photos and documents stay
   in the app's data folder on your Umbrel.
 developer: PatriotCrypto
-website: https://github.com/PatriotCrypto/umbrel-ipod-sync
+website: https://github.com/PatriotCrypto/umbrel-patriot-apps
 dependencies: []
-repo: https://github.com/PatriotCrypto/umbrel-ipod-sync
-support: https://github.com/PatriotCrypto/umbrel-ipod-sync/issues
+repo: https://github.com/PatriotCrypto/umbrel-patriot-apps
+support: https://github.com/PatriotCrypto/umbrel-patriot-apps/issues
 port: 8231
-icon: https://raw.githubusercontent.com/PatriotCrypto/umbrel-ipod-sync/main/patriot-builder-log/icon.svg
+icon: https://raw.githubusercontent.com/PatriotCrypto/umbrel-patriot-apps/main/patriot-builder-log/icon.svg
 gallery:
-  - https://raw.githubusercontent.com/PatriotCrypto/umbrel-ipod-sync/main/patriot-builder-log/1.jpg
-  - https://raw.githubusercontent.com/PatriotCrypto/umbrel-ipod-sync/main/patriot-builder-log/2.jpg
-  - https://raw.githubusercontent.com/PatriotCrypto/umbrel-ipod-sync/main/patriot-builder-log/3.jpg
+  - https://raw.githubusercontent.com/PatriotCrypto/umbrel-patriot-apps/main/patriot-builder-log/1.jpg
+  - https://raw.githubusercontent.com/PatriotCrypto/umbrel-patriot-apps/main/patriot-builder-log/2.jpg
+  - https://raw.githubusercontent.com/PatriotCrypto/umbrel-patriot-apps/main/patriot-builder-log/3.jpg
 path: ""
 defaultUsername: ""
 defaultPassword: ""
 submitter: PatriotCrypto
-submission: https://github.com/PatriotCrypto/umbrel-ipod-sync
+submission: https://github.com/PatriotCrypto/umbrel-patriot-apps
 releaseNotes: >-
   First release.
 

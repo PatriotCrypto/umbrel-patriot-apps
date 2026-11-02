@@ -64,21 +64,21 @@ description: >-
   logbooks, and nothing it prints is a maintenance release. Nothing in this app
   contacts the internet.
 developer: PatriotCrypto
-website: https://github.com/PatriotCrypto/umbrel-ipod-sync
+website: https://github.com/PatriotCrypto/umbrel-patriot-apps
 dependencies: []
-repo: https://github.com/PatriotCrypto/umbrel-ipod-sync
-support: https://github.com/PatriotCrypto/umbrel-ipod-sync/issues
+repo: https://github.com/PatriotCrypto/umbrel-patriot-apps
+support: https://github.com/PatriotCrypto/umbrel-patriot-apps/issues
 port: 8232
-icon: https://raw.githubusercontent.com/PatriotCrypto/umbrel-ipod-sync/main/patriot-owner-log/icon.svg
+icon: https://raw.githubusercontent.com/PatriotCrypto/umbrel-patriot-apps/main/patriot-owner-log/icon.svg
 gallery:
-  - https://raw.githubusercontent.com/PatriotCrypto/umbrel-ipod-sync/main/patriot-owner-log/1.jpg
-  - https://raw.githubusercontent.com/PatriotCrypto/umbrel-ipod-sync/main/patriot-owner-log/2.jpg
-  - https://raw.githubusercontent.com/PatriotCrypto/umbrel-ipod-sync/main/patriot-owner-log/3.jpg
+  - https://raw.githubusercontent.com/PatriotCrypto/umbrel-patriot-apps/main/patriot-owner-log/1.jpg
+  - https://raw.githubusercontent.com/PatriotCrypto/umbrel-patriot-apps/main/patriot-owner-log/2.jpg
+  - https://raw.githubusercontent.com/PatriotCrypto/umbrel-patriot-apps/main/patriot-owner-log/3.jpg
 path: ""
 defaultUsername: ""
 defaultPassword: ""
 submitter: PatriotCrypto
-submission: https://github.com/PatriotCrypto/umbrel-ipod-sync
+submission: https://github.com/PatriotCrypto/umbrel-patriot-apps
 releaseNotes: >-
   First release.
 

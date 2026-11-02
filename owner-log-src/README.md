@@ -53,7 +53,7 @@ Logbook and Builder Log.
 2. Add the store, if it is not already there:
 
    ```
-   https://github.com/PatriotCrypto/umbrel-ipod-sync
+   https://github.com/PatriotCrypto/umbrel-patriot-apps
    ```
 
 3. Open the **Hangar** store and install **Owner Log**.
@@ -67,7 +67,7 @@ Updates keep your data. Only uninstalling removes it.
 This repository holds the source and builds the container image. The store
 listing — `hangar-owner-log/umbrel-app.yml` and its `docker-compose.yml` — lives
 in the
-[pilot-logbook-umbrel](https://github.com/PatriotCrypto/umbrel-ipod-sync)
+[pilot-logbook-umbrel](https://github.com/PatriotCrypto/umbrel-patriot-apps)
 repository, because a community app store cannot share an id with another one.
 
 1. Here: tag `vX.Y.Z` and push it. GitHub Actions builds
@@ -78,7 +78,7 @@ repository, because a community app store cannot share an id with another one.
 ## Run it without Umbrel
 
 ```bash
-git clone https://github.com/PatriotCrypto/umbrel-ipod-sync
+git clone https://github.com/PatriotCrypto/umbrel-patriot-apps
 cd owner-log-umbrel
 pip install -r requirements.txt
 OWL_DATA_DIR=./data python -m uvicorn app.main:app --port 8080
@@ -98,7 +98,7 @@ a copy off the server.
 ## Support
 
 Open an issue at
-<https://github.com/PatriotCrypto/umbrel-ipod-sync/issues>.
+<https://github.com/PatriotCrypto/umbrel-patriot-apps/issues>.
 
 ## Disclaimer
 

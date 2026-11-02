@@ -4,7 +4,7 @@ category: files
 name: Rally Point
 version: "0.4.0"
 tagline: Private preparedness and homestead planner
-icon: https://raw.githubusercontent.com/PatriotCrypto/umbrel-ipod-sync/main/patriot-rally-point/icon.svg
+icon: https://raw.githubusercontent.com/PatriotCrypto/umbrel-patriot-apps/main/patriot-rally-point/icon.svg
 description: >-
   Rally Point keeps track of what you have, how long it will last, and who does what.
 
@@ -20,17 +20,17 @@ description: >-
 
   Rally Point is an independent community app and is not affiliated with or endorsed by Umbrel.
 developer: PatriotCrypto
-website: https://github.com/PatriotCrypto/umbrel-ipod-sync
+website: https://github.com/PatriotCrypto/umbrel-patriot-apps
 dependencies: []
-repo: https://github.com/PatriotCrypto/umbrel-ipod-sync
-support: https://github.com/PatriotCrypto/umbrel-ipod-sync/issues
+repo: https://github.com/PatriotCrypto/umbrel-patriot-apps
+support: https://github.com/PatriotCrypto/umbrel-patriot-apps/issues
 port: 3967
 gallery: []
 path: ""
 defaultUsername: ""
 defaultPassword: ""
 submitter: PatriotCrypto
-submission: https://github.com/PatriotCrypto/umbrel-ipod-sync
+submission: https://github.com/PatriotCrypto/umbrel-patriot-apps
 releaseNotes: >-
   First release. Inventory with lots and expiry, supply math for food, water, power and fuel, group management, plans, homestead tools, encrypted vault, stealth mode, console widgets and optional daily digest.
 widgets:
