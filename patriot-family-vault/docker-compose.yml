@@ -1,0 +1,28 @@
+version: "3.7"
+
+services:
+  app_proxy:
+    environment:
+      APP_HOST: patriot-family-vault_web_1
+      APP_PORT: 3000
+
+  web:
+    image: ghcr.io/patriotcrypto/family-vault:0.5.1@sha256:0d9c0fe300669f7b2aa1b369ab7d5cbefd2a91e1779b917c9f61f024bce0e1e0
+    restart: on-failure
+    stop_grace_period: 1m
+    read_only: true
+    tmpfs:
+      - /tmp
+    cap_drop:
+      - ALL
+    cap_add:
+      - CHOWN
+      - SETUID
+      - SETGID
+    security_opt:
+      - no-new-privileges:true
+    environment:
+      PORT: 3000
+      DATA_DIR: /data
+    volumes:
+      - ${APP_DATA_DIR}/data:/data

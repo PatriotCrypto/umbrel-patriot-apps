@@ -1,0 +1,10 @@
+{
+  "name": "disc-ripper",
+  "version": "0.3.1",
+  "private": true,
+  "description": "Insert a DVD, get a Jellyfin-ready file on your Umbrel.",
+  "license": "MIT",
+  "main": "server.js",
+  "scripts": { "start": "node server.js" },
+  "dependencies": { "express": "4.21.2" }
+}

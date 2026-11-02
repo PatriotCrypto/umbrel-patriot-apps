@@ -1,0 +1,37 @@
+version: "3.7"
+
+services:
+  app_proxy:
+    environment:
+      APP_HOST: patriot-uplink_web_1
+      APP_PORT: 3000
+      # The other station talks to /peer/* directly. Every request there is
+      # end-to-end encrypted and only accepted from stations you linked.
+      PROXY_AUTH_WHITELIST: "/peer/*"
+
+  web:
+    image: ghcr.io/patriotcrypto/uplink:0.3.1@sha256:d9d3454ba9963ffc16369aeb82e93a59ea97ea6ec37fd7c072c56d4c0329370f
+    restart: on-failure
+    stop_grace_period: 30s
+    read_only: true
+    tmpfs:
+      - /tmp
+    cap_drop:
+      - ALL
+    # Only used at start-up to create the Uplink folder and hand it to the umbrel
+    # user; the app then switches to that user and these are dropped.
+    cap_add:
+      - CHOWN
+      - DAC_OVERRIDE
+      - SETUID
+      - SETGID
+    security_opt:
+      - no-new-privileges:true
+    environment:
+      PORT: 3000
+      DATA_DIR: /data
+      FILES_DIR: /files
+      PEER_PORT: 3947
+    volumes:
+      - ${APP_DATA_DIR}/data:/data
+      - ${UMBREL_ROOT}/home/Uplink:/files

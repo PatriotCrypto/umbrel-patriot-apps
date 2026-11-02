@@ -1,0 +1,48 @@
+manifestVersion: 1
+id: patriot-disc-ripper
+storage:
+  dataRoot: data
+category: media
+name: Disc Ripper
+version: "0.3.1"
+tagline: "Pop in a DVD and walk away. It rips, names it for Jellyfin and ejects."
+description: >-
+  Plug a USB DVD drive into your Umbrel, put a disc in, and walk away. Disc Ripper notices the disc, works out whether it is a movie
+  or a TV season, rips it with MakeMKV at full quality, saves it where Jellyfin expects it, and ejects the disc when it is finished.
+
+
+  Movies are saved as Movies / Name (Year) / Name (Year).mkv. TV season discs are split into episodes and saved as
+  TV Shows / Show (Year) / Season 01 / Show (Year) - S01E01 - Episode Title.mkv, continuing the numbering from disc to disc.
+
+
+  When it is not sure what a disc is, it waits and asks you on its status page (or you can switch on automatic mode in settings).
+
+
+  Setup: after installing, open the app's settings in Umbrel, go to Storage, and under Access to your folders choose your Media
+  folder with read and write access. Then open Disc Ripper and press Get the free beta key in its settings.
+
+
+  Only rip discs you own, for your own use. Not affiliated with MakeMKV, IMDb or TVmaze.
+developer: PatriotCrypto
+website: https://github.com/PatriotCrypto/umbrel-ipod-sync
+repo: https://github.com/PatriotCrypto/umbrel-ipod-sync
+support: https://github.com/PatriotCrypto/umbrel-ipod-sync/issues
+port: 3926
+gallery: []
+path: ""
+permissions:
+  - STORAGE_DOWNLOADS
+folderAccess:
+  - id: media
+    name: Media folder
+    note: "Choose your Media folder (the one Jellyfin reads) and allow read and write. Ripped discs are saved inside it."
+    mounts:
+      - service: web
+        targetPath: /media
+        readOnly: false
+releaseNotes: >-
+  The drive on the main screen is now a real-time 3D model with metal reflections and a shadow. The tray slides out toward you with a disc on it when your drive opens, and the progress bar and time remaining run across the front. Falls back to a simpler drawing if your browser cannot do 3D. Includes three.js (MIT license).
+submitter: PatriotCrypto
+submission: https://github.com/PatriotCrypto/umbrel-ipod-sync
+dependencies: []
+icon: https://raw.githubusercontent.com/PatriotCrypto/umbrel-ipod-sync/main/patriot-disc-ripper/icon.svg

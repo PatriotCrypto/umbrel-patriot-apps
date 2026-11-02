@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="en" data-skin="bunker">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0e110c">
+<meta name="robots" content="noindex">
+<title>Rally Point</title>
+<link rel="icon" href="/icon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/style.css">
+<script src="/boot.js"></script>
+</head>
+<body>
+<div id="app">
+  <header id="top">
+    <button id="menu" class="icon-btn" aria-label="Menu">&#9776;</button>
+    <div id="brand"><span class="logo" aria-hidden="true"></span><span id="brand-name">RALLY POINT</span></div>
+    <span id="ready-chip" class="chip" title="Readiness score"></span>
+    <form id="cmd-form" autocomplete="off"><input id="cmd" type="text" placeholder="Search, scan a barcode, or type / for commands" aria-label="Search or scan"></form>
+    <button id="stealth-btn" class="icon-btn" title="Stealth mode: hide ammo and lock the vault"></button>
+    <button id="lock-btn" class="icon-btn" title="Vault"></button>
+    <button id="skin-btn" class="icon-btn" title="Change look">&#9681;</button>
+  </header>
+  <nav id="side"></nav>
+  <main id="view" tabindex="-1"></main>
+</div>
+<script type="module" src="/js/main.js"></script>
+<noscript>Rally Point needs JavaScript.</noscript>
+</body>
+</html>

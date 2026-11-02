@@ -1,0 +1,30 @@
+version: "3.7"
+
+services:
+  app_proxy:
+    environment:
+      APP_HOST: patriot-bible-terminal_web_1
+      APP_PORT: 3953
+
+  web:
+    # digest is filled in after the first image push (see README)
+    image: ghcr.io/patriotcrypto/bible-terminal:0.2.2@sha256:8db1c8e956fddb52df15c36fd72de21c49283fc9cf1aab1792f265d5fc71926a
+    restart: on-failure
+    stop_grace_period: 1m
+    environment:
+      PORT: 3953
+      DATA_DIR: /data
+      NODE_ENV: production
+    volumes:
+      - ${APP_DATA_DIR}/data:/data
+    read_only: true
+    tmpfs:
+      - /tmp
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    cap_add:
+      - CHOWN
+      - SETUID
+      - SETGID

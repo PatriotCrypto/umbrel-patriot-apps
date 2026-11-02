@@ -1,0 +1,83 @@
+manifestVersion: 1.1
+id: patriot-rally-point
+category: files
+name: Rally Point
+version: "0.4.0"
+tagline: Private preparedness and homestead planner
+icon: https://raw.githubusercontent.com/PatriotCrypto/umbrel-ipod-sync/main/patriot-rally-point/icon.svg
+description: >-
+  Rally Point keeps track of what you have, how long it will last, and who does what.
+
+
+  Log food, water, medical supplies, comms, lights, power, fuel, filters, tools and more, with lots and expiration dates. Set the size of your group and your daily food and water needs, and the Console shows days of supply, your weakest links and an overall readiness score.
+
+
+  Plan water and power (rain catchment, bleach dosing, solar, battery, generator fuel), manage your group (members, positions, skills, tasks, watch roster, go-bags), keep checklists, contacts, places and document expirations, and run a garden and animals with a frost-based sowing calendar.
+
+
+  A PIN-protected encrypted vault holds firearm records, medical details and secure notes. Stealth mode hides ammo and locks the vault with one tap. Everything stays on your Umbrel. No accounts, no telemetry.
+
+
+  Rally Point is an independent community app and is not affiliated with or endorsed by Umbrel.
+developer: PatriotCrypto
+website: https://github.com/PatriotCrypto/umbrel-ipod-sync
+dependencies: []
+repo: https://github.com/PatriotCrypto/umbrel-ipod-sync
+support: https://github.com/PatriotCrypto/umbrel-ipod-sync/issues
+port: 3967
+gallery: []
+path: ""
+defaultUsername: ""
+defaultPassword: ""
+submitter: PatriotCrypto
+submission: https://github.com/PatriotCrypto/umbrel-ipod-sync
+releaseNotes: >-
+  First release. Inventory with lots and expiry, supply math for food, water, power and fuel, group management, plans, homestead tools, encrypted vault, stealth mode, console widgets and optional daily digest.
+widgets:
+  - id: readiness
+    type: text-with-progress
+    refresh: 5m
+    endpoint: /widgets/readiness
+    example:
+      type: text-with-progress
+      link: ""
+      title: My Group
+      text: "72"
+      progressLabel: Good
+      progress: 0.72
+  - id: supplies
+    type: four-stats
+    refresh: 5m
+    endpoint: /widgets/supplies
+    example:
+      type: four-stats
+      link: ""
+      items:
+        - title: Food
+          text: "34"
+          subtext: days
+        - title: Water
+          text: "12"
+          subtext: days
+        - title: Expiring
+          text: "3"
+          subtext: items
+        - title: Low stock
+          text: "2"
+          subtext: items
+  - id: attention
+    type: list-emoji
+    refresh: 5m
+    endpoint: /widgets/attention
+    example:
+      type: list-emoji
+      link: ""
+      count: 2
+      items:
+        - emoji: "🔴"
+          text: Water filter expired
+          subtext: 5 days ago
+        - emoji: "🟠"
+          text: Batteries low
+          subtext: 4 left
+      noItemsText: All clear

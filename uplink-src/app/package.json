@@ -1,0 +1,10 @@
+{
+  "name": "uplink",
+  "version": "0.3.1",
+  "private": true,
+  "description": "A private, encrypted chat and file link between two Umbrels over Tailscale.",
+  "license": "MIT",
+  "main": "server.js",
+  "scripts": { "start": "node server.js" },
+  "dependencies": { "express": "4.22.3" }
+}

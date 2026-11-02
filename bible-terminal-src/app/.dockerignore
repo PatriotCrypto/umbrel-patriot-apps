@@ -1,0 +1,10 @@
+node_modules
+.cache
+var
+test
+scripts
+data-src
+*.md
+
+**/* 2.*
+**/* 3.*

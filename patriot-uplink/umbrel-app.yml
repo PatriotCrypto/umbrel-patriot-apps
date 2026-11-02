@@ -1,0 +1,45 @@
+manifestVersion: 1
+id: patriot-uplink
+storage:
+  dataRoot: data
+category: networking
+name: Uplink
+version: "0.3.1"
+tagline: "A private chat and file link between your Umbrel and a friend's."
+description: >-
+  Uplink links your Umbrel directly with another person's Umbrel over Tailscale, so the two of you can send messages and
+  files to each other with nothing in between. There is no company server, no account and no cloud.
+
+
+  Messages wait and are delivered when the other station comes back online. Files of any size are sent in pieces and pick
+  up where they left off if the link drops. Everything between the two stations is end-to-end encrypted on top of
+  Tailscale's own encryption.
+
+
+  Setup: install the Tailscale app on both Umbrels and get them onto the same Tailscale network (the README shows two easy
+  ways). Open Uplink, give your station a name, paste your Umbrel's Tailscale address (it starts with 100.), and make an
+  invite code. The other person pastes the code into Uplink on their Umbrel and you are linked.
+
+
+  Files sent to you land in an Uplink folder in your Umbrel Files, which Uplink creates the first time it starts.
+developer: PatriotCrypto
+website: https://github.com/PatriotCrypto/umbrel-ipod-sync
+repo: https://github.com/PatriotCrypto/umbrel-ipod-sync
+support: https://github.com/PatriotCrypto/umbrel-ipod-sync/issues
+port: 3947
+gallery: []
+path: ""
+dependencies: []
+folderAccess:
+  - id: files
+    name: Received files
+    note: "Files sent to you are saved here. It starts as an Uplink folder in your Home; you can pick a different folder."
+    mounts:
+      - service: web
+        targetPath: /files
+        readOnly: false
+releaseNotes: >-
+  Security update from a full audit. Fixes a malformed request that could crash Uplink, checks who is sending before reading any data, limits unknown devices and turns away repeat offenders, only lets a linked station move to another Tailscale address (and notes it in the chat), adds per-station message, rate and storage limits with cleanup of half-finished files, blocks replays after a restart, lengthens the safety number (compare it again with your contact), updates the web framework to fix known issues, and pins the build. Also fixes the link up-time readout.
+submitter: PatriotCrypto
+submission: https://github.com/PatriotCrypto/umbrel-ipod-sync
+icon: https://raw.githubusercontent.com/PatriotCrypto/umbrel-ipod-sync/main/patriot-uplink/icon.svg

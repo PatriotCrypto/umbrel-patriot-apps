@@ -1,0 +1,36 @@
+manifestVersion: 1
+id: patriot-skynet
+category: networking
+name: Skynet
+version: "0.1.6"
+tagline: Your Meshtastic mesh and ham radio in one control room
+description: >-
+  Skynet is a control room for your radios, running on your own Umbrel.
+
+
+  Meshtastic: see every node on a map with trails and a coverage heat map, watch battery and signal, get alerts when a node goes quiet or runs low, and chat with the mesh from your browser. Connects to a node over your network (Wi-Fi or Ethernet), and includes a demo mesh so you can try everything before you have a node.
+
+
+  Ham radio: keep contacts, callsigns and frequencies in one place. Build a channel list for a Baofeng (or any CHIRP-supported radio) and export it as a CHIRP CSV, import your radio's current list, keep a logbook, and export it as ADIF.
+
+
+  Everything stays on your Umbrel. Four looks to choose from, and a hidden surprise.
+
+
+  Independent hobby project. Not affiliated with or endorsed by Meshtastic, Baofeng, CHIRP or Umbrel.
+developer: PatriotCrypto
+website: https://github.com/PatriotCrypto/umbrel-ipod-sync
+dependencies: []
+repo: https://github.com/PatriotCrypto/umbrel-ipod-sync
+support: https://github.com/PatriotCrypto/umbrel-ipod-sync/issues
+port: 3959
+gallery: []
+path: ""
+defaultUsername: ""
+defaultPassword: ""
+releaseNotes: >-
+  Removed all sound effects. The app is now completely silent.
+submitter: PatriotCrypto
+submission: https://github.com/PatriotCrypto/umbrel-ipod-sync
+
+icon: https://raw.githubusercontent.com/PatriotCrypto/umbrel-ipod-sync/main/skynet-src/app/public/icon.svg

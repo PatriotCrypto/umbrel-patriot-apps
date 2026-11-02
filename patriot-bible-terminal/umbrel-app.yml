@@ -1,0 +1,38 @@
+manifestVersion: 1
+id: patriot-bible-terminal
+category: files
+name: Bible Terminal
+version: "0.2.2"
+tagline: A study desk for the King James Bible, read straight from Bitcoin
+icon: https://raw.githubusercontent.com/PatriotCrypto/umbrel-ipod-sync/main/patriot-bible-terminal/icon.svg
+description: >-
+  Bible Terminal is a quiet, terminal-style study desk for the King James Bible that runs entirely on your Umbrel.
+
+
+  Read any chapter with a second translation (World English Bible) alongside, search by word, phrase or prefix with a book-by-book chart of where matches fall, follow 250,000 cross-references, look up Strong's Hebrew and Greek words, browse a timeline of Bible history, follow reading plans, and keep bookmarks, highlights and notes you can export to Markdown. A memory-card mode helps you learn verses.
+
+
+  Ask a question in plain words and your own local AI model (Ollama) answers from the relevant verses only, with citations.
+
+
+  The King James text was read from 66 Bitcoin inscriptions, and Verify re-checks every book against the blockchain on demand, right from the app.
+
+
+  Build a ready-to-flash SD card image for a Raspberry Pi Zero 2 W and it becomes a pocket Wi-Fi "Scripture hotspot" that serves the whole Bible with no internet.
+
+
+  No accounts, no tracking, no outside services unless you choose them. Not affiliated with any publisher, church or ministry.
+developer: PatriotCrypto
+website: https://github.com/PatriotCrypto/umbrel-ipod-sync
+repo: https://github.com/PatriotCrypto/umbrel-ipod-sync
+support: https://github.com/PatriotCrypto/umbrel-ipod-sync/issues
+port: 3953
+gallery: []
+path: ""
+defaultUsername: ""
+defaultPassword: ""
+dependencies: []
+releaseNotes: >-
+  First release: reader, search, Strong's, timeline, reading plans, bookmarks and notes, memorize, Ask with a local model, on-chain Verify, and the Pi Zero hotspot image builder.
+submitter: PatriotCrypto
+submission: https://github.com/PatriotCrypto/umbrel-ipod-sync

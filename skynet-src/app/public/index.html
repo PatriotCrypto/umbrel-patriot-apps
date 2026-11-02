@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="en" data-skin="cyberdeck">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Skynet</title>
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="style.css">
+<script src="boot.js"></script>
+</head>
+<body>
+<header class="top">
+  <div class="brand"><svg viewBox="0 0 24 24" class="logo" aria-hidden="true"><circle cx="12" cy="12" r="2.2"/><path d="M7.5 7.5a6.4 6.4 0 0 0 0 9M16.5 7.5a6.4 6.4 0 0 1 0 9M4.6 4.6a10.5 10.5 0 0 0 0 14.8M19.4 4.6a10.5 10.5 0 0 1 0 14.8"/></svg><span class="word">SKYNET</span><span id="callsign" class="call"></span></div>
+  <div class="grow"></div>
+  <div id="clock" aria-hidden="true"></div>
+  <span id="link" class="chip">…</span>
+  <button id="skin" class="ghost" title="Change look">LOOK</button>
+</header>
+<nav id="tabs" class="tabs" role="tablist">
+  <button data-v="nodes" class="on"><i>F1</i>Nodes</button>
+  <button data-v="chat"><i>F2</i>Chat</button>
+  <button data-v="contacts"><i>F3</i>Contacts</button>
+  <button data-v="freqs"><i>F4</i>Freqs</button>
+  <button data-v="log"><i>F5</i>Log</button>
+  <button data-v="settings"><i>F6</i>Config</button>
+</nav>
+<main id="view"></main>
+<dialog id="dlg"><form method="dialog" id="dform"></form></dialog>
+<div id="egg" class="egg" hidden></div>
+<div id="toast" class="toast" hidden></div>
+<script src="map.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

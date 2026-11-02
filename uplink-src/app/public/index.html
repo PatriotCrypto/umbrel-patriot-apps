@@ -1,0 +1,120 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="color-scheme" content="dark">
+<title>Uplink</title>
+<link rel="icon" href="icon.svg">
+<link rel="stylesheet" href="style.css">
+<link rel="stylesheet" href="themes.css">
+<script src="boot.js"></script>
+</head>
+<body>
+<div class="case">
+<header class="top">
+  <div class="brand"><img src="icon.svg" alt="" width="24" height="24"><span>UPLINK</span><span class="mc">MISSION CONTROL</span><small id="ver"></small></div>
+  <div class="me" id="meBox"></div>
+  <div class="top-r">
+    <span class="clock" id="topClock"></span>
+    <span class="sig" id="topSig" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></span>
+    <button type="button" class="key snd" id="sndBtn" aria-pressed="true" title="Sound on or off"><i aria-hidden="true"></i>SND</button>
+    <button type="button" class="key" id="topLink" aria-controls="linkPanel">+ LINK</button>
+    <button type="button" class="key" id="setBtn" aria-controls="setPanel">SETTINGS</button>
+  </div>
+</header>
+
+<nav class="tabs" id="tabs" aria-label="Views">
+  <button type="button" data-tab="comms" aria-pressed="true">COMMS</button>
+  <button type="button" data-tab="console" aria-pressed="false">CONSOLE</button>
+</nav>
+
+<main class="deck" id="deck" data-tab="comms">
+  <aside class="rail panel" aria-label="Stations">
+    <div class="ph"><span>STATIONS</span><button type="button" class="key sm" id="linkBtn">+ LINK</button></div>
+    <ul id="stations" class="stations"></ul>
+    <p class="rail-empty" id="railEmpty" hidden>No stations linked yet.</p>
+  </aside>
+
+  <section class="comms panel" id="logWrap" aria-label="Conversation">
+    <div class="ph log-h" id="logHead" hidden>
+      <div class="lh-who"><i class="led" id="lhDot"></i><b id="lhName"></b><span class="lh-meta" id="lhMeta"></span></div>
+      <button type="button" class="key sm" id="peerMenuBtn" aria-expanded="false" aria-controls="peerMenu">STATION</button>
+    </div>
+    <div class="peer-menu" id="peerMenu" hidden>
+      <div class="pm-row"><label for="pmAddr">Address</label><input id="pmAddr" type="text" spellcheck="false" autocomplete="off"><label for="pmPort" class="sr">Port</label><input id="pmPort" type="number" min="1" max="65535" class="port"><button type="button" class="key" id="pmSave">SAVE</button></div>
+      <div class="pm-row"><button type="button" class="key" id="pmClear">CLEAR LOG</button><button type="button" class="key danger" id="pmUnlink">UNLINK</button></div>
+      <p class="hint" id="pmErr"></p>
+    </div>
+    <div class="log" id="log" role="log" aria-live="polite"></div>
+    <div class="welcome" id="welcome" hidden></div>
+    <form class="composer" id="composer" hidden>
+      <label class="prompt" for="msg" id="prompt">&gt;</label>
+      <textarea id="msg" rows="1" placeholder="type a message" maxlength="8000" autocomplete="off"></textarea>
+      <input type="file" id="fileIn" multiple hidden>
+      <button type="button" class="key" id="attachBtn" title="Send a file">FILE</button>
+      <button type="submit" class="key go" id="sendBtn">SEND</button>
+    </form>
+    <div class="drop" id="drop" hidden><div>DROP TO SEND TO <b id="dropName"></b></div></div>
+  </section>
+
+  <section class="console" id="console" aria-label="Console">
+    <div class="w panel radar" id="radarW"><div class="ph"><span>RADAR</span><em id="radarSub">scanning</em></div><div class="wb"><canvas id="radarC" width="300" height="300" role="img" aria-label="Radar showing transmissions to and from the linked station"></canvas><dl class="kv rkv" id="radarKv"></dl></div></div>
+    <div id="widgets" class="widgets"></div>
+  </section>
+</main>
+</div>
+
+<div class="sheet" id="setPanel" hidden>
+  <div class="sheet-in panel" role="dialog" aria-modal="true" aria-labelledby="setTitle">
+    <div class="ph"><span id="setTitle">THIS STATION</span><button type="button" class="key sm" data-close>CLOSE</button></div>
+    <form id="setForm" class="form">
+      <div class="f"><label for="sCall">Station name or callsign</label><input id="sCall" name="uplink-callsign" type="text" data-1p-ignore data-lpignore="true" maxlength="24" spellcheck="false" autocomplete="off" placeholder="e.g. KD9ZNV"></div>
+      <div class="f"><label for="sAddr">This Umbrel's Tailscale address</label><input id="sAddr" type="text" spellcheck="false" autocomplete="off" placeholder="100.x.y.z">
+        <span class="hint">Open the Tailscale app on this Umbrel and copy the address that starts with 100. The other station uses it to reach you.</span></div>
+      <details class="adv"><summary>More</summary>
+        <div class="f"><label for="sPort">Uplink port</label><input id="sPort" type="number" min="1" max="65535"><span class="hint">Leave at 3947 unless you changed it.</span></div>
+        <div class="f"><label for="sMax">Largest file this station accepts (GB)</label><input id="sMax" type="number" min="1" max="10000"></div>
+        <p class="hint" id="sFp"></p>
+      </details>
+      <div class="f"><label for="sSkin" class="lab">Look</label>
+        <div class="skins" id="sSkin" role="radiogroup" aria-label="Look">
+          <button type="button" role="radio" data-skin="cyber"><i class="sw sw-cyber"></i>Cyberdeck</button>
+          <button type="button" role="radio" data-skin="mars"><i class="sw sw-mars"></i>Mars Mission</button>
+          <button type="button" role="radio" data-skin="desk85"><i class="sw sw-desk85"></i>1985 Desktop</button>
+          <button type="button" role="radio" data-skin="umbrel"><i class="sw sw-umbrel"></i>Umbrel</button>
+          <button type="button" role="radio" data-skin="war"><i class="sw sw-war"></i>Field Command</button>
+        </div>
+        <span class="hint">Each look has its own sounds. Saved in this browser.</span></div>
+      <div class="f"><span class="lab">Sound</span>
+        <div class="row"><label class="chk"><input type="checkbox" id="sSnd"> Play sounds for messages, files and the link</label></div>
+        <div class="row"><label for="sVol" class="hint">Volume</label><input id="sVol" type="range" min="0" max="100" step="5"><button type="button" class="key sm" id="sTest">TEST</button></div>
+        <span class="hint">Saved in this browser.</span></div>
+      <p class="hint" id="sFolder"></p>
+      <div class="row"><button type="submit" class="key go">SAVE</button><span class="hint" id="sMsg"></span></div>
+    </form>
+  </div>
+</div>
+
+<div class="sheet" id="linkPanel" hidden>
+  <div class="sheet-in panel" role="dialog" aria-modal="true" aria-labelledby="linkTitle">
+    <div class="ph"><span id="linkTitle">LINK A STATION</span><button type="button" class="key sm" data-close>CLOSE</button></div>
+    <div id="linkHome"><div class="form" id="linkForm">
+      <div class="f"><span class="lab">Invite someone</span>
+        <span class="hint">Make a code and send it to the other person, by text or email. It works once and expires in 48 hours.</span>
+        <div class="row"><button type="button" class="key" id="mkInvite">MAKE INVITE CODE</button></div>
+        <div class="code" id="inviteBox" hidden><code id="inviteCode"></code><button type="button" class="key" id="copyInvite">COPY</button></div>
+      </div>
+      <div class="f"><label for="codeIn" class="lab">Got a code?</label>
+        <textarea id="codeIn" rows="3" spellcheck="false" placeholder="Paste the code that starts with UPLINK1."></textarea>
+        <div class="row"><button type="button" class="key go" id="useCode">LINK</button><span class="hint" id="linkMsg"></span></div>
+      </div>
+    </div></div>
+  </div>
+</div>
+
+<script src="sfx.js"></script>
+<script src="radar.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

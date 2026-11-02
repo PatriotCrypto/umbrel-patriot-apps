@@ -1,0 +1,125 @@
+<!doctype html>
+<html lang="en" data-theme="auto">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<title>Disc Ripper</title>
+<link rel="icon" href="icon.svg">
+<link rel="stylesheet" href="modern.css" id="cssModern">
+<link rel="stylesheet" href="classic.css" id="cssClassic" disabled>
+<script src="theme.js"></script>
+</head>
+<body>
+<header class="taskbar"><div class="wrap bar-in">
+  <a class="brand" href="./"><img src="icon.svg" alt="" width="22" height="22"><span>Disc Ripper</span></a>
+  <div class="themes" id="themes" role="group" aria-label="Color theme">
+    <button type="button" data-theme-set="auto" aria-label="Match system">Auto</button>
+    <button type="button" data-theme-set="light" aria-label="Light">Light</button>
+    <button type="button" data-theme-set="dark" aria-label="Dark">Dark</button>
+  </div>
+</div></header>
+
+<main class="wrap">
+  <div id="setup" class="notice warn" hidden></div>
+
+  <section class="win" id="statusCard">
+    <div class="tb"><span>Disc Ripper</span></div>
+    <div class="wb">
+      <div class="dv" id="dv" data-tray="closed" data-mode="idle" data-disc="0">
+        <div class="dv-gl" id="dvGL" hidden><canvas id="dvCanvas"></canvas></div>
+        <div class="dv-stage" id="dvStage"><div class="dv-persp" role="img" id="dvLabel" aria-label="DVD drive">
+          <div class="box">
+            <div class="tray">
+              <div class="plate"><div class="well"></div><div class="disc"><i class="hub"></i></div></div>
+              <div class="lip"></div>
+            </div>
+            <div class="face top"><i class="mark"></i><b class="brand">Disc Ripper</b><i class="vent"></i></div>
+            <div class="face side"></div>
+            <div class="face front">
+              <div class="fr-top"><span class="dv-state"><i class="dv-led"></i><b id="dvState">Ready</b></span><span class="dv-eta" id="dvEta"></span></div>
+              <div class="dv-track"><i class="dv-fill" id="dvFill"></i><i class="dv-busy" id="dvBusy"></i><span class="dv-pct" id="dvPct"></span></div>
+              <div class="slot"></div>
+            </div>
+            <div class="lip-front"></div>
+          </div>
+        </div></div>
+      </div>
+      <div class="statushead">
+        <svg class="disc" id="discIcon" viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><circle cx="24" cy="24" r="20"/><circle cx="24" cy="24" r="6"/><path d="M24 4a20 20 0 0 1 14 6" stroke-linecap="round"/></svg>
+        <div class="grow"><h2 id="stTitle">Starting up</h2><p class="muted" id="stSub"></p></div>
+        <button class="btn small" id="stopBtn" hidden>Stop</button>
+        <button class="btn small" id="ejectBtn" hidden>Eject</button>
+      </div>
+      <div id="jobBox" hidden>
+        <div class="pbar" id="pbar"><i></i></div>
+        <div class="muted small" id="pText"></div>
+        <div class="outs" id="outs"></div>
+        <div class="notice" id="jobNote" hidden></div>
+      </div>
+      <details class="dd" id="discDetails" hidden>
+        <summary>Disc details</summary>
+        <div class="pre" id="ddBody"></div>
+      </details>
+    </div>
+  </section>
+
+  <section class="win" id="confirmCard" hidden>
+    <div class="tb"><span>I need your OK</span></div>
+    <div class="wb">
+      <p class="muted" id="cfWhy"></p>
+      <div class="fgrid">
+        <div class="seg" id="cfKind" role="tablist"><button type="button" data-k="movie">Movie</button><button type="button" data-k="movies">Several movies</button><button type="button" data-k="tv">TV show</button></div>
+        <div class="field"><label for="cfQ" id="cfQLabel">Find the title</label>
+          <form id="cfSearch" class="row"><input id="cfQ" type="search" autocomplete="off" spellcheck="false"><button class="btn" id="cfSearchBtn">Search</button></form>
+        </div>
+        <div class="cands" id="cfCands"></div>
+        <div id="cfMovie" class="field"><label for="cfName">File name</label><input id="cfName" type="text" maxlength="150" placeholder="Movie Name (Year)"></div>
+        <div id="cfTv" class="two"><div class="field"><label for="cfSeason">Season</label><input id="cfSeason" type="number" min="0" max="99"></div><div class="field"><label for="cfStart">First episode on this disc</label><input id="cfStart" type="number" min="1" max="999"></div></div>
+        <div><div class="lab" id="cfTitlesLabel"></div><div class="titles" id="cfTitles"></div></div>
+      </div>
+      <div class="row end"><button class="btn" id="cfSkip">Skip this disc</button><button class="btn primary big" id="cfGo">Rip this disc</button></div>
+      <div id="cfErr" class="notice err" hidden></div>
+    </div>
+  </section>
+
+  <section class="win" id="histCard">
+    <div class="tb"><span>Recently ripped</span><button type="button" class="tbbtn" id="histClear" hidden>Clear list</button></div>
+    <div class="wb">
+      <div id="hist" class="hist"><p class="muted">Nothing yet. Put a DVD in the drive.</p></div>
+    </div>
+  </section>
+
+  <details class="win" id="settings">
+    <summary class="tb"><span>Settings</span></summary>
+    <div class="wb">
+    <div class="setgrid">
+      <div class="rowset skin-row"><label for="sSkin" class="lab">Look</label>
+        <select id="sSkin"><option value="modern">Modern</option><option value="classic">Classic 90s</option></select>
+        <span class="hint">Classic is the old Windows 98 style, for nostalgia. This is saved in this browser.</span></div>
+      <div class="rowset"><label for="sAuto" class="lab">When a disc is hard to identify</label>
+        <select id="sAuto"><option value="auto">Rip it automatically with my best guess</option><option value="ask">Ask me before ripping</option></select>
+        <span class="hint">Clear matches are always ripped without asking.</span></div>
+      <label class="chk"><input type="checkbox" id="sEject"> Eject the disc when it's finished</label>
+      <div class="rowset"><label for="sRoot" class="lab">Library location</label><select id="sRoot"></select></div>
+      <div class="two"><div class="rowset"><label for="sMovies" class="lab">Movies folder</label><input id="sMovies" type="text"></div><div class="rowset"><label for="sTv" class="lab">TV shows folder</label><input id="sTv" type="text"></div></div>
+      <div class="rowset"><span class="lab">MakeMKV key</span>
+        <span class="hint" id="keyState"></span>
+        <div class="row"><input id="sKey" type="text" placeholder="Paste a key (starts with T-)" autocomplete="off" spellcheck="false"><button class="btn" id="keySave" type="button">Save key</button><button class="btn" id="keyFetch" type="button">Get the free beta key</button></div>
+        <label class="chk"><input type="checkbox" id="sAutoKey"> Fetch a fresh free beta key automatically when it expires</label>
+        <span class="hint">MakeMKV does the actual ripping. It is free while in beta, or you can buy a permanent key at makemkv.com.</span></div>
+      <div class="row"><button class="btn primary" id="sSave" type="button">Save settings</button><span class="muted small" id="sMsg"></span></div>
+      <div class="rowset"><span class="lab">Drive not showing up?</span><div class="row"><button class="btn" id="checkBtn" type="button">Check drive</button></div><div id="checkOut" class="pre" hidden></div></div>
+    </div>
+    </div>
+  </details>
+
+  <footer class="foot">
+    <p>Only rip discs you own, for your own use. Copying discs may be restricted where you live.</p>
+    <p>Ripping is done by <a href="https://www.makemkv.com" target="_blank" rel="noopener noreferrer">MakeMKV</a>. Movie titles come from IMDb&rsquo;s public search and TV listings from <a href="https://www.tvmaze.com" target="_blank" rel="noopener noreferrer">TVmaze</a>. Not affiliated with any of them.</p>
+  </footer>
+</main>
+<script src="app.js"></script>
+<script type="module" src="drive3d.js"></script>
+</body>
+</html>

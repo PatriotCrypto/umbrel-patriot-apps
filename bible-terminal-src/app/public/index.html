@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="en" data-skin="phosphor">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Bible Terminal</title>
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<header id="top">
+  <div class="brand"><span class="logo">✝</span> BIBLE TERMINAL<span class="cursor">█</span></div>
+  <form id="cmd" autocomplete="off" spellcheck="false">
+    <label for="cmdin" class="prompt">›</label>
+    <input id="cmdin" type="text" placeholder="John 3:16 · faith hope · &quot;in the beginning&quot; · H7225 · ? who was Melchizedek" aria-label="Go to a verse, search, or ask">
+  </form>
+  <button id="look" type="button" title="Change the look" aria-label="Change the look">◐ look</button>
+  <span id="savestate" class="muted" title="Your notes and bookmarks"></span>
+</header>
+<nav id="nav" aria-label="Sections"></nav>
+<main id="view" tabindex="-1"><p class="muted pad">Loading…</p></main>
+<footer id="foot"></footer>
+<div id="toast" role="status" aria-live="polite"></div>
+<script src="config.js"></script>
+<script type="module" src="js/app.js"></script>
+</body>
+</html>

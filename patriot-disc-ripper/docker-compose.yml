@@ -1,0 +1,37 @@
+version: "3.7"
+
+services:
+  app_proxy:
+    environment:
+      APP_HOST: patriot-disc-ripper_web_1
+      APP_PORT: 3000
+
+  web:
+    image: ghcr.io/patriotcrypto/disc-ripper:0.3.1@sha256:a21e59393262ece787e711688e2bc7450dea7b1c356b7a869a715944e40921af
+    restart: on-failure
+    stop_grace_period: 1m
+    read_only: true
+    tmpfs:
+      - /tmp
+    cap_drop:
+      - ALL
+    cap_add:
+      - CHOWN
+      - DAC_OVERRIDE
+      - FOWNER
+      - SYS_RAWIO
+    security_opt:
+      - no-new-privileges:true
+    # Only optical drives (block major 11) and SCSI generic nodes (char major 21) may be opened.
+    device_cgroup_rules:
+      - "b 11:* rwm"
+      - "c 21:* rwm"
+    environment:
+      PORT: 3000
+      DATA_DIR: /data
+      MEDIA_DIR: /media
+      DOWNLOADS_DIR: /downloads
+    volumes:
+      - ${APP_DATA_DIR}/data:/data
+      - ${UMBREL_ROOT}/data/storage/downloads:/downloads
+      - /dev:/dev

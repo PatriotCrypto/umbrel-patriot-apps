@@ -1,0 +1,16 @@
+{
+  "name": "rally-point",
+  "version": "0.4.0",
+  "description": "Private preparedness and homestead planner for Umbrel: inventory, supply days, water and power, group, plans, garden, encrypted vault.",
+  "main": "server.js",
+  "license": "MIT",
+  "private": true,
+  "engines": { "node": ">=20" },
+  "scripts": {
+    "start": "node server.js",
+    "test": "node --test"
+  },
+  "dependencies": {
+    "express": "^4.21.2"
+  }
+}

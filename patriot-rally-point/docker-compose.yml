@@ -1,0 +1,18 @@
+version: "3.7"
+
+services:
+  app_proxy:
+    environment:
+      APP_HOST: patriot-rally-point_web_1
+      APP_PORT: 3967
+      PROXY_AUTH_ADD: "false"
+
+  web:
+    image: ghcr.io/patriotcrypto/rally-point:0.4.0@sha256:f767626261a65562bd12e4b543c2276d0b43e60eb7acd61ee3d61e75656f5330
+    restart: on-failure
+    stop_grace_period: 15s
+    environment:
+      DATA_DIR: /data
+      PORT: 3967
+    volumes:
+      - ${APP_DATA_DIR}/data:/data

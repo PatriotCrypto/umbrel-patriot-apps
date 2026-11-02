@@ -1,0 +1,19 @@
+{
+  "name": "bible-terminal",
+  "version": "0.2.2",
+  "description": "A study terminal for the King James Bible, read straight from its Bitcoin inscriptions. For Umbrel.",
+  "private": true,
+  "license": "MIT",
+  "type": "commonjs",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "start": "node server/index.js",
+    "test": "node --test \"test/*.test.js\"",
+    "build-data": "node scripts/build-data.mjs"
+  },
+  "dependencies": {
+    "express": "4.22.3"
+  }
+}
