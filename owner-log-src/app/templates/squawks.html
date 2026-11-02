@@ -1,0 +1,151 @@
+{% extends "base.html" %}
+{% from "_icons.html" import icon, csrf %}
+
+{% block subtitle %}
+<p class="subtitle">
+  {{ counts['open'] }} open · {{ counts['in_progress'] }} in progress ·
+  {{ counts['deferred'] }} deferred · {{ counts['resolved'] }} resolved
+</p>
+{% endblock %}
+
+{% block actions %}
+<a class="btn" href="/export/squawks.csv">{{ icon('download') }}CSV</a>
+{% endblock %}
+
+{% block content %}
+
+<div class="card">
+  <div class="chips">
+    <a class="chip {% if not status %}current{% endif %}" href="/squawks">Open work</a>
+    {% for s in statuses %}
+    <a class="chip {% if status == s %}current{% endif %}" href="/squawks?status={{ s }}">{{ s|replace('_', ' ')|title }}</a>
+    {% endfor %}
+    <a class="chip {% if status == 'all' %}current{% endif %}" href="/squawks?status=all">Everything</a>
+  </div>
+</div>
+
+<div class="card">
+  <h2>Report a squawk</h2>
+  <form method="post" action="/squawks/add" enctype="multipart/form-data">
+    {{ csrf(csrf_token, csrf_field) }}
+    <div class="field">
+      <label for="title">What is wrong</label>
+      <input type="text" id="title" name="title" maxlength="160" required placeholder="Right brake soft, pulls to the left">
+    </div>
+    <div class="field-row">
+      <div class="field">
+        <label for="reported_on">Noticed on</label>
+        <input type="date" id="reported_on" name="reported_on" value="{{ today }}">
+      </div>
+      <div class="field">
+        <label for="severity">Severity</label>
+        <select id="severity" name="severity">
+          {% for s in severities %}<option value="{{ s }}" {% if s == 'medium' %}selected{% endif %}>{{ s|title }}</option>{% endfor %}
+        </select>
+      </div>
+      <div class="field">
+        <label for="person_id">Reported by</label>
+        <select id="person_id" name="person_id">
+          <option value="">—</option>
+          {% for person in people %}<option value="{{ person['id'] }}">{{ person['name'] }}</option>{% endfor %}
+        </select>
+      </div>
+      <div class="field">
+        <label for="tach">Tach</label>
+        <input type="text" id="tach" name="tach" inputmode="decimal" placeholder="{{ hours_fmt(craft['tach']) }}">
+      </div>
+      <div class="field">
+        <label for="photos">Photos</label>
+        <input type="file" id="photos" name="photos" accept="image/*" multiple capture="environment">
+      </div>
+    </div>
+    <div class="field">
+      <label for="description">Details</label>
+      <textarea id="description" name="description" placeholder="When it happens, what you have checked already"></textarea>
+    </div>
+    <div class="btn-row">
+      <label class="nowrap"><input type="checkbox" name="grounding" value="1"> Grounds the aircraft</label>
+      <button class="btn btn-primary" type="submit">{{ icon('plus') }}Log squawk</button>
+    </div>
+  </form>
+</div>
+
+<div class="stack">
+  {% for squawk in rows %}
+  <div class="card">
+    <div class="card-head">
+      <h2>{{ squawk['title'] }}</h2>
+      <span>
+        <span class="badge badge-{{ squawk['severity'] }}">{{ squawk['severity']|title }}</span>
+        <span class="badge badge-{{ squawk['status'] }}">{{ squawk['status']|replace('_', ' ')|title }}</span>
+        {% if squawk['grounding'] and squawk['status'] != 'resolved' %}<span class="badge badge-critical">Grounding</span>{% endif %}
+      </span>
+    </div>
+    <p class="muted small">
+      Reported {{ squawk['reported_on'] }}
+      {%- if squawk['person_name'] %} by {{ squawk['person_name'] }}{% endif %}
+      {%- if squawk['tach'] is not none %} at {{ '%g'|format(squawk['tach']) }} tach{% endif %}
+      {%- if squawk['resolved_on'] %} · resolved {{ squawk['resolved_on'] }}{% endif %}
+    </p>
+    {% if squawk['description'] %}<p class="notes">{{ squawk['description'] }}</p>{% endif %}
+    {% if squawk['resolution'] %}<p class="notes"><strong>Fix:</strong> {{ squawk['resolution'] }}</p>{% endif %}
+
+    <details class="panel">
+      <summary>Update</summary>
+      <div class="panel-body">
+        <form method="post" action="/squawks/{{ squawk['id'] }}/update">
+          {{ csrf(csrf_token, csrf_field) }}
+          <div class="field">
+            <label for="t{{ squawk['id'] }}">Title</label>
+            <input type="text" id="t{{ squawk['id'] }}" name="title" value="{{ squawk['title'] }}" maxlength="160">
+          </div>
+          <div class="field-row">
+            <div class="field">
+              <label for="st{{ squawk['id'] }}">Status</label>
+              <select id="st{{ squawk['id'] }}" name="status">
+                {% for s in statuses %}<option value="{{ s }}" {% if squawk['status'] == s %}selected{% endif %}>{{ s|replace('_', ' ')|title }}</option>{% endfor %}
+              </select>
+            </div>
+            <div class="field">
+              <label for="sv{{ squawk['id'] }}">Severity</label>
+              <select id="sv{{ squawk['id'] }}" name="severity">
+                {% for s in severities %}<option value="{{ s }}" {% if squawk['severity'] == s %}selected{% endif %}>{{ s|title }}</option>{% endfor %}
+              </select>
+            </div>
+            <div class="field">
+              <label for="ro{{ squawk['id'] }}">Resolved on</label>
+              <input type="date" id="ro{{ squawk['id'] }}" name="resolved_on" value="{{ squawk['resolved_on'] or today }}">
+            </div>
+            <div class="field">
+              <label for="pb{{ squawk['id'] }}">Fixed by</label>
+              <input type="text" id="pb{{ squawk['id'] }}" name="performed_by" maxlength="120">
+            </div>
+            <div class="field">
+              <label for="cf{{ squawk['id'] }}">Certificate</label>
+              <input type="text" id="cf{{ squawk['id'] }}" name="certificate" maxlength="60">
+            </div>
+          </div>
+          <div class="field">
+            <label for="ds{{ squawk['id'] }}">Details</label>
+            <textarea id="ds{{ squawk['id'] }}" name="description">{{ squawk['description'] }}</textarea>
+          </div>
+          <div class="field">
+            <label for="rs{{ squawk['id'] }}">How it was fixed</label>
+            <textarea id="rs{{ squawk['id'] }}" name="resolution">{{ squawk['resolution'] }}</textarea>
+            <p class="field-hint">Setting the status to resolved writes a logbook entry with this text.</p>
+          </div>
+          <div class="btn-row">
+            <label class="nowrap"><input type="checkbox" name="grounding" value="1" {% if squawk['grounding'] %}checked{% endif %}> Grounds the aircraft</label>
+            <button class="btn btn-primary" type="submit">{{ icon('check') }}Save</button>
+            <button class="btn btn-danger" type="submit" formaction="/squawks/{{ squawk['id'] }}/delete">{{ icon('trash') }}Delete</button>
+          </div>
+        </form>
+      </div>
+    </details>
+  </div>
+  {% else %}
+  <p class="chart-empty">Nothing here. {% if not status %}Everything is resolved.{% endif %}</p>
+  {% endfor %}
+</div>
+
+{% endblock %}

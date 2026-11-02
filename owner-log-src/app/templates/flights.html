@@ -1,0 +1,140 @@
+{% extends "base.html" %}
+{% from "_icons.html" import icon, csrf %}
+
+{% block subtitle %}
+<p class="subtitle">{{ hours_fmt(total_hours) }} hours logged · {{ hours_fmt(year_hours) }} in the last 12 months · {{ total_landings }} landings</p>
+{% endblock %}
+
+{% block actions %}
+<a class="btn" href="/export/flights.csv">{{ icon('download') }}CSV</a>
+{% endblock %}
+
+{% block content %}
+
+<div class="card">
+  <h2>Log a flight</h2>
+  <p class="muted small">
+    Hours come from the tach readings, or the Hobbs if there is no tach, or whatever you
+    type. Saving rolls the aircraft times forward and sets money aside in the reserves.
+  </p>
+  <form method="post" action="/flights/add">
+    {{ csrf(csrf_token, csrf_field) }}
+    <div class="field-row">
+      <div class="field">
+        <label for="flew_on">Date</label>
+        <input type="date" id="flew_on" name="flew_on" value="{{ today }}">
+      </div>
+      <div class="field">
+        <label for="person_id">Pilot</label>
+        <select id="person_id" name="person_id">
+          <option value="">—</option>
+          {% for person in people %}<option value="{{ person['id'] }}">{{ person['name'] }}</option>{% endfor %}
+        </select>
+      </div>
+      <div class="field">
+        <label for="route">Route</label>
+        <input type="text" id="route" name="route" maxlength="120" placeholder="KHAO — KI69 — KHAO">
+      </div>
+      <div class="field">
+        <label for="purpose">Purpose</label>
+        <input type="text" id="purpose" name="purpose" maxlength="120" placeholder="Local, $100 hamburger, training">
+      </div>
+    </div>
+    <div class="field-row">
+      <div class="field">
+        <label for="tach_start">Tach out</label>
+        <input type="text" id="tach_start" name="tach_start" inputmode="decimal" value="{{ '%g'|format(craft['tach']) }}">
+      </div>
+      <div class="field">
+        <label for="tach_end">Tach in</label>
+        <input type="text" id="tach_end" name="tach_end" inputmode="decimal">
+      </div>
+      <div class="field">
+        <label for="hobbs_start">Hobbs out</label>
+        <input type="text" id="hobbs_start" name="hobbs_start" inputmode="decimal" value="{{ '%g'|format(craft['hobbs']) }}">
+      </div>
+      <div class="field">
+        <label for="hobbs_end">Hobbs in</label>
+        <input type="text" id="hobbs_end" name="hobbs_end" inputmode="decimal">
+      </div>
+      <div class="field">
+        <label for="hours">Hours</label>
+        <input type="text" id="hours" name="hours" inputmode="decimal" placeholder="auto">
+      </div>
+      <div class="field">
+        <label for="landings">Landings</label>
+        <input type="number" id="landings" name="landings" min="0" step="1" value="1">
+      </div>
+    </div>
+    <div class="field-row">
+      <div class="field">
+        <label for="fuel_gal">Fuel added (gal)</label>
+        <input type="text" id="fuel_gal" name="fuel_gal" inputmode="decimal">
+      </div>
+      <div class="field">
+        <label for="fuel_cost">Fuel cost</label>
+        <input type="text" id="fuel_cost" name="fuel_cost" inputmode="decimal" placeholder="0.00">
+        <p class="field-hint">Recorded as a variable cost.</p>
+      </div>
+      <div class="field">
+        <label for="fuel_vendor">Fuel from</label>
+        <input type="text" id="fuel_vendor" name="fuel_vendor" maxlength="120">
+      </div>
+      <div class="field">
+        <label for="oil_qt">Oil added (qt)</label>
+        <input type="text" id="oil_qt" name="oil_qt" inputmode="decimal">
+      </div>
+    </div>
+    <div class="field">
+      <label for="notes">Notes</label>
+      <input type="text" id="notes" name="notes" placeholder="Anything worth remembering about the flight">
+    </div>
+    <button class="btn btn-primary" type="submit">{{ icon('plus') }}Log flight</button>
+  </form>
+</div>
+
+<div class="card">
+  <div class="card-head"><h2>Hours by month</h2><span class="muted small">last 8 months</span></div>
+  {{ chart|safe }}
+</div>
+
+<div class="card">
+  <div class="card-head"><h2>Flights</h2><span class="muted small">{{ rows|length }} shown</span></div>
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr><th>Date</th><th>Pilot</th><th>Route</th><th class="num">Tach</th><th class="num">Hours</th><th class="num">Ldg</th><th class="num">Fuel</th><th></th></tr>
+      </thead>
+      <tbody>
+        {% for flight in rows %}
+        <tr>
+          <td class="mono nowrap">{{ flight['flew_on'] }}</td>
+          <td class="small">{{ flight['pilot'] or '—' }}</td>
+          <td>
+            {{ flight['route'] or '—' }}
+            {% if flight['purpose'] %}<div class="muted small">{{ flight['purpose'] }}</div>{% endif %}
+          </td>
+          <td class="num small">
+            {% if flight['tach_start'] is not none and flight['tach_end'] is not none %}
+              {{ '%g'|format(flight['tach_start']) }}–{{ '%g'|format(flight['tach_end']) }}
+            {% else %}—{% endif %}
+          </td>
+          <td class="num">{{ hours_fmt(flight['hours']) }}</td>
+          <td class="num">{{ flight['landings'] or '' }}</td>
+          <td class="num small">{{ '%g'|format(flight['fuel_gal']) if flight['fuel_gal'] else '' }}</td>
+          <td class="right">
+            <form method="post" action="/flights/{{ flight['id'] }}/delete">
+              {{ csrf(csrf_token, csrf_field) }}
+              <button class="btn btn-sm btn-danger" type="submit">{{ icon('trash') }}</button>
+            </form>
+          </td>
+        </tr>
+        {% else %}
+        <tr><td colspan="8" class="muted">No flights logged yet.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+{% endblock %}

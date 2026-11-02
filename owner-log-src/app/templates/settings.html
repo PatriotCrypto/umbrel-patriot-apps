@@ -1,0 +1,181 @@
+{% extends "base.html" %}
+{% from "_icons.html" import icon, csrf %}
+
+{% block content %}
+
+<div class="card">
+  <h2>People</h2>
+  <p class="muted small">
+    Co-owners, pilots and your mechanic. Shares are used to split recorded costs on the
+    costs page. There are no logins — anyone who can reach this app can use all of it,
+    which is what Umbrel's own access control is for.
+  </p>
+  {% if people %}
+  <div class="stack">
+    {% for person in people %}
+    <details class="panel">
+      <summary>
+        <span>{{ person['name'] }} <span class="badge">{{ person['role'] }}</span>
+          {% if person['share'] %}<span class="badge badge-accent">{{ '%g'|format(person['share']) }}%</span>{% endif %}
+        </span>
+        <span class="muted small">{{ person['email'] }}</span>
+      </summary>
+      <div class="panel-body">
+        <form method="post" action="/people/{{ person['id'] }}/update">
+          {{ csrf(csrf_token, csrf_field) }}
+          <div class="field-row">
+            <div class="field">
+              <label for="pr{{ person['id'] }}">Role</label>
+              <select id="pr{{ person['id'] }}" name="role">
+                {% for role in roles %}<option value="{{ role }}" {% if person['role'] == role %}selected{% endif %}>{{ role }}</option>{% endfor %}
+              </select>
+            </div>
+            <div class="field">
+              <label for="pe{{ person['id'] }}">Email</label>
+              <input type="text" id="pe{{ person['id'] }}" name="email" value="{{ person['email'] }}">
+            </div>
+            <div class="field">
+              <label for="pp{{ person['id'] }}">Phone</label>
+              <input type="text" id="pp{{ person['id'] }}" name="phone" value="{{ person['phone'] }}">
+            </div>
+            <div class="field">
+              <label for="ps{{ person['id'] }}">Share of costs (%)</label>
+              <input type="text" id="ps{{ person['id'] }}" name="share" inputmode="decimal" value="{{ '%g'|format(person['share']) }}">
+            </div>
+            <div class="field">
+              <label for="pc{{ person['id'] }}">Certificate</label>
+              <input type="text" id="pc{{ person['id'] }}" name="certificate" value="{{ person['certificate'] }}">
+            </div>
+          </div>
+          <div class="field">
+            <label for="pn{{ person['id'] }}">Notes</label>
+            <input type="text" id="pn{{ person['id'] }}" name="notes" value="{{ person['notes'] }}">
+          </div>
+          <div class="btn-row">
+            <button class="btn btn-primary" type="submit">Save</button>
+            <button class="btn btn-danger" type="submit" formaction="/people/{{ person['id'] }}/delete">{{ icon('trash') }}Remove</button>
+          </div>
+        </form>
+      </div>
+    </details>
+    {% endfor %}
+  </div>
+  {% else %}
+  <p class="muted">No one listed yet.</p>
+  {% endif %}
+
+  <form method="post" action="/people/add" class="inline-form">
+    {{ csrf(csrf_token, csrf_field) }}
+    <div class="field">
+      <label for="name">Name</label>
+      <input type="text" id="name" name="name" required maxlength="80">
+    </div>
+    <div class="field">
+      <label for="role">Role</label>
+      <select id="role" name="role">
+        {% for role in roles %}<option value="{{ role }}">{{ role }}</option>{% endfor %}
+      </select>
+    </div>
+    <div class="field">
+      <label for="share">Share (%)</label>
+      <input type="text" id="share" name="share" inputmode="decimal" placeholder="50">
+    </div>
+    <div class="field">
+      <label for="email">Email</label>
+      <input type="text" id="email" name="email" maxlength="160">
+    </div>
+    <button class="btn btn-primary" type="submit">{{ icon('plus') }}Add</button>
+  </form>
+</div>
+
+<div class="card">
+  <h2>Reports</h2>
+  <p class="muted small">Built from your own records, on demand.</p>
+  <div class="btn-row">
+    <a class="btn btn-primary" href="/export/annual.pdf">{{ icon('download') }}Annual inspection packet</a>
+    <a class="btn" href="/export/compliance.pdf">{{ icon('download') }}AD and SB compliance</a>
+    <a class="btn" href="/export/costs.pdf">{{ icon('download') }}Cost of ownership</a>
+  </div>
+  <p class="field-hint">
+    The annual packet gathers inspection status, directives, the equipment list, open
+    squawks and the maintenance done since the last annual — the things an IA tends to
+    ask for. It is not a maintenance release.
+  </p>
+</div>
+
+<div class="card">
+  <h2>Export</h2>
+  <div class="btn-row">
+    <a class="btn" href="/export/flights.csv">{{ icon('download') }}Flights CSV</a>
+    <a class="btn" href="/export/costs.csv">{{ icon('download') }}Costs CSV</a>
+    <a class="btn" href="/export/squawks.csv">{{ icon('download') }}Squawks CSV</a>
+    <a class="btn" href="/export/logbook.csv">{{ icon('download') }}Logbook CSV</a>
+    <a class="btn" href="/export/directives.csv">{{ icon('download') }}Directives CSV</a>
+    <a class="btn" href="/export/owner-log.json">{{ icon('download') }}Everything as JSON</a>
+    <a class="btn btn-primary" href="/export/backup.zip">{{ icon('download') }}Full backup ZIP</a>
+  </div>
+</div>
+
+<div class="card">
+  <h2>Import flights</h2>
+  <p class="muted small">
+    A CSV with date and hours columns. An export from Pilot Logbook, ForeFlight or a
+    spreadsheet works — column names are matched loosely, and an unknown pilot name is
+    added to the people list. Flights are added, never replaced, and the airframe and
+    engine times go up by the imported hours.
+  </p>
+  <form method="post" action="/settings/import/flights" enctype="multipart/form-data" class="inline-form">
+    {{ csrf(csrf_token, csrf_field) }}
+    <div class="field">
+      <label for="file">Flights CSV</label>
+      <input type="file" id="file" name="file" accept=".csv,text/csv" required>
+    </div>
+    <button class="btn btn-primary" type="submit">{{ icon('upload') }}Import</button>
+  </form>
+</div>
+
+<div class="card">
+  <h2>Restore a backup</h2>
+  <p class="muted small">
+    Replaces everything in this app with the contents of a backup ZIP made here.
+    Download a fresh backup first if you are not sure.
+  </p>
+  <form method="post" action="/settings/restore" enctype="multipart/form-data" class="inline-form">
+    {{ csrf(csrf_token, csrf_field) }}
+    <div class="field">
+      <label for="backup">Backup ZIP</label>
+      <input type="file" id="backup" name="backup" accept=".zip,application/zip" required>
+    </div>
+    <button class="btn btn-danger" type="submit">{{ icon('upload') }}Restore</button>
+  </form>
+</div>
+
+<div class="card">
+  <h2>This instance</h2>
+  <dl class="kv">
+    <dt>Maintenance items</dt><dd>{{ counts['items'] }}</dd>
+    <dt>Logbook entries</dt><dd>{{ counts['entries'] }}</dd>
+    <dt>Squawks</dt><dd>{{ counts['squawks'] }}</dd>
+    <dt>Directives</dt><dd>{{ counts['directives'] }}</dd>
+    <dt>Equipment</dt><dd>{{ counts['equipment'] }}</dd>
+    <dt>Flights</dt><dd>{{ counts['flights'] }}</dd>
+    <dt>Costs</dt><dd>{{ counts['costs'] }}</dd>
+    <dt>Documents</dt><dd>{{ counts['documents'] }}</dd>
+    <dt>Storage used</dt><dd>{{ usage['human'] }} across {{ usage['files'] }} file(s)</dd>
+    <dt>Version</dt><dd>{{ version }}</dd>
+    <dt>Outbound connections</dt><dd>None. Nothing in this app contacts the internet.</dd>
+  </dl>
+</div>
+
+<div class="card">
+  <h2>A word on what this is</h2>
+  <p class="muted small">
+    Owner Log keeps <em>your</em> records. It does not replace the aircraft's permanent
+    logbooks, and nothing it prints is a maintenance release or a return to service. Due
+    dates are worked out from the intervals you enter — check them against your
+    airworthiness limitations, the manufacturer's schedule and the regulations that
+    apply to you.
+  </p>
+</div>
+
+{% endblock %}

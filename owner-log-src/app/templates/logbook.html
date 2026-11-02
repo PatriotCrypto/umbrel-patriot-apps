@@ -1,0 +1,117 @@
+{% extends "base.html" %}
+{% from "_icons.html" import icon, csrf %}
+
+{% block subtitle %}
+<p class="subtitle">{{ total }} entries · your own record of work done, alongside the aircraft's permanent logbooks</p>
+{% endblock %}
+
+{% block actions %}
+<a class="btn" href="/export/logbook.csv">{{ icon('download') }}CSV</a>
+{% endblock %}
+
+{% block content %}
+
+<div class="card">
+  <h2>Add an entry</h2>
+  <form method="post" action="/logbook/add" enctype="multipart/form-data">
+    {{ csrf(csrf_token, csrf_field) }}
+    <div class="field-row">
+      <div class="field">
+        <label for="entry_date">Date</label>
+        <input type="date" id="entry_date" name="entry_date" value="{{ today }}">
+      </div>
+      <div class="field">
+        <label for="kind">Kind</label>
+        <select id="kind" name="kind">
+          {% for k in kinds %}<option value="{{ k }}">{{ k }}</option>{% endfor %}
+        </select>
+      </div>
+      <div class="field">
+        <label for="performed_by">Performed by</label>
+        <input type="text" id="performed_by" name="performed_by" maxlength="120" placeholder="A&amp;P name or your own">
+      </div>
+      <div class="field">
+        <label for="certificate">Certificate</label>
+        <input type="text" id="certificate" name="certificate" maxlength="60">
+      </div>
+      <div class="field">
+        <label for="tach">Tach</label>
+        <input type="text" id="tach" name="tach" inputmode="decimal" placeholder="{{ hours_fmt(craft['tach']) }}">
+      </div>
+      <div class="field">
+        <label for="hobbs">Hobbs</label>
+        <input type="text" id="hobbs" name="hobbs" inputmode="decimal" placeholder="{{ hours_fmt(craft['hobbs']) }}">
+      </div>
+      <div class="field">
+        <label for="cost">Cost</label>
+        <input type="text" id="cost" name="cost" inputmode="decimal" placeholder="0.00">
+        <p class="field-hint">Also recorded on the costs page.</p>
+      </div>
+      <div class="field">
+        <label for="item_id">Satisfies item</label>
+        <select id="item_id" name="item_id">
+          <option value="">—</option>
+          {% for item in items %}<option value="{{ item['id'] }}">{{ item['name'] }}</option>{% endfor %}
+        </select>
+      </div>
+    </div>
+    <div class="field">
+      <label for="summary">Summary</label>
+      <input type="text" id="summary" name="summary" maxlength="200" required placeholder="Replaced both main tyres and tubes">
+    </div>
+    <div class="field">
+      <label for="work">Work performed</label>
+      <textarea id="work" name="work" placeholder="Parts used, torque values, what was found, what was signed off"></textarea>
+    </div>
+    <div class="field">
+      <label for="attachments">Attachments</label>
+      <input type="file" id="attachments" name="attachments" multiple>
+    </div>
+    <div class="btn-row">
+      <label class="nowrap"><input type="checkbox" name="completes" value="1"> Reset the selected item's due date</label>
+      <button class="btn btn-primary" type="submit">{{ icon('plus') }}Save entry</button>
+    </div>
+  </form>
+</div>
+
+<div class="card">
+  <div class="card-head">
+    <h2>Entries</h2>
+    <form method="get" action="/logbook" class="inline-form">
+      <div class="field">
+        <label for="q">Search</label>
+        <input type="search" id="q" name="q" value="{{ q }}" placeholder="tyre, oil, Smith">
+      </div>
+      <button class="btn btn-sm" type="submit">Find</button>
+      {% if q %}<a class="btn btn-sm" href="/logbook">Clear</a>{% endif %}
+    </form>
+  </div>
+  <div class="stack">
+    {% for entry in rows %}
+    <div class="row-item">
+      <div>
+        <strong>{{ entry['summary'] }}</strong>
+        <div class="meta">
+          {{ entry['entry_date'] }} · {{ entry['kind'] }}
+          {%- if entry['performed_by'] %} · {{ entry['performed_by'] }}{% endif %}
+          {%- if entry['certificate'] %} ({{ entry['certificate'] }}){% endif %}
+          {%- if entry['tach'] is not none %} · {{ '%g'|format(entry['tach']) }} tach{% endif %}
+          {%- if entry['item_name'] %} · {{ entry['item_name'] }}{% endif %}
+        </div>
+        {% if entry['work'] %}<div class="meta notes">{{ entry['work'][:400] }}</div>{% endif %}
+      </div>
+      <div class="btn-row">
+        {% if entry['cost_cents'] %}<span class="badge">{{ money(entry['cost_cents']) }}</span>{% endif %}
+        <form method="post" action="/logbook/{{ entry['id'] }}/delete">
+          {{ csrf(csrf_token, csrf_field) }}
+          <button class="btn btn-sm btn-danger" type="submit">{{ icon('trash') }}</button>
+        </form>
+      </div>
+    </div>
+    {% else %}
+    <p class="chart-empty">No entries yet. Signing off a maintenance item writes one automatically.</p>
+    {% endfor %}
+  </div>
+</div>
+
+{% endblock %}

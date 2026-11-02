@@ -1,0 +1,176 @@
+{% extends "base.html" %}
+{% from "_icons.html" import icon, csrf %}
+
+{% block subtitle %}
+<p class="subtitle">
+  {{ craft['make'] }} {{ craft['model'] }}{% if craft['serial'] %} · S/N {{ craft['serial'] }}{% endif %}
+  {%- if craft['home_base'] %} · {{ craft['home_base'] }}{% endif %}
+</p>
+{% endblock %}
+
+{% block actions %}
+<a class="btn btn-primary" href="/flights">{{ icon('plus') }}Log a flight</a>
+<a class="btn" href="/export/annual.pdf">{{ icon('download') }}Annual packet</a>
+{% endblock %}
+
+{% block content %}
+
+<div class="verdict {{ 'verdict-ok' if status['ready'] else 'verdict-bad' }}">
+  {{ icon('shield' if status['ready'] else 'alert') }}
+  <div>
+    <strong>{{ 'Clear to fly, by these records' if status['ready'] else 'Something needs attention' }}</strong>
+    <span>
+      {% if status['ready'] %}
+        No overdue airworthiness items, directives or grounding squawks.
+      {% else %}
+        {% set bits = [] %}
+        {% if status['blocking_items'] %}{% set _ = bits.append(status['blocking_items']|length ~ ' overdue item' ~ ('' if status['blocking_items']|length == 1 else 's')) %}{% endif %}
+        {% if status['open_directives'] %}{% set _ = bits.append(status['open_directives']|length ~ ' open directive' ~ ('' if status['open_directives']|length == 1 else 's')) %}{% endif %}
+        {% if status['grounding_squawks'] %}{% set _ = bits.append(status['grounding_squawks']|length ~ ' grounding squawk' ~ ('' if status['grounding_squawks']|length == 1 else 's')) %}{% endif %}
+        {{ bits|join(' · ') }}
+      {% endif %}
+    </span>
+  </div>
+</div>
+
+<div class="card">
+  <div class="card-head"><h2>Times</h2><a class="small" href="/aircraft">update</a></div>
+  <dl class="ticker">
+    <div><dt>Tach</dt><dd>{{ hours_fmt(craft['tach']) }}</dd></div>
+    <div><dt>Hobbs</dt><dd>{{ hours_fmt(craft['hobbs']) }}</dd></div>
+    <div><dt>Airframe</dt><dd>{{ hours_fmt(craft['total_time']) }}</dd></div>
+    <div><dt>Engine SMOH</dt><dd>{{ hours_fmt(craft['engine_smoh']) }}</dd></div>
+    <div><dt>Hours, 12 mo</dt><dd>{{ hours_fmt(hours_year) }}</dd></div>
+    <div><dt>Open squawks</dt><dd>{{ open_squawks }}</dd></div>
+  </dl>
+  {% if engine_percent is not none %}
+  <p class="bar-label"><span>Engine to TBO ({{ hours_fmt(craft['engine_tbo']) }} h)</span><span>{{ engine_percent }}%</span></p>
+  <progress value="{{ engine_percent if engine_percent < 100 else 100 }}" max="100">{{ engine_percent }}%</progress>
+  {% endif %}
+</div>
+
+<div class="grid grid-2">
+  <div class="card">
+    <div class="card-head"><h2>Coming due</h2><a class="small" href="/maintenance">all items</a></div>
+    {% if items %}
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Item</th><th>Due</th><th>Status</th></tr></thead>
+        <tbody>
+          {% for item in items %}
+          <tr class="row-{{ item['status'] }}">
+            <td>
+              <strong>{{ item['name'] }}</strong>
+              {% if item['airworthiness'] %}<span class="badge badge-accent">airworthiness</span>{% endif %}
+            </td>
+            <td class="small">
+              <div class="due-line">
+                {% if item['next_date'] %}<span>{{ item['next_date'] }}{% if item['days_left'] is not none %} ({{ item['days_left'] }} d){% endif %}</span>{% endif %}
+                {% if item['next_hours'] is not none %}<span class="small">{{ item['next_hours'] }} {{ item['timer'] }}{% if item['hours_left'] is not none %} ({{ item['hours_left'] }} h left){% endif %}</span>{% endif %}
+              </div>
+            </td>
+            <td><span class="badge badge-{{ item['status'] }}">{{ item['status']|replace('_', ' ')|title }}</span></td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+    <p class="chart-empty">Nothing due in the next 30 days or 10 hours.</p>
+    {% endif %}
+  </div>
+
+  <div class="card">
+    <div class="card-head"><h2>Open squawks</h2><a class="small" href="/squawks">all squawks</a></div>
+    {% if squawks %}
+    <div class="stack">
+      {% for squawk in squawks %}
+      <div class="row-item">
+        <div>
+          <strong>{{ squawk['title'] }}</strong>
+          <div class="meta">
+            {{ squawk['reported_on'] }}
+            {%- if squawk['person_name'] %} · {{ squawk['person_name'] }}{% endif %}
+            {%- if squawk['grounding'] %} · <strong>grounding</strong>{% endif %}
+          </div>
+        </div>
+        <span class="badge badge-{{ squawk['severity'] }}">{{ squawk['severity']|title }}</span>
+      </div>
+      {% endfor %}
+    </div>
+    {% else %}
+    <p class="chart-empty">No open squawks.</p>
+    {% endif %}
+  </div>
+</div>
+
+<div class="grid grid-2">
+  <div class="card">
+    <div class="card-head"><h2>Hours flown</h2><span class="muted small">last 6 months</span></div>
+    {{ hours_chart|safe }}
+  </div>
+
+  <div class="card">
+    <div class="card-head"><h2>Cost of ownership</h2><a class="small" href="/costs">details</a></div>
+    <dl class="kv">
+      <dt>Last 12 months</dt><dd>{{ money(summary['total_cents']) }} over {{ hours_fmt(summary['hours']) }} hours</dd>
+      <dt>Fixed / variable</dt><dd>{{ money(summary['fixed_cents']) }} / {{ money(summary['variable_cents']) }}</dd>
+      <dt>Variable per hour</dt><dd>{{ money(summary['variable_per_hour_cents']) }}</dd>
+      <dt>Reserves per hour</dt><dd>{{ money(summary['reserve_rate_cents']) }}</dd>
+      <dt><strong>All-in per hour</strong></dt><dd><strong>{{ money(summary['all_in_per_hour_cents']) }}</strong></dd>
+    </dl>
+    {% if reserves %}
+    <h3>Reserves set aside</h3>
+    <div class="stack">
+      {% for reserve in reserves %}
+      <div class="row-item">
+        <div><strong>{{ reserve['name'] }}</strong><div class="meta">{{ rate(reserve['rate_cents']) }}</div></div>
+        <span class="badge">{{ money(reserve['balance_cents']) }}</span>
+      </div>
+      {% endfor %}
+    </div>
+    {% endif %}
+  </div>
+</div>
+
+<div class="grid grid-2">
+  <div class="card">
+    <div class="card-head"><h2>Recent flights</h2><a class="small" href="/flights">all flights</a></div>
+    {% if recent_flights %}
+    <div class="stack">
+      {% for flight in recent_flights %}
+      <div class="row-item">
+        <div>
+          <strong>{{ flight['route'] or 'Local' }}</strong>
+          <div class="meta">{{ flight['flew_on'] }}{% if flight['pilot'] %} · {{ flight['pilot'] }}{% endif %}</div>
+        </div>
+        <span class="badge">{{ hours_fmt(flight['hours']) }} h</span>
+      </div>
+      {% endfor %}
+    </div>
+    {% else %}
+    <p class="chart-empty">No flights logged yet.</p>
+    {% endif %}
+  </div>
+
+  <div class="card">
+    <div class="card-head"><h2>IFR checks</h2><a class="small" href="/compliance">compliance</a></div>
+    <dl class="kv">
+      <dt>VOR check</dt>
+      <dd>
+        {% if vor['status'] == 'unset' %}
+          Never logged
+        {% else %}
+          {{ vor['last']['checked_on'] }} · next due {{ vor['next_date'] }}
+          <span class="badge badge-{{ vor['status'] }}">{{ vor['status']|replace('_', ' ')|title }}</span>
+        {% endif %}
+      </dd>
+    </dl>
+    <p class="muted small">
+      Transponder and static-system checks are tracked as maintenance items, since
+      they run on 24-month intervals.
+    </p>
+  </div>
+</div>
+
+{% endblock %}

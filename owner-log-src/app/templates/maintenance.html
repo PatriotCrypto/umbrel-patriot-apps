@@ -1,0 +1,222 @@
+{% extends "base.html" %}
+{% from "_icons.html" import icon, csrf %}
+
+{% block subtitle %}
+<p class="subtitle">
+  Due dates come from the interval plus the last time it was done. Hours are counted on
+  the timer each item names — tach {{ hours_fmt(craft['tach']) }}, hobbs {{ hours_fmt(craft['hobbs']) }}.
+</p>
+{% endblock %}
+
+{% block actions %}
+<a class="btn" href="/maintenance?all={{ '0' if show_all else '1' }}">{{ 'Hide inactive' if show_all else 'Show inactive' }}</a>
+<a class="btn" href="/export/annual.pdf">{{ icon('download') }}Annual packet</a>
+{% endblock %}
+
+{% block content %}
+
+<div class="card">
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr><th>Item</th><th>Interval</th><th>Last done</th><th>Next due</th><th>Status</th><th></th></tr>
+      </thead>
+      <tbody>
+        {% for item in items %}
+        <tr class="row-{{ item['status'] }}">
+          <td>
+            <strong>{{ item['name'] }}</strong>
+            {% if item['airworthiness'] %}<span class="badge badge-accent">airworthiness</span>{% endif %}
+            {% if not item['active'] %}<span class="badge">inactive</span>{% endif %}
+            <div class="meta muted small">{{ item['category'] }}{% if item['reference'] %} · {{ item['reference'] }}{% endif %}</div>
+          </td>
+          <td class="small">
+            {% if item['interval_hours'] %}{{ '%g'|format(item['interval_hours']) }} h{% endif %}
+            {%- if item['interval_hours'] and item['interval_months'] %} +<br>{% endif %}
+            {% if item['interval_months'] %}{{ '%g'|format(item['interval_months']) }} mo{% endif %}
+            {% if not item['interval_hours'] and not item['interval_months'] %}—{% endif %}
+          </td>
+          <td class="small">
+            {{ item['last_done_date'] or '—' }}
+            {% if item['last_done_hours'] is not none %}<br><span class="muted">{{ '%g'|format(item['last_done_hours']) }} {{ item['timer'] }}</span>{% endif %}
+          </td>
+          <td class="small">
+            <div class="due-line">
+              {% if item['next_date'] %}<span>{{ item['next_date'] }}{% if item['days_left'] is not none %} · {{ item['days_left'] }} d{% endif %}</span>{% endif %}
+              {% if item['next_hours'] is not none %}<span class="small">{{ '%g'|format(item['next_hours']) }} {{ item['timer'] }}{% if item['hours_left'] is not none %} · {{ item['hours_left'] }} h{% endif %}</span>{% endif %}
+              {% if not item['next_date'] and item['next_hours'] is none %}<span class="muted">not set</span>{% endif %}
+            </div>
+          </td>
+          <td><span class="badge badge-{{ item['status'] }}">{{ item['status']|replace('_', ' ')|title }}</span></td>
+          <td class="right">
+            <details class="panel">
+              <summary>Edit</summary>
+              <div class="panel-body">
+                <form method="post" action="/items/{{ item['id'] }}/complete">
+                  {{ csrf(csrf_token, csrf_field) }}
+                  <h3>Sign it off</h3>
+                  <div class="field-row">
+                    <div class="field">
+                      <label for="dd{{ item['id'] }}">Date done</label>
+                      <input type="date" id="dd{{ item['id'] }}" name="done_date" value="{{ today }}">
+                    </div>
+                    <div class="field">
+                      <label for="dh{{ item['id'] }}">{{ timer_labels[item['timer']] }} reading</label>
+                      <input type="text" id="dh{{ item['id'] }}" name="done_hours" inputmode="decimal" placeholder="current">
+                    </div>
+                    <div class="field">
+                      <label for="pb{{ item['id'] }}">Performed by</label>
+                      <input type="text" id="pb{{ item['id'] }}" name="performed_by" maxlength="120">
+                    </div>
+                    <div class="field">
+                      <label for="ct{{ item['id'] }}">Certificate</label>
+                      <input type="text" id="ct{{ item['id'] }}" name="certificate" maxlength="60">
+                    </div>
+                    <div class="field">
+                      <label for="cs{{ item['id'] }}">Cost</label>
+                      <input type="text" id="cs{{ item['id'] }}" name="cost" inputmode="decimal" placeholder="0.00">
+                    </div>
+                  </div>
+                  <div class="field">
+                    <label for="wk{{ item['id'] }}">Work performed</label>
+                    <textarea id="wk{{ item['id'] }}" name="work" placeholder="What was inspected or replaced"></textarea>
+                  </div>
+                  <button class="btn btn-primary" type="submit">{{ icon('check') }}Mark done and log it</button>
+                  <p class="field-hint">Writes a logbook entry, moves the due date, and records the cost.</p>
+                </form>
+
+                <form method="post" action="/items/{{ item['id'] }}/update">
+                  {{ csrf(csrf_token, csrf_field) }}
+                  <h3>Settings</h3>
+                  <div class="field-row">
+                    <div class="field">
+                      <label for="nm{{ item['id'] }}">Name</label>
+                      <input type="text" id="nm{{ item['id'] }}" name="name" value="{{ item['name'] }}">
+                    </div>
+                    <div class="field">
+                      <label for="cg{{ item['id'] }}">Category</label>
+                      <select id="cg{{ item['id'] }}" name="category">
+                        {% for cat in categories %}<option value="{{ cat }}" {% if item['category'] == cat %}selected{% endif %}>{{ cat }}</option>{% endfor %}
+                      </select>
+                    </div>
+                    <div class="field">
+                      <label for="ih{{ item['id'] }}">Every (hours)</label>
+                      <input type="text" id="ih{{ item['id'] }}" name="interval_hours" value="{{ '%g'|format(item['interval_hours']) }}" inputmode="decimal">
+                    </div>
+                    <div class="field">
+                      <label for="im{{ item['id'] }}">Every (months)</label>
+                      <input type="text" id="im{{ item['id'] }}" name="interval_months" value="{{ '%g'|format(item['interval_months']) }}" inputmode="decimal">
+                    </div>
+                    <div class="field">
+                      <label for="tm{{ item['id'] }}">Counted on</label>
+                      <select id="tm{{ item['id'] }}" name="timer">
+                        {% for t in timers %}<option value="{{ t }}" {% if item['timer'] == t %}selected{% endif %}>{{ timer_labels[t] }}</option>{% endfor %}
+                      </select>
+                    </div>
+                    <div class="field">
+                      <label for="ld{{ item['id'] }}">Last done</label>
+                      <input type="date" id="ld{{ item['id'] }}" name="last_done_date" value="{{ item['last_done_date'] }}">
+                    </div>
+                    <div class="field">
+                      <label for="lh{{ item['id'] }}">at hours</label>
+                      <input type="text" id="lh{{ item['id'] }}" name="last_done_hours" inputmode="decimal" value="{{ '%g'|format(item['last_done_hours']) if item['last_done_hours'] is not none else '' }}">
+                    </div>
+                    <div class="field">
+                      <label for="rf{{ item['id'] }}">Reference</label>
+                      <input type="text" id="rf{{ item['id'] }}" name="reference" value="{{ item['reference'] }}">
+                    </div>
+                  </div>
+                  <div class="field">
+                    <label for="no{{ item['id'] }}">Notes</label>
+                    <input type="text" id="no{{ item['id'] }}" name="notes" value="{{ item['notes'] }}">
+                  </div>
+                  <div class="btn-row">
+                    <label class="nowrap"><input type="checkbox" name="airworthiness" value="1" {% if item['airworthiness'] %}checked{% endif %}> Required for airworthiness</label>
+                    <label class="nowrap"><input type="checkbox" name="active" value="1" {% if item['active'] %}checked{% endif %}> Active</label>
+                  </div>
+                  <div class="btn-row">
+                    <button class="btn btn-primary" type="submit">Save item</button>
+                    <button class="btn btn-danger" type="submit" formaction="/items/{{ item['id'] }}/delete">{{ icon('trash') }}Delete</button>
+                  </div>
+                </form>
+              </div>
+            </details>
+          </td>
+        </tr>
+        {% else %}
+        <tr><td colspan="6" class="muted">No items yet.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<div class="grid grid-2">
+  <div class="card">
+    <h2>Add an item</h2>
+    <form method="post" action="/items/add">
+      {{ csrf(csrf_token, csrf_field) }}
+      <div class="field-row">
+        <div class="field">
+          <label for="name">Name</label>
+          <input type="text" id="name" name="name" required placeholder="Rotax gearbox inspection">
+        </div>
+        <div class="field">
+          <label for="category">Category</label>
+          <select id="category" name="category">
+            {% for cat in categories %}<option value="{{ cat }}">{{ cat }}</option>{% endfor %}
+          </select>
+        </div>
+        <div class="field">
+          <label for="interval_hours">Every (hours)</label>
+          <input type="text" id="interval_hours" name="interval_hours" inputmode="decimal" placeholder="100">
+        </div>
+        <div class="field">
+          <label for="interval_months">Every (months)</label>
+          <input type="text" id="interval_months" name="interval_months" inputmode="decimal" placeholder="12">
+        </div>
+        <div class="field">
+          <label for="timer">Counted on</label>
+          <select id="timer" name="timer">
+            {% for t in timers %}<option value="{{ t }}">{{ timer_labels[t] }}</option>{% endfor %}
+          </select>
+        </div>
+        <div class="field">
+          <label for="last_done_date">Last done</label>
+          <input type="date" id="last_done_date" name="last_done_date">
+        </div>
+        <div class="field">
+          <label for="last_done_hours">at hours</label>
+          <input type="text" id="last_done_hours" name="last_done_hours" inputmode="decimal">
+        </div>
+        <div class="field">
+          <label for="reference">Reference</label>
+          <input type="text" id="reference" name="reference" placeholder="SB-XX-XX or 14 CFR …">
+        </div>
+      </div>
+      <label class="nowrap"><input type="checkbox" name="airworthiness" value="1"> Required for airworthiness</label>
+      <div class="btn-row">
+        <button class="btn btn-primary" type="submit">{{ icon('plus') }}Add item</button>
+      </div>
+    </form>
+  </div>
+
+  <div class="card">
+    <h2>Defaults</h2>
+    <p class="muted small">
+      New instances start with the common ones: annual, transponder and static checks,
+      ELT inspection and battery, oil change, registration and insurance. If you deleted
+      one by mistake, this puts back anything missing without touching what you have.
+    </p>
+    <form method="post" action="/items/restore-defaults">
+      {{ csrf(csrf_token, csrf_field) }}
+      <button class="btn" type="submit">Restore missing defaults</button>
+    </form>
+    <p class="field-hint">
+      Intervals are a starting point, not legal advice — check them against your own
+      aircraft, its operating limitations and the manufacturer's schedule.
+    </p>
+  </div>
+</div>
+
+{% endblock %}

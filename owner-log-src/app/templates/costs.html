@@ -1,0 +1,350 @@
+{% extends "base.html" %}
+{% from "_icons.html" import icon, csrf %}
+
+{% block subtitle %}
+<p class="subtitle">
+  {{ money(summary['total_cents']) }} over the last 12 months · {{ hours_fmt(summary['hours']) }} hours ·
+  {{ money(summary['all_in_per_hour_cents']) }} an hour all in
+</p>
+{% endblock %}
+
+{% block actions %}
+<a class="btn" href="/export/costs.pdf">{{ icon('download') }}Cost report</a>
+<a class="btn" href="/export/costs.csv">{{ icon('download') }}CSV</a>
+{% endblock %}
+
+{% block content %}
+
+<div class="grid grid-4">
+  <div class="card stat">
+    <span class="stat-label">Fixed, 12 months</span>
+    <span class="stat-value">{{ money(summary['fixed_cents']) }}</span>
+    <span class="stat-note">hangar, insurance, loan, subscriptions</span>
+  </div>
+  <div class="card stat">
+    <span class="stat-label">Variable, 12 months</span>
+    <span class="stat-value">{{ money(summary['variable_cents']) }}</span>
+    <span class="stat-note">{{ money(summary['variable_per_hour_cents']) }} per hour flown</span>
+  </div>
+  <div class="card stat">
+    <span class="stat-label">Reserves</span>
+    <span class="stat-value">{{ money(summary['reserve_rate_cents']) }}</span>
+    <span class="stat-note">set aside per hour</span>
+  </div>
+  <div class="card stat">
+    <span class="stat-label">All-in per hour</span>
+    <span class="stat-value">{{ money(summary['all_in_per_hour_cents']) }}</span>
+    <span class="stat-note">fixed + variable + reserves</span>
+  </div>
+</div>
+
+<div class="card">
+  <div class="card-head">
+    <h2>What an hour really costs</h2>
+    <span class="muted small">fixed costs spread over the hours you expect to fly</span>
+  </div>
+  <form method="get" action="/costs" class="inline-form">
+    <div class="field">
+      <label for="planned">Hours a year</label>
+      <input type="text" id="planned" name="planned" inputmode="decimal" value="{{ '%g'|format(planned) }}">
+    </div>
+    <button class="btn" type="submit">Recalculate</button>
+  </form>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Component</th><th class="num">Per hour</th><th class="num">Per year</th></tr></thead>
+      <tbody>
+        <tr>
+          <td>Fixed costs spread over {{ '%g'|format(projection['planned_hours']) }} hours</td>
+          <td class="num">{{ money(projection['fixed_per_hour_cents']) }}</td>
+          <td class="num">{{ money(projection['fixed_annual_cents']) }}</td>
+        </tr>
+        <tr>
+          <td>Variable costs {% if not summary['hours'] %}<span class="muted small">(estimated from fuel burn and price)</span>{% endif %}</td>
+          <td class="num">{{ money(projection['variable_per_hour_cents']) }}</td>
+          <td class="num">{{ money(projection['variable_per_hour_cents'] * projection['planned_hours']) }}</td>
+        </tr>
+        <tr>
+          <td>Reserves for overhaul and the unexpected</td>
+          <td class="num">{{ money(projection['reserve_rate_cents']) }}</td>
+          <td class="num">{{ money(projection['reserve_rate_cents'] * projection['planned_hours']) }}</td>
+        </tr>
+      </tbody>
+      <tfoot>
+        <tr>
+          <th>Total</th>
+          <th class="num">{{ money(projection['total_per_hour_cents']) }}</th>
+          <th class="num">{{ money(projection['annual_total_cents']) }}</th>
+        </tr>
+      </tfoot>
+    </table>
+  </div>
+  <p class="field-hint">
+    Fly fewer hours and the fixed costs land harder on each one. Depreciation and the
+    cost of tying up capital are not included.
+  </p>
+</div>
+
+<div class="grid grid-2">
+  <div class="card">
+    <div class="card-head"><h2>By category</h2><span class="muted small">dollars, all time</span></div>
+    {{ category_chart|safe }}
+  </div>
+  <div class="card">
+    <div class="card-head"><h2>By month</h2><span class="muted small">last 8 months</span></div>
+    {{ month_chart|safe }}
+  </div>
+</div>
+
+<div class="card">
+  <h2>Reserves</h2>
+  <p class="muted small">
+    Every flight hour puts money aside at these rates, so the overhaul is not a surprise.
+    The balances below are what the app says you should have banked.
+  </p>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Reserve</th><th class="num">Per hour</th><th class="num">Balance</th><th class="num">Target</th><th class="bar-cell">Progress</th><th></th></tr></thead>
+      <tbody>
+        {% for reserve in reserves %}
+        <tr>
+          <td>
+            <strong>{{ reserve['name'] }}</strong>
+            {% if not reserve['active'] %}<span class="badge">paused</span>{% endif %}
+            {% if reserve['notes'] %}<div class="muted small">{{ reserve['notes'] }}</div>{% endif %}
+          </td>
+          <td class="num">{{ money(reserve['rate_cents']) }}</td>
+          <td class="num">{{ money(reserve['balance_cents']) }}</td>
+          <td class="num">{{ money(reserve['target_cents']) if reserve['target_cents'] else '—' }}</td>
+          <td class="bar-cell">
+            {% if reserve['percent'] is not none %}
+            <progress value="{{ reserve['percent'] if reserve['percent'] < 100 else 100 }}" max="100">{{ reserve['percent'] }}%</progress>
+            <span class="small muted">{{ reserve['percent'] }}%</span>
+            {% endif %}
+          </td>
+          <td class="right">
+            <details class="panel">
+              <summary>Edit</summary>
+              <div class="panel-body">
+                <form method="post" action="/reserves/{{ reserve['id'] }}/update" class="inline-form">
+                  {{ csrf(csrf_token, csrf_field) }}
+                  <div class="field">
+                    <label for="rr{{ reserve['id'] }}">Per hour</label>
+                    <input type="text" id="rr{{ reserve['id'] }}" name="rate" inputmode="decimal" value="{{ '%.2f'|format(reserve['rate_cents'] / 100) }}">
+                  </div>
+                  <div class="field">
+                    <label for="rt{{ reserve['id'] }}">Target</label>
+                    <input type="text" id="rt{{ reserve['id'] }}" name="target" inputmode="decimal" value="{{ '%.2f'|format(reserve['target_cents'] / 100) if reserve['target_cents'] else '' }}">
+                  </div>
+                  <div class="field">
+                    <label for="rn{{ reserve['id'] }}">Notes</label>
+                    <input type="text" id="rn{{ reserve['id'] }}" name="notes" value="{{ reserve['notes'] }}">
+                  </div>
+                  <label class="nowrap"><input type="checkbox" name="active" value="1" {% if reserve['active'] %}checked{% endif %}> Accruing</label>
+                  <button class="btn btn-sm btn-primary" type="submit">Save</button>
+                </form>
+                <form method="post" action="/reserves/{{ reserve['id'] }}/txn" class="inline-form">
+                  {{ csrf(csrf_token, csrf_field) }}
+                  <div class="field">
+                    <label for="ta{{ reserve['id'] }}">Amount</label>
+                    <input type="text" id="ta{{ reserve['id'] }}" name="amount" inputmode="decimal" placeholder="0.00">
+                  </div>
+                  <div class="field">
+                    <label for="tk{{ reserve['id'] }}">Type</label>
+                    <select id="tk{{ reserve['id'] }}" name="kind">
+                      <option value="deposit">Deposit</option>
+                      <option value="withdrawal">Withdrawal</option>
+                    </select>
+                  </div>
+                  <div class="field">
+                    <label for="td{{ reserve['id'] }}">Date</label>
+                    <input type="date" id="td{{ reserve['id'] }}" name="happened_on" value="{{ today }}">
+                  </div>
+                  <div class="field">
+                    <label for="tn{{ reserve['id'] }}">Note</label>
+                    <input type="text" id="tn{{ reserve['id'] }}" name="note">
+                  </div>
+                  <button class="btn btn-sm" type="submit">Record</button>
+                </form>
+                <form method="post" action="/reserves/{{ reserve['id'] }}/delete">
+                  {{ csrf(csrf_token, csrf_field) }}
+                  <button class="btn btn-sm btn-danger" type="submit">{{ icon('trash') }}Delete reserve</button>
+                </form>
+              </div>
+            </details>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  <form method="post" action="/reserves/add" class="inline-form">
+    {{ csrf(csrf_token, csrf_field) }}
+    <div class="field">
+      <label for="rname">New reserve</label>
+      <input type="text" id="rname" name="name" placeholder="Interior refresh" maxlength="80">
+    </div>
+    <div class="field">
+      <label for="rrate">Per hour</label>
+      <input type="text" id="rrate" name="rate" inputmode="decimal" placeholder="5.00">
+    </div>
+    <div class="field">
+      <label for="rtarget">Target</label>
+      <input type="text" id="rtarget" name="target" inputmode="decimal">
+    </div>
+    <button class="btn" type="submit">{{ icon('plus') }}Add reserve</button>
+  </form>
+</div>
+
+{% if shares %}
+<div class="card">
+  <h2>Co-owner shares</h2>
+  <p class="muted small">
+    Based on the share percentages set in Settings, against {{ money(total_all) }} of
+    recorded costs and who paid them.
+  </p>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Who</th><th class="num">Share</th><th class="num">Their share of costs</th><th class="num">Paid</th><th class="num">Balance</th></tr></thead>
+      <tbody>
+        {% for share in shares %}
+        <tr>
+          <td>{{ share['name'] }}</td>
+          <td class="num">{{ '%g'|format(share['share']) }}%</td>
+          <td class="num">{{ money(share['owed_cents']) }}</td>
+          <td class="num">{{ money(share['paid_cents']) }}</td>
+          <td class="num">
+            <span class="badge badge-{{ 'ok' if share['balance_cents'] >= 0 else 'overdue' }}">
+              {{ money(share['balance_cents']) }}
+            </span>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  <p class="field-hint">A positive balance means they have paid in more than their share.</p>
+</div>
+{% endif %}
+
+<div class="card">
+  <h2>Add a cost</h2>
+  <form method="post" action="/costs/add" enctype="multipart/form-data">
+    {{ csrf(csrf_token, csrf_field) }}
+    <div class="field-row">
+      <div class="field">
+        <label for="spent_on">Date</label>
+        <input type="date" id="spent_on" name="spent_on" value="{{ today }}">
+      </div>
+      <div class="field">
+        <label for="amount">Amount</label>
+        <input type="text" id="amount" name="amount" inputmode="decimal" required placeholder="249.95">
+      </div>
+      <div class="field">
+        <label for="category">Category</label>
+        <select id="category" name="category">
+          {% for cat in categories %}<option value="{{ cat }}">{{ cat }}</option>{% endfor %}
+        </select>
+      </div>
+      <div class="field">
+        <label for="kind">Fixed or variable</label>
+        <select id="kind" name="kind">
+          <option value="">By category</option>
+          <option value="fixed">Fixed</option>
+          <option value="variable">Variable</option>
+        </select>
+      </div>
+      <div class="field">
+        <label for="vendor">Vendor</label>
+        <input type="text" id="vendor" name="vendor" maxlength="120">
+      </div>
+      <div class="field">
+        <label for="person_id">Paid by</label>
+        <select id="person_id" name="person_id">
+          <option value="">—</option>
+          {% for person in people %}<option value="{{ person['id'] }}">{{ person['name'] }}</option>{% endfor %}
+        </select>
+      </div>
+      <div class="field">
+        <label for="receipt">Receipt</label>
+        <input type="file" id="receipt" name="receipt">
+      </div>
+    </div>
+    <div class="field">
+      <label for="description">Description</label>
+      <input type="text" id="description" name="description" maxlength="300">
+    </div>
+    <div class="btn-row">
+      <label class="nowrap"><input type="checkbox" name="deductible" value="1"> Tax deductible</label>
+      <button class="btn btn-primary" type="submit">{{ icon('plus') }}Add cost</button>
+    </div>
+  </form>
+</div>
+
+<div class="card">
+  <div class="card-head">
+    <h2>Spending</h2>
+    <form method="get" action="/costs" class="inline-form">
+      <div class="field">
+        <label for="f-category">Category</label>
+        <select id="f-category" name="category">
+          <option value="">Any</option>
+          {% for cat in categories %}<option value="{{ cat }}" {% if filters['category'] == cat %}selected{% endif %}>{{ cat }}</option>{% endfor %}
+        </select>
+      </div>
+      <div class="field">
+        <label for="f-kind">Type</label>
+        <select id="f-kind" name="kind">
+          <option value="">Any</option>
+          <option value="fixed" {% if filters['kind'] == 'fixed' %}selected{% endif %}>Fixed</option>
+          <option value="variable" {% if filters['kind'] == 'variable' %}selected{% endif %}>Variable</option>
+        </select>
+      </div>
+      <div class="field">
+        <label for="f-year">Year</label>
+        <select id="f-year" name="year">
+          <option value="">Any</option>
+          {% for y in years %}<option value="{{ y }}" {% if filters['year'] == y %}selected{% endif %}>{{ y }}</option>{% endfor %}
+        </select>
+      </div>
+      <button class="btn btn-sm" type="submit">Filter</button>
+    </form>
+  </div>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Date</th><th>Vendor</th><th>Category</th><th>Description</th><th>Paid by</th><th class="num">Amount</th><th></th></tr></thead>
+      <tbody>
+        {% for cost in rows %}
+        <tr>
+          <td class="mono nowrap">{{ cost['spent_on'] }}</td>
+          <td>{{ cost['vendor'] or '—' }}</td>
+          <td>
+            <span class="badge">{{ cost['category'] }}</span>
+            {% if cost['kind'] == 'fixed' %}<span class="badge badge-accent">fixed</span>{% endif %}
+          </td>
+          <td>
+            {{ cost['description'] }}
+            {% if cost['receipt_name'] %} <a class="small" href="/files/{{ cost['receipt_name'] }}">receipt</a>{% endif %}
+            {% if cost['deductible'] %}<span class="badge">deductible</span>{% endif %}
+          </td>
+          <td class="small">{{ cost['person_name'] or '—' }}</td>
+          <td class="num">{{ money(cost['amount_cents']) }}</td>
+          <td class="right">
+            <form method="post" action="/costs/{{ cost['id'] }}/delete">
+              {{ csrf(csrf_token, csrf_field) }}
+              <button class="btn btn-sm btn-danger" type="submit">{{ icon('trash') }}</button>
+            </form>
+          </td>
+        </tr>
+        {% else %}
+        <tr><td colspan="7" class="muted">No costs recorded yet.</td></tr>
+        {% endfor %}
+      </tbody>
+      {% if rows %}
+      <tfoot><tr><th colspan="5" class="right">Shown</th><th class="num">{{ money(shown) }}</th><th></th></tr></tfoot>
+      {% endif %}
+    </table>
+  </div>
+</div>
+
+{% endblock %}

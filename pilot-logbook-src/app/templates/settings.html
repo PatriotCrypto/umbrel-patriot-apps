@@ -1,0 +1,76 @@
+{% extends "base.html" %}
+{% block title %}Settings{% endblock %}
+{% block content %}
+<header class="page-head"><div><h1>Settings</h1><p class="sub">Everything here stays on this device.</p></div></header>
+{% if saved %}<div class="notice" role="status">Saved.</div>{% endif %}
+<form method="post" action="/settings">
+  <input type="hidden" name="csrf" value="{{ csrf }}">
+  <section class="panel">
+    <h2>Pilot</h2><p class="hint">Drives the reminders on your dashboard and the name on your printed logbook.</p>
+    <div class="formgrid">
+      <label class="field"><span>Name</span><input name="name" value="{{ prof.get('name', '') }}"></label>
+      <label class="field"><span>Certificate</span><input name="certificate" value="{{ prof.get('certificate', '') }}" placeholder="Student, Private, Commercial"></label>
+      <label class="field"><span>Last flight review</span><input type="date" name="flight_review" value="{{ prof.get('flight_review', '') }}">
+        <small>{% if review_through %}Valid through {{ review_through|pretty_date }} (FAR 61.56).{% else %}A checkride or new rating can count too (FAR 61.56(d)).{% endif %}</small></label>
+      <label class="field"><span>Medical class</span><input name="medical_class" value="{{ prof.get('medical_class', '') }}" placeholder="Third class, BasicMed"></label>
+      <label class="field"><span>Medical valid through</span><input type="date" name="medical_expires" value="{{ prof.get('medical_expires', '') }}">
+        <small>How long it lasts depends on the class and your age at the exam, so enter the date you worked out.</small></label>
+    </div>
+  </section>
+  <section class="panel">
+    <h2>Entry time format</h2><p class="hint">How hours are shown and typed. You can always enter 1.3 or 1:18, whichever format is selected.</p>
+    <div class="radios">
+      {% for k, label in formats.items() %}<label><input type="radio" name="time_format" value="{{ k }}"{% if k == tf %} checked{% endif %}>{{ label }}</label>{% endfor %}
+    </div>
+  </section>
+  <section class="panel">
+    <h2>Configure fields</h2>
+    <p class="hint">Choose the fields you want on each flight, as in ForeFlight. A field that already holds data on a flight always shows when you edit that flight, so nothing gets hidden or lost.</p>
+    <div class="feat-groups">
+      {% for group, items in groups.items() %}
+      <div><h3>{{ group }}</h3>
+        {% for it in items %}
+        <label class="feat"><input type="checkbox" name="feat_{{ it.key }}" value="1"{% if it.on %} checked{% endif %}><span>{{ it.label }}</span>{% if it.hint %}<small>{{ it.hint }}</small>{% endif %}</label>
+        {% endfor %}
+      </div>
+      {% endfor %}
+    </div>
+  </section>
+  <div class="formactions"><button class="btn primary" type="submit">Save settings</button></div>
+</form>
+
+<section class="panel spaced-top" id="alerts" aria-labelledby="alerts-h">
+  <h2 id="alerts-h">{{ icon("bell") }} Expiry alerts</h2>
+  <p class="hint">Get a phone notification before your medical, flight review, endorsements, Hangar documents or passenger currency run out. Alerts go to an <a href="https://ntfy.sh" rel="noreferrer">ntfy</a> topic, either the free ntfy.sh service or the ntfy app on your Umbrel, or to any address that accepts a plain-text POST.</p>
+  {% if alerts == "saved" %}<div class="notice" role="status">Alert settings saved.</div>{% elif alerts == "sent" %}<div class="notice" role="status">Test alert sent. Check your phone.</div>{% endif %}
+  {% if alert_error %}<div class="notice err" role="alert">{{ alert_error }}</div>{% endif %}
+  <details class="more howto"{% if not al.url %} open{% endif %}><summary>How to set it up (3 minutes)</summary>
+    <ol>
+      <li>Install the free <b>ntfy</b> app on your phone (App Store or Google Play) and allow notifications.</li>
+      <li>In ntfy, tap <b>+</b> to subscribe to a topic and enter this private name: <code>{{ (al.url or suggested).rsplit("/", 1)[-1] }}</code>. Keep the server as ntfy.sh.</li>
+      <li>Paste <code>{{ al.url or suggested }}</code> into <b>Send alerts to</b> below (it's filled in for you), tick <b>Send expiry alerts</b> and click <b>Save alerts</b>.</li>
+      <li>Click <b>Send a test alert</b>. Your phone should buzz within a few seconds.</li>
+    </ol>
+    <p class="note">Alerts cover your medical and flight review (enter both under Pilot above), endorsements with an expiry, Hangar documents with an expiry date, and your passenger currency. The name is the only thing protecting your topic, so keep it long and random.</p>
+  </details>
+  <form method="post" action="/settings/alerts" autocomplete="off">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    <div class="formgrid">
+      <label class="field span-all"><span>Send alerts to</span><input name="url" type="url" value="{{ al.url or suggested }}">
+        <small>Pick a long, hard-to-guess topic name: anyone who knows a public ntfy.sh topic can read it. On your Umbrel the ntfy app's address looks like http://umbrel.local:PORT/your-topic.</small></label>
+      <label class="field"><span>Access token</span><input name="token" type="password" placeholder="{{ 'Saved, leave blank to keep' if al.token else 'Optional' }}">
+        {% if al.token %}<small><label class="flag"><input type="checkbox" name="clear_token" value="1">Remove saved token</label></small>{% endif %}</label>
+      <label class="field"><span>Days before</span><input name="days" value="{{ al.days|join(', ') }}" inputmode="numeric">
+        <small>One alert at each, for example 30, 7, 0 (0 is the day it expires).</small></label>
+    </div>
+    <label class="flag"><input type="checkbox" name="enabled" value="1"{% if al.enabled %} checked{% endif %}>Send expiry alerts</label>
+    <div class="actions"><button class="btn primary" type="submit">Save alerts</button>
+      <button class="btn" type="submit" formaction="/settings/alerts/test"{% if not al.url %} disabled{% endif %}>Send a test alert</button></div>
+  </form>
+  <p class="note">Checked every 15 minutes while the app runs.{% if al.last_run %} Last check {{ al.last_run.replace("T", " ") }}{% if al.last_sent %}, last alert sent {{ al.last_sent.replace("T", " ") }}{% endif %}.{% endif %}{% if al.last_error %} <span class="bad">Last attempt failed: {{ al.last_error }}</span>{% endif %}</p>
+  {% if upcoming %}
+  <h3 class="subhead">Coming up</h3>
+  <ul class="statuslist">{% for x in upcoming %}<li><span>{{ x.label }}</span><span class="muted small">{{ x.through|pretty_date }}, {% if x.days == 0 %}today{% else %}in {{ x.days }} day{{ "s" if x.days != 1 }}{% endif %}</span></li>{% endfor %}</ul>
+  {% endif %}
+</section>
+{% endblock %}

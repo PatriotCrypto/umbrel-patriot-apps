@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+{% block title %}Personal minimums{% endblock %}
+{% block content %}
+<header class="page-head"><div><p class="crumb"><a href="/preflight">&larr; Preflight Risk Check</a></p><h1>Personal minimums</h1>
+  <p class="sub">The limits the Preflight Risk Check compares the weather against. Leave a box blank if you don't use that limit.</p></div></header>
+{% if saved %}<div class="notice" role="status">Minimums saved. <a href="/preflight">Back to the Preflight Risk Check</a></div>{% endif %}
+{% if errors %}<div class="errors" role="alert"><strong>Fix these before saving:</strong><ul>{% for e in errors %}<li>{{ e }}</li>{% endfor %}</ul></div>{% endif %}
+<form class="panel" method="post" action="/preflight/minimums">
+  <input type="hidden" name="csrf" value="{{ csrf }}">
+  <p class="hint">Work these out with your instructor, and tighten them when you're tired, rusty or in an unfamiliar aircraft.</p>
+  <div class="scrollx">
+  <table class="plain mins">
+    <thead><tr><th>Limit</th>{% for k, label in profiles %}<th>{{ label }}</th>{% endfor %}</tr></thead>
+    <tbody>
+    {% for fk, label, unit, kind in fields %}
+    <tr><td>{{ label }} <span class="muted small">({{ unit }})</span></td>
+      {% for p, _ in profiles %}{% set v = mins[p][fk] %}<td><input name="{{ p }}_{{ fk }}" value="{{ '%g'|format(v) if v is not none else '' }}" inputmode="decimal" aria-label="{{ label }}, {{ p }}"></td>{% endfor %}</tr>
+    {% endfor %}
+    <tr><td>Night flying allowed</td>{% for p, _ in profiles %}<td><label class="flag"><input type="checkbox" name="{{ p }}_night" value="1"{% if mins[p].night %} checked{% endif %}>Yes</label></td>{% endfor %}</tr>
+    </tbody>
+  </table>
+  </div>
+  <div class="actions"><button class="btn primary" type="submit">Save minimums</button><a class="btn" href="/preflight">Back</a></div>
+</form>
+{% endblock %}

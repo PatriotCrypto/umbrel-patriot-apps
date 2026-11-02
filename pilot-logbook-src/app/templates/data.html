@@ -1,0 +1,93 @@
+{% extends "base.html" %}
+{% from "_hangar_tabs.html" import hangar_tabs with context %}
+{% block title %}Import and backup{% endblock %}
+{% block content %}
+<header class="page-head"><div><h1>Document Hangar</h1><p class="sub">Import from ForeFlight, export, and back up everything. Your logbook lives only on this server, so keep a copy somewhere else too.</p></div></header>
+{{ hangar_tabs("data") }}
+{% if changes %}
+<section class="panel attention" id="changes">
+  <h2>{{ changes|length }} flight{{ "s" if changes|length != 1 }} changed in ForeFlight</h2>
+  <p class="hint">Your latest import has a new version of {{ "these flights" if changes|length != 1 else "this flight" }}. Use ForeFlight's version to replace the old copy (costs you entered here carry over), or keep both if they really are two flights.</p>
+  {% for ch in changes %}
+  <div class="change">
+    <p><b>{{ ch.new.date|pretty_date }}</b> {{ ch.new.aircraft }} {{ ch.new|route }}</p>
+    <table class="plain small"><thead><tr><th>Changed</th><th>Before</th><th>ForeFlight now</th></tr></thead>
+      <tbody>{% for d in ch.diffs[:8] %}<tr><td>{{ d.label }}</td><td>{{ d.old if d.old not in (none, "") else "-" }}</td><td><b>{{ d.new if d.new not in (none, "") else "-" }}</b></td></tr>{% endfor %}</tbody></table>
+    <div class="actions">
+      <form method="post" action="/data/changes/{{ ch.id }}"><input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="keep" value="new"><button class="btn primary" type="submit">Use ForeFlight's version</button></form>
+      <form method="post" action="/data/changes/{{ ch.id }}"><input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="keep" value="both"><button class="btn" type="submit">Keep both</button></form>
+    </div>
+  </div>
+  {% endfor %}
+  {% if changes|length > 1 %}<form method="post" action="/data/changes/0"><input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="keep" value="new"><button class="btn" type="submit">Use ForeFlight's version for all {{ changes|length }}</button></form>{% endif %}
+</section>
+{% endif %}
+{% if msg %}<div class="notice" role="status">{{ msg }}</div>{% endif %}
+{% if error %}<div class="notice err" role="alert">{{ error }}</div>{% endif %}
+<div class="two">
+  <form class="panel" method="post" action="/data/import" enctype="multipart/form-data">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    <h2>Import from ForeFlight</h2>
+    <p class="hint">Export your logbook from ForeFlight as CSV and upload it here. Importing again is safe: flights you already have are skipped.</p>
+    <label class="field"><span>ForeFlight CSV</span><input type="file" name="file" accept=".csv,text/csv" required></label>
+    <div class="actions"><button class="btn primary" type="submit">Import</button></div>
+    <p class="note">If you change a flight in ForeFlight and import again, the changed version is added as a new entry. Delete the older one from the logbook.</p>
+  </form>
+  <div class="panel">
+    <h2>Export</h2>
+    <p class="hint">{{ n }} flight{{ "s" if n != 1 }} in your logbook.</p>
+    <div class="actions"><a class="btn primary" href="/export/foreflight.csv">ForeFlight CSV</a><a class="btn" href="/export/logbook.pdf">Printable PDF</a></div>
+    <p class="note">The CSV uses ForeFlight's own layout and includes every column. The PDF has page totals and a running total.</p>
+  </div>
+  <div class="panel">
+    <h2>Back up everything</h2>
+    <p class="hint">One zip with your flights, aircraft, settings, import history, scanned pages and every file in the Document Hangar.</p>
+    <div class="actions"><a class="btn primary" href="/export/backup.zip">Download backup</a><a class="btn" href="/export/backup.zip?documents=0">Without documents</a></div>
+    <p class="note">A full backup is as large as your Hangar, and needs about that much free space while it is being made. Restoring a backup made without documents leaves your current Hangar alone.</p>
+  </div>
+  <form class="panel" method="post" action="/data/restore" enctype="multipart/form-data">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    <h2>Restore a backup</h2>
+    <p class="hint">This replaces everything in the logbook with the contents of the backup.</p>
+    <label class="field"><span>Backup zip</span><input type="file" name="file" accept=".zip" required></label>
+    <label class="flag"><input type="checkbox" name="confirm" value="yes">Replace my current logbook</label>
+    <div class="actions"><button class="btn danger" type="submit">Restore</button></div>
+  </form>
+</div>
+<section class="panel spaced-top" aria-labelledby="ab-h">
+  <h2 id="ab-h">Scheduled backups</h2>
+  <p class="hint">Saves a backup zip on this device on a schedule and keeps the newest ones. It protects you from mistakes like deleting entries; it doesn't protect you if the device fails, so download a copy now and then too.</p>
+  <form method="post" action="/data/autobackup">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    <div class="formgrid">
+      <label class="field"><span>How often</span><select name="freq">{% for k, label in (("off", "Off"), ("daily", "Every day"), ("weekly", "Every week")) %}<option value="{{ k }}"{% if ab.freq == k %} selected{% endif %}>{{ label }}</option>{% endfor %}</select></label>
+      <label class="field"><span>Keep the newest</span><input name="keep" value="{{ ab.keep }}" inputmode="numeric"></label>
+    </div>
+    <label class="flag"><input type="checkbox" name="documents" value="1"{% if ab.documents %} checked{% endif %}>Include Document Hangar files (uses as much space as your Hangar, for every copy kept)</label>
+    <div class="actions"><button class="btn primary" type="submit">Save schedule</button>
+      <button class="btn" type="submit" formaction="/data/backups/now">Back up now</button></div>
+  </form>
+  {% if ab.last_error %}<p class="note bad">Last scheduled backup failed: {{ ab.last_error }}</p>{% endif %}
+  {% if backups %}
+  <table class="plain spaced-top"><thead><tr><th>Backup</th><th>Made</th><th class="n">Size</th><th></th></tr></thead>
+    <tbody>{% for b in backups %}<tr><td><a href="/data/backups/{{ b.name }}">{{ b.name }}</a></td><td>{{ b.when.strftime("%b %-d, %Y %H:%M") }}</td><td class="n">{{ b.size }}</td>
+      <td class="n"><form method="post" action="/data/backups/{{ b.name }}/delete"><input type="hidden" name="csrf" value="{{ csrf }}"><button class="linkbtn" type="submit">Delete</button></form></td></tr>{% endfor %}</tbody></table>
+  {% else %}<p class="note">No saved backups yet.</p>{% endif %}
+</section>
+<form class="panel danger-zone spaced-top" method="post" action="/data/delete-all" autocomplete="off">
+  <input type="hidden" name="csrf" value="{{ csrf }}">
+  <h2>Delete all logbook entries</h2>
+  <p class="warn"><strong>Warning: this permanently deletes all {{ n }} flight{{ "s" if n != 1 }} and the import history, and cannot be undone.</strong></p>
+  <p class="hint">Aircraft, settings, paper scans and the Document Hangar are kept. Download a backup first if there is any chance you want these entries back.</p>
+  <label class="field"><span>Type <b>Delete-All-Logs</b> to confirm</span><input name="phrase" required autocapitalize="off" autocorrect="off" spellcheck="false"></label>
+  <div class="actions"><button class="btn danger" type="submit">Delete all entries</button></div>
+</form>
+{% if imports %}
+<section class="panel spaced-top">
+  <h2>Import history</h2>
+  <table class="plain"><thead><tr><th>File</th><th>Imported</th><th class="n">New</th><th class="n">Skipped</th></tr></thead>
+    <tbody>{% for i in imports %}<tr><td>{{ i.filename }}</td><td>{{ i.imported_at[:16].replace('T', ' ') }} UTC</td><td class="n">{{ i.flights_new }}</td><td class="n">{{ i.flights_skipped }}</td></tr>{% endfor %}</tbody></table>
+  <p class="note">Every imported file is kept exactly as uploaded inside the backup, so you can always show where an entry came from.</p>
+</section>
+{% endif %}
+{% endblock %}

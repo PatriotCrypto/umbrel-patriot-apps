@@ -1,0 +1,201 @@
+{% extends "base.html" %}
+{% from "_icons.html" import icon, csrf %}
+
+{% block content %}
+
+<div class="card">
+  <h2>Current times</h2>
+  <p class="muted small">
+    Logging a flight rolls these forward automatically. Edit them here if you are
+    catching the app up, or correcting a reading.
+  </p>
+  <form method="post" action="/aircraft/times">
+    {{ csrf(csrf_token, csrf_field) }}
+    <div class="field-row">
+      <div class="field">
+        <label for="tach">Tach</label>
+        <input type="text" id="tach" name="tach" inputmode="decimal" value="{{ '%g'|format(craft['tach']) }}">
+      </div>
+      <div class="field">
+        <label for="hobbs">Hobbs</label>
+        <input type="text" id="hobbs" name="hobbs" inputmode="decimal" value="{{ '%g'|format(craft['hobbs']) }}">
+      </div>
+      <div class="field">
+        <label for="total_time">Airframe total time</label>
+        <input type="text" id="total_time" name="total_time" inputmode="decimal" value="{{ '%g'|format(craft['total_time']) }}">
+      </div>
+      <div class="field">
+        <label for="engine_smoh">Engine since overhaul</label>
+        <input type="text" id="engine_smoh" name="engine_smoh" inputmode="decimal" value="{{ '%g'|format(craft['engine_smoh']) }}">
+      </div>
+      <div class="field">
+        <label for="prop_since">Prop since overhaul</label>
+        <input type="text" id="prop_since" name="prop_since" inputmode="decimal" value="{{ '%g'|format(craft['prop_since']) }}">
+      </div>
+    </div>
+    <button class="btn btn-primary" type="submit">{{ icon('check') }}Save times</button>
+  </form>
+
+  {% if engine_percent is not none or prop_percent is not none %}
+  <div class="grid grid-2">
+    {% if engine_percent is not none %}
+    <div>
+      <p class="bar-label"><span>Engine to TBO ({{ hours_fmt(craft['engine_tbo']) }} h)</span><span>{{ engine_percent }}%</span></p>
+      <progress value="{{ engine_percent if engine_percent < 100 else 100 }}" max="100">{{ engine_percent }}%</progress>
+      <p class="muted small">{{ hours_fmt(craft['engine_tbo'] - craft['engine_smoh']) }} hours remaining</p>
+    </div>
+    {% endif %}
+    {% if prop_percent is not none %}
+    <div>
+      <p class="bar-label"><span>Propeller to TBO ({{ hours_fmt(craft['prop_tbo']) }} h)</span><span>{{ prop_percent }}%</span></p>
+      <progress value="{{ prop_percent if prop_percent < 100 else 100 }}" max="100">{{ prop_percent }}%</progress>
+    </div>
+    {% endif %}
+  </div>
+  {% endif %}
+</div>
+
+<div class="card">
+  <h2>Aircraft</h2>
+  <form method="post" action="/aircraft">
+    {{ csrf(csrf_token, csrf_field) }}
+    <div class="field-row">
+      <div class="field">
+        <label for="tail">Registration</label>
+        <input type="text" id="tail" name="tail" value="{{ craft['tail'] }}" maxlength="12" placeholder="N912WG">
+      </div>
+      <div class="field">
+        <label for="make">Make</label>
+        <input type="text" id="make" name="make" value="{{ craft['make'] }}">
+      </div>
+      <div class="field">
+        <label for="model">Model</label>
+        <input type="text" id="model" name="model" value="{{ craft['model'] }}">
+      </div>
+      <div class="field">
+        <label for="serial">Serial number</label>
+        <input type="text" id="serial" name="serial" value="{{ craft['serial'] }}">
+      </div>
+      <div class="field">
+        <label for="year">Year</label>
+        <input type="text" id="year" name="year" value="{{ craft['year'] }}" maxlength="8">
+      </div>
+      <div class="field">
+        <label for="category">Category</label>
+        <input type="text" id="category" name="category" value="{{ craft['category'] }}" placeholder="Experimental, Normal…">
+      </div>
+      <div class="field">
+        <label for="home_base">Home base</label>
+        <input type="text" id="home_base" name="home_base" value="{{ craft['home_base'] }}" placeholder="KHAO">
+      </div>
+      <div class="field">
+        <label for="planned_hours">Planned hours a year</label>
+        <input type="text" id="planned_hours" name="planned_hours" inputmode="decimal" value="{{ '%g'|format(craft['planned_hours']) }}">
+        <p class="field-hint">Used for the cost-per-hour projection.</p>
+      </div>
+    </div>
+
+    <h3>Engine and propeller</h3>
+    <div class="field-row">
+      <div class="field">
+        <label for="engine_make">Engine make</label>
+        <input type="text" id="engine_make" name="engine_make" value="{{ craft['engine_make'] }}" placeholder="Rotax">
+      </div>
+      <div class="field">
+        <label for="engine_model">Engine model</label>
+        <input type="text" id="engine_model" name="engine_model" value="{{ craft['engine_model'] }}" placeholder="912iS Sport">
+      </div>
+      <div class="field">
+        <label for="engine_serial">Engine serial</label>
+        <input type="text" id="engine_serial" name="engine_serial" value="{{ craft['engine_serial'] }}">
+      </div>
+      <div class="field">
+        <label for="engine_tbo">Engine TBO (hours)</label>
+        <input type="text" id="engine_tbo" name="engine_tbo" inputmode="decimal" value="{{ '%g'|format(craft['engine_tbo']) }}" placeholder="2000">
+      </div>
+      <div class="field">
+        <label for="prop_make">Prop make</label>
+        <input type="text" id="prop_make" name="prop_make" value="{{ craft['prop_make'] }}">
+      </div>
+      <div class="field">
+        <label for="prop_model">Prop model</label>
+        <input type="text" id="prop_model" name="prop_model" value="{{ craft['prop_model'] }}">
+      </div>
+      <div class="field">
+        <label for="prop_serial">Prop serial</label>
+        <input type="text" id="prop_serial" name="prop_serial" value="{{ craft['prop_serial'] }}">
+      </div>
+      <div class="field">
+        <label for="prop_tbo">Prop TBO (hours)</label>
+        <input type="text" id="prop_tbo" name="prop_tbo" inputmode="decimal" value="{{ '%g'|format(craft['prop_tbo']) }}">
+      </div>
+    </div>
+
+    <h3>Weights and fuel</h3>
+    <div class="field-row">
+      <div class="field">
+        <label for="empty_weight">Empty weight (lb)</label>
+        <input type="text" id="empty_weight" name="empty_weight" inputmode="decimal" value="{{ '%g'|format(craft['empty_weight']) }}">
+      </div>
+      <div class="field">
+        <label for="empty_arm">Empty CG arm (in)</label>
+        <input type="text" id="empty_arm" name="empty_arm" inputmode="decimal" value="{{ '%g'|format(craft['empty_arm']) }}">
+      </div>
+      <div class="field">
+        <label for="max_gross">Max gross (lb)</label>
+        <input type="text" id="max_gross" name="max_gross" inputmode="decimal" value="{{ '%g'|format(craft['max_gross']) }}">
+      </div>
+      <div class="field">
+        <label for="fuel_capacity">Fuel capacity (gal)</label>
+        <input type="text" id="fuel_capacity" name="fuel_capacity" inputmode="decimal" value="{{ '%g'|format(craft['fuel_capacity']) }}">
+      </div>
+      <div class="field">
+        <label for="fuel_burn">Burn (gal/hr)</label>
+        <input type="text" id="fuel_burn" name="fuel_burn" inputmode="decimal" value="{{ '%g'|format(craft['fuel_burn']) }}">
+      </div>
+      <div class="field">
+        <label for="fuel_price">Fuel price ($/gal)</label>
+        <input type="text" id="fuel_price" name="fuel_price" inputmode="decimal" value="{{ '%g'|format(craft['fuel_price']) }}">
+        <p class="field-hint">Falls back to this when no fuel costs are recorded yet.</p>
+      </div>
+    </div>
+
+    <div class="field">
+      <label for="notes">Notes</label>
+      <textarea id="notes" name="notes" placeholder="Equipment list summary, operating limitations, anything worth keeping to hand">{{ craft['notes'] }}</textarea>
+    </div>
+    <button class="btn btn-primary" type="submit">{{ icon('check') }}Save aircraft</button>
+  </form>
+</div>
+
+<div class="card">
+  <h2>Record an overhaul</h2>
+  <p class="muted small">
+    Resets the engine or propeller counter to zero and writes a logbook entry.
+  </p>
+  <form method="post" action="/aircraft/overhaul" class="inline-form">
+    {{ csrf(csrf_token, csrf_field) }}
+    <div class="field">
+      <label for="what">What</label>
+      <select id="what" name="what">
+        <option value="engine">Engine</option>
+        <option value="prop">Propeller</option>
+      </select>
+    </div>
+    <div class="field">
+      <label for="when">Date</label>
+      <input type="date" id="when" name="when" value="{{ today }}">
+    </div>
+    <div class="field">
+      <label for="performed_by">Performed by</label>
+      <input type="text" id="performed_by" name="performed_by" maxlength="120">
+    </div>
+    <div class="field">
+      <label for="onotes">Notes</label>
+      <input type="text" id="onotes" name="notes">
+    </div>
+    <button class="btn btn-danger" type="submit">Record overhaul</button>
+  </form>
+</div>
+
+{% endblock %}

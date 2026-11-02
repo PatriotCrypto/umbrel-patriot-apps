@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="auto">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>{{ title }} · {{ craft_name }}</title>
+<meta name="color-scheme" content="light dark">
+<link rel="stylesheet" href="/static/app.css?v={{ asset_version }}">
+<link rel="icon" href="/static/icon.svg" type="image/svg+xml">
+</head>
+<body>
+{% from "_icons.html" import icon, csrf %}
+<a class="skip" href="#main">Skip to content</a>
+
+<aside class="sidebar">
+  <div class="brand">
+    <img class="brand-mark" src="/static/icon.svg" alt="" width="34" height="34">
+    <div class="brand-text">
+      <strong>Owner Log</strong>
+      <span>{{ craft_name }}</span>
+    </div>
+  </div>
+  <nav class="nav" aria-label="Sections">
+    {% for href, label, ico in nav %}
+    <a class="nav-item{% if path == href or (href != '/' and path.startswith(href)) %} current{% endif %}" href="{{ href }}">
+      {{ icon(ico) }}<span>{{ label }}</span>
+    </a>
+    {% endfor %}
+  </nav>
+  <div class="sidebar-foot">
+    <p class="muted small">v{{ version }}</p>
+  </div>
+</aside>
+
+<main id="main" class="main">
+  <header class="topbar">
+    <div>
+      <h1>{{ title }}</h1>
+      {% block subtitle %}{% endblock %}
+    </div>
+    <div class="topbar-actions">{% block actions %}{% endblock %}</div>
+  </header>
+
+  {% if msg %}<p class="flash flash-ok" role="status">{{ icon('check') }}{{ msg }}</p>{% endif %}
+  {% if err %}<p class="flash flash-bad" role="alert">{{ err }}</p>{% endif %}
+
+  {% block content %}{% endblock %}
+
+  <footer class="foot">
+    <p class="muted small">
+      Hangar Owner Log v{{ version }} · your data stays on this server ·
+      <a href="/export/backup.zip">download a backup</a>
+    </p>
+  </footer>
+</main>
+
+<nav class="tabbar" aria-label="Sections">
+  <a class="tab{% if path == '/' %} current{% endif %}" href="/">{{ icon('gauge') }}<span>Status</span></a>
+  <a class="tab{% if path.startswith('/maintenance') %} current{% endif %}" href="/maintenance">{{ icon('wrench') }}<span>Maint</span></a>
+  <a class="tab{% if path.startswith('/squawks') %} current{% endif %}" href="/squawks">{{ icon('alert') }}<span>Squawks</span></a>
+  <a class="tab{% if path.startswith('/flights') %} current{% endif %}" href="/flights">{{ icon('plane') }}<span>Flights</span></a>
+  <a class="tab{% if path.startswith('/costs') %} current{% endif %}" href="/costs">{{ icon('dollar') }}<span>Costs</span></a>
+  <a class="tab{% if path.startswith('/settings') %} current{% endif %}" href="/settings">{{ icon('cog') }}<span>More</span></a>
+</nav>
+</body>
+</html>

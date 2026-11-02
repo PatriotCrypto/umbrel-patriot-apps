@@ -1,0 +1,179 @@
+{% extends "base.html" %}
+{% from "_icons.html" import icon, csrf %}
+
+{% block subtitle %}
+<p class="subtitle">Everything installed, with serial numbers for the equipment list and time in service</p>
+{% endblock %}
+
+{% block content %}
+
+<div class="card">
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr><th>Component</th><th>Make / model</th><th>Part</th><th>Serial</th><th>Installed</th><th class="bar-cell">Life</th><th></th></tr>
+      </thead>
+      <tbody>
+        {% for row in rows %}
+        <tr>
+          <td>
+            <strong>{{ row['name'] }}</strong>
+            {% if row['removed_on'] %}<span class="badge">removed {{ row['removed_on'] }}</span>{% endif %}
+            {% if row['stc'] %}<div class="muted small">STC {{ row['stc'] }}</div>{% endif %}
+            <div class="muted small">{{ row['category'] }}</div>
+          </td>
+          <td class="small">{{ (row['make'] ~ ' ' ~ row['model'])|trim or '—' }}</td>
+          <td class="mono small">{{ row['part_number'] or '—' }}</td>
+          <td class="mono small">{{ row['serial'] or '—' }}</td>
+          <td class="small">
+            {{ row['installed_on'] or '—' }}
+            {% if row['installed_tach'] is not none %}<br><span class="muted">{{ '%g'|format(row['installed_tach']) }} tach</span>{% endif %}
+          </td>
+          <td class="bar-cell">
+            {% if row['percent'] is not none %}
+              <div class="bar-label"><span>{{ row['used_hours'] }} h used</span><span>{{ row['remaining'] }} left</span></div>
+              <progress value="{{ row['percent'] }}" max="100">{{ row['percent'] }}%</progress>
+            {% elif row['life_date'] %}
+              <span class="small muted">life limit {{ row['life_date'] }}</span>
+            {% else %}—{% endif %}
+          </td>
+          <td class="right">
+            <details class="panel">
+              <summary>Edit</summary>
+              <div class="panel-body">
+                <form method="post" action="/equipment/{{ row['id'] }}/update">
+                  {{ csrf(csrf_token, csrf_field) }}
+                  <div class="field-row">
+                    <div class="field">
+                      <label for="en{{ row['id'] }}">Name</label>
+                      <input type="text" id="en{{ row['id'] }}" name="name" value="{{ row['name'] }}">
+                    </div>
+                    <div class="field">
+                      <label for="ec{{ row['id'] }}">Category</label>
+                      <select id="ec{{ row['id'] }}" name="category">
+                        {% for cat in categories %}<option value="{{ cat }}" {% if row['category'] == cat %}selected{% endif %}>{{ cat }}</option>{% endfor %}
+                      </select>
+                    </div>
+                    <div class="field">
+                      <label for="ema{{ row['id'] }}">Make</label>
+                      <input type="text" id="ema{{ row['id'] }}" name="make" value="{{ row['make'] }}">
+                    </div>
+                    <div class="field">
+                      <label for="emo{{ row['id'] }}">Model</label>
+                      <input type="text" id="emo{{ row['id'] }}" name="model" value="{{ row['model'] }}">
+                    </div>
+                    <div class="field">
+                      <label for="ep{{ row['id'] }}">Part number</label>
+                      <input type="text" id="ep{{ row['id'] }}" name="part_number" value="{{ row['part_number'] }}">
+                    </div>
+                    <div class="field">
+                      <label for="es{{ row['id'] }}">Serial</label>
+                      <input type="text" id="es{{ row['id'] }}" name="serial" value="{{ row['serial'] }}">
+                    </div>
+                    <div class="field">
+                      <label for="ei{{ row['id'] }}">Installed</label>
+                      <input type="date" id="ei{{ row['id'] }}" name="installed_on" value="{{ row['installed_on'] }}">
+                    </div>
+                    <div class="field">
+                      <label for="et{{ row['id'] }}">at tach</label>
+                      <input type="text" id="et{{ row['id'] }}" name="installed_tach" inputmode="decimal" value="{{ '%g'|format(row['installed_tach']) if row['installed_tach'] is not none else '' }}">
+                    </div>
+                    <div class="field">
+                      <label for="eb{{ row['id'] }}">TBO hours</label>
+                      <input type="text" id="eb{{ row['id'] }}" name="tbo_hours" inputmode="decimal" value="{{ '%g'|format(row['tbo_hours']) }}">
+                    </div>
+                    <div class="field">
+                      <label for="el{{ row['id'] }}">Life limit date</label>
+                      <input type="date" id="el{{ row['id'] }}" name="life_date" value="{{ row['life_date'] }}">
+                    </div>
+                    <div class="field">
+                      <label for="ex{{ row['id'] }}">STC</label>
+                      <input type="text" id="ex{{ row['id'] }}" name="stc" value="{{ row['stc'] }}">
+                    </div>
+                    <div class="field">
+                      <label for="er{{ row['id'] }}">Removed on</label>
+                      <input type="date" id="er{{ row['id'] }}" name="removed_on" value="{{ row['removed_on'] }}">
+                    </div>
+                  </div>
+                  <div class="field">
+                    <label for="eo{{ row['id'] }}">Notes</label>
+                    <input type="text" id="eo{{ row['id'] }}" name="notes" value="{{ row['notes'] }}">
+                  </div>
+                  <div class="btn-row">
+                    <button class="btn btn-primary" type="submit">Save</button>
+                    <button class="btn btn-danger" type="submit" formaction="/equipment/{{ row['id'] }}/delete">{{ icon('trash') }}Delete</button>
+                  </div>
+                </form>
+              </div>
+            </details>
+          </td>
+        </tr>
+        {% else %}
+        <tr><td colspan="7" class="muted">Nothing recorded yet.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<div class="card">
+  <h2>Add a component</h2>
+  <form method="post" action="/equipment/add">
+    {{ csrf(csrf_token, csrf_field) }}
+    <div class="field-row">
+      <div class="field">
+        <label for="name">Name</label>
+        <input type="text" id="name" name="name" required placeholder="Garmin G3X Touch display">
+      </div>
+      <div class="field">
+        <label for="category">Category</label>
+        <select id="category" name="category">
+          {% for cat in categories %}<option value="{{ cat }}">{{ cat }}</option>{% endfor %}
+        </select>
+      </div>
+      <div class="field">
+        <label for="make">Make</label>
+        <input type="text" id="make" name="make">
+      </div>
+      <div class="field">
+        <label for="model">Model</label>
+        <input type="text" id="model" name="model">
+      </div>
+      <div class="field">
+        <label for="part_number">Part number</label>
+        <input type="text" id="part_number" name="part_number">
+      </div>
+      <div class="field">
+        <label for="serial">Serial</label>
+        <input type="text" id="serial" name="serial">
+      </div>
+      <div class="field">
+        <label for="installed_on">Installed</label>
+        <input type="date" id="installed_on" name="installed_on">
+      </div>
+      <div class="field">
+        <label for="installed_tach">at tach</label>
+        <input type="text" id="installed_tach" name="installed_tach" inputmode="decimal">
+      </div>
+      <div class="field">
+        <label for="tbo_hours">TBO hours</label>
+        <input type="text" id="tbo_hours" name="tbo_hours" inputmode="decimal">
+      </div>
+      <div class="field">
+        <label for="life_date">Life limit date</label>
+        <input type="date" id="life_date" name="life_date">
+      </div>
+      <div class="field">
+        <label for="stc">STC</label>
+        <input type="text" id="stc" name="stc">
+      </div>
+    </div>
+    <div class="field">
+      <label for="notes">Notes</label>
+      <input type="text" id="notes" name="notes">
+    </div>
+    <button class="btn btn-primary" type="submit">{{ icon('plus') }}Add component</button>
+  </form>
+</div>
+
+{% endblock %}

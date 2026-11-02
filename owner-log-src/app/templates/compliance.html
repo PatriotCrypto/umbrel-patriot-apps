@@ -1,0 +1,290 @@
+{% extends "base.html" %}
+{% from "_icons.html" import icon, csrf %}
+
+{% block subtitle %}
+<p class="subtitle">{{ counts['total'] }} records · {{ counts['open'] }} open · {{ counts['due_soon'] }} due soon</p>
+{% endblock %}
+
+{% block actions %}
+<a class="btn" href="/export/compliance.pdf">{{ icon('download') }}Compliance PDF</a>
+<a class="btn" href="/export/directives.csv">{{ icon('download') }}CSV</a>
+{% endblock %}
+
+{% block content %}
+
+<div class="card">
+  <div class="chips">
+    <a class="chip {% if not kind %}current{% endif %}" href="/compliance">All</a>
+    {% for k in kinds %}
+    <a class="chip {% if kind == k %}current{% endif %}" href="/compliance?kind={{ k }}">{{ k }}</a>
+    {% endfor %}
+  </div>
+</div>
+
+<div class="card">
+  <div class="card-head"><h2>Directives and bulletins</h2><span class="muted small">{{ rows|length }} shown</span></div>
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr><th>Type</th><th>Number</th><th>Title</th><th>Complied</th><th>Next due</th><th>Status</th><th></th></tr>
+      </thead>
+      <tbody>
+        {% for row in rows %}
+        <tr class="row-{{ row['due_status'] if row['due_status'] in ('overdue', 'due_soon') else '' }}">
+          <td><span class="badge">{{ row['kind'] }}</span></td>
+          <td class="mono nowrap">
+            {% if row['url'] %}<a href="{{ row['url'] }}" rel="noreferrer noopener">{{ row['number'] or '—' }}</a>{% else %}{{ row['number'] or '—' }}{% endif %}
+          </td>
+          <td>
+            {{ row['title'] }}
+            {% if row['applicability'] %}<div class="muted small">{{ row['applicability'][:90] }}</div>{% endif %}
+          </td>
+          <td class="small">
+            {{ row['complied_on'] or '—' }}
+            {% if row['complied_hours'] is not none %}<br><span class="muted">{{ '%g'|format(row['complied_hours']) }} h</span>{% endif %}
+          </td>
+          <td class="small">
+            {% if row['recurring'] %}
+              <div class="due-line">
+                {% if row['next_date'] %}<span>{{ row['next_date'] }}{% if row['days_left'] is not none %} · {{ row['days_left'] }} d{% endif %}</span>{% endif %}
+                {% if row['next_hours'] is not none %}<span class="small">{{ '%g'|format(row['next_hours']) }} h{% if row['hours_left'] is not none %} · {{ row['hours_left'] }} left{% endif %}</span>{% endif %}
+              </div>
+            {% else %}—{% endif %}
+          </td>
+          <td><span class="badge badge-{{ row['due_status'] }}">{{ row['due_status']|replace('_', ' ')|title }}</span></td>
+          <td class="right">
+            <details class="panel">
+              <summary>Edit</summary>
+              <div class="panel-body">
+                <form method="post" action="/directives/{{ row['id'] }}/update">
+                  {{ csrf(csrf_token, csrf_field) }}
+                  <div class="field-row">
+                    <div class="field">
+                      <label for="n{{ row['id'] }}">Number</label>
+                      <input type="text" id="n{{ row['id'] }}" name="number" value="{{ row['number'] }}">
+                    </div>
+                    <div class="field">
+                      <label for="is{{ row['id'] }}">Issued</label>
+                      <input type="date" id="is{{ row['id'] }}" name="issued_on" value="{{ row['issued_on'] }}">
+                    </div>
+                    <div class="field">
+                      <label for="sts{{ row['id'] }}">Status</label>
+                      <select id="sts{{ row['id'] }}" name="status">
+                        {% for s in statuses %}<option value="{{ s }}" {% if row['status'] == s %}selected{% endif %}>{{ s|replace('_', ' ')|title }}</option>{% endfor %}
+                      </select>
+                    </div>
+                    <div class="field">
+                      <label for="co{{ row['id'] }}">Complied on</label>
+                      <input type="date" id="co{{ row['id'] }}" name="complied_on" value="{{ row['complied_on'] }}">
+                    </div>
+                    <div class="field">
+                      <label for="ch{{ row['id'] }}">at hours</label>
+                      <input type="text" id="ch{{ row['id'] }}" name="complied_hours" inputmode="decimal" value="{{ '%g'|format(row['complied_hours']) if row['complied_hours'] is not none else '' }}">
+                    </div>
+                    <div class="field">
+                      <label for="rh{{ row['id'] }}">Repeat (hours)</label>
+                      <input type="text" id="rh{{ row['id'] }}" name="interval_hours" inputmode="decimal" value="{{ '%g'|format(row['interval_hours']) }}">
+                    </div>
+                    <div class="field">
+                      <label for="rm{{ row['id'] }}">Repeat (months)</label>
+                      <input type="text" id="rm{{ row['id'] }}" name="interval_months" inputmode="decimal" value="{{ '%g'|format(row['interval_months']) }}">
+                    </div>
+                  </div>
+                  <div class="field">
+                    <label for="ti{{ row['id'] }}">Title</label>
+                    <input type="text" id="ti{{ row['id'] }}" name="title" value="{{ row['title'] }}">
+                  </div>
+                  <div class="field">
+                    <label for="ap{{ row['id'] }}">Applies to</label>
+                    <input type="text" id="ap{{ row['id'] }}" name="applicability" value="{{ row['applicability'] }}">
+                  </div>
+                  <div class="field">
+                    <label for="me{{ row['id'] }}">Method of compliance</label>
+                    <input type="text" id="me{{ row['id'] }}" name="method" value="{{ row['method'] }}">
+                  </div>
+                  <div class="field">
+                    <label for="ur{{ row['id'] }}">Link</label>
+                    <input type="text" id="ur{{ row['id'] }}" name="url" value="{{ row['url'] }}">
+                  </div>
+                  <div class="field">
+                    <label for="nt{{ row['id'] }}">Notes</label>
+                    <input type="text" id="nt{{ row['id'] }}" name="notes" value="{{ row['notes'] }}">
+                  </div>
+                  <div class="btn-row">
+                    <label class="nowrap"><input type="checkbox" name="recurring" value="1" {% if row['recurring'] %}checked{% endif %}> Recurring</label>
+                    <button class="btn btn-primary" type="submit">Save</button>
+                    <button class="btn btn-danger" type="submit" formaction="/directives/{{ row['id'] }}/delete">{{ icon('trash') }}Delete</button>
+                  </div>
+                </form>
+              </div>
+            </details>
+          </td>
+        </tr>
+        {% else %}
+        <tr><td colspan="7" class="muted">Nothing recorded yet. Add one below, or import a CSV.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<div class="grid grid-2">
+  <div class="card">
+    <h2>Add a directive or bulletin</h2>
+    <form method="post" action="/directives/add">
+      {{ csrf(csrf_token, csrf_field) }}
+      <div class="field-row">
+        <div class="field">
+          <label for="kind">Type</label>
+          <select id="kind" name="kind">
+            {% for k in kinds %}<option value="{{ k }}">{{ k }}</option>{% endfor %}
+          </select>
+        </div>
+        <div class="field">
+          <label for="number">Number</label>
+          <input type="text" id="number" name="number" placeholder="SB-00031 or 2024-12-05">
+        </div>
+        <div class="field">
+          <label for="issued_on">Issued</label>
+          <input type="date" id="issued_on" name="issued_on">
+        </div>
+        <div class="field">
+          <label for="status">Status</label>
+          <select id="status" name="status">
+            {% for s in statuses %}<option value="{{ s }}">{{ s|replace('_', ' ')|title }}</option>{% endfor %}
+          </select>
+        </div>
+        <div class="field">
+          <label for="complied_on">Complied on</label>
+          <input type="date" id="complied_on" name="complied_on">
+        </div>
+        <div class="field">
+          <label for="complied_hours">at hours</label>
+          <input type="text" id="complied_hours" name="complied_hours" inputmode="decimal">
+        </div>
+      </div>
+      <div class="field">
+        <label for="title">Title</label>
+        <input type="text" id="title" name="title" placeholder="Flaperon hinge bracket inspection">
+      </div>
+      <div class="field-row">
+        <div class="field">
+          <label for="applicability">Applies to</label>
+          <input type="text" id="applicability" name="applicability" placeholder="RV-12iS, kits before 120999">
+        </div>
+        <div class="field">
+          <label for="url">Link</label>
+          <input type="text" id="url" name="url" placeholder="https://…">
+        </div>
+        <div class="field">
+          <label for="interval_hours">Repeat (hours)</label>
+          <input type="text" id="interval_hours" name="interval_hours" inputmode="decimal">
+        </div>
+        <div class="field">
+          <label for="interval_months">Repeat (months)</label>
+          <input type="text" id="interval_months" name="interval_months" inputmode="decimal">
+        </div>
+      </div>
+      <div class="btn-row">
+        <label class="nowrap"><input type="checkbox" name="recurring" value="1"> Recurring</label>
+        <button class="btn btn-primary" type="submit">{{ icon('plus') }}Add record</button>
+      </div>
+    </form>
+  </div>
+
+  <div class="card">
+    <h2>Import a CSV</h2>
+    <p class="muted small">
+      Van's publishes service information per model, with a CSV download on their
+      <a href="https://www.vansaircraft.com/service-information-and-revisions/" rel="noreferrer noopener">service information page</a>.
+      Download it for your model and import it here, then mark which ones apply to your
+      serial number. Column names are matched loosely, so an FAA or spreadsheet export
+      works too. Records with a number already present are skipped.
+    </p>
+    <form method="post" action="/directives/import" enctype="multipart/form-data" class="inline-form">
+      {{ csrf(csrf_token, csrf_field) }}
+      <div class="field">
+        <label for="ikind">Import as</label>
+        <select id="ikind" name="kind">
+          {% for k in kinds %}<option value="{{ k }}" {% if k == 'SB' %}selected{% endif %}>{{ k }}</option>{% endfor %}
+        </select>
+      </div>
+      <div class="field">
+        <label for="file">CSV file</label>
+        <input type="file" id="file" name="file" accept=".csv,text/csv" required>
+      </div>
+      <button class="btn btn-primary" type="submit">{{ icon('upload') }}Import</button>
+    </form>
+  </div>
+</div>
+
+<div class="card">
+  <div class="card-head">
+    <h2>VOR checks</h2>
+    {% if vor['status'] != 'unset' %}
+    <span class="badge badge-{{ vor['status'] }}">
+      {% if vor['days_left'] is not none %}{{ vor['days_left'] }} days left{% else %}{{ vor['status'] }}{% endif %}
+    </span>
+    {% endif %}
+  </div>
+  <p class="muted small">Required every 30 days for IFR flight under 14 CFR 91.171.</p>
+  <form method="post" action="/vor/add" class="inline-form">
+    {{ csrf(csrf_token, csrf_field) }}
+    <div class="field">
+      <label for="checked_on">Date</label>
+      <input type="date" id="checked_on" name="checked_on" value="{{ today }}">
+    </div>
+    <div class="field">
+      <label for="place">Place</label>
+      <input type="text" id="place" name="place" placeholder="KHAO">
+    </div>
+    <div class="field">
+      <label for="method">Method</label>
+      <select id="method" name="method">
+        <option>VOT</option><option>Ground checkpoint</option>
+        <option>Airborne checkpoint</option><option>Dual VOR</option>
+      </select>
+    </div>
+    <div class="field">
+      <label for="bearing">Bearing</label>
+      <input type="text" id="bearing" name="bearing" placeholder="180">
+    </div>
+    <div class="field">
+      <label for="error">Error</label>
+      <input type="text" id="error" name="error" placeholder="-2">
+    </div>
+    <div class="field">
+      <label for="signed_by">Signed by</label>
+      <input type="text" id="signed_by" name="signed_by">
+    </div>
+    <button class="btn btn-primary" type="submit">{{ icon('plus') }}Log check</button>
+  </form>
+
+  {% if vor_rows %}
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Date</th><th>Place</th><th>Method</th><th>Bearing</th><th>Error</th><th>Signed</th><th></th></tr></thead>
+      <tbody>
+        {% for row in vor_rows %}
+        <tr>
+          <td class="mono nowrap">{{ row['checked_on'] }}</td>
+          <td>{{ row['place'] }}</td>
+          <td class="small">{{ row['method'] }}</td>
+          <td class="num">{{ row['bearing'] }}</td>
+          <td class="num">{{ row['error'] }}</td>
+          <td class="small">{{ row['signed_by'] }}</td>
+          <td class="right">
+            <form method="post" action="/vor/{{ row['id'] }}/delete">
+              {{ csrf(csrf_token, csrf_field) }}
+              <button class="btn btn-sm btn-danger" type="submit">{{ icon('trash') }}</button>
+            </form>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% endif %}
+</div>
+
+{% endblock %}
