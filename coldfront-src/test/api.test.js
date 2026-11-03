@@ -159,3 +159,21 @@ test('filter and ntfy settings: validation, token never echoed, test send, mark 
   assert.equal(r.status, 400);
   t.close();
 });
+
+test('dashboard layout saves, validates, and resets', async () => {
+  const t = await boot();
+  let st = await (await t.j('/api/state')).json();
+  assert.equal(st.settings.dashboard, null);
+  const layout = [{ id: 'thermostat', size: '2x3' }, { id: 'chart', size: '4x2' }];
+  assert.equal((await t.j('/api/settings', 'PUT', { dashboard: layout })).status, 200);
+  st = await (await t.j('/api/state')).json();
+  assert.deepEqual(st.settings.dashboard, layout);
+  assert.equal((await t.j('/api/settings', 'PUT', { dashboard: [{ id: 'a b', size: '2x3' }] })).status, 400);
+  assert.equal((await t.j('/api/settings', 'PUT', { dashboard: [{ id: 'chart', size: '9x9' }] })).status, 400);
+  assert.equal((await t.j('/api/settings', 'PUT', { dashboard: [{ id: 'chart', size: '2x2' }, { id: 'chart', size: '2x2' }] })).status, 400);
+  assert.equal((await t.j('/api/settings', 'PUT', { dashboard: 'nope' })).status, 400);
+  assert.equal((await t.j('/api/settings', 'PUT', { dashboard: null })).status, 200);
+  st = await (await t.j('/api/state')).json();
+  assert.equal(st.settings.dashboard, null);
+  t.close();
+});

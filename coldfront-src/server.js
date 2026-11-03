@@ -145,6 +145,19 @@ function createApp({ dataDir, zwaveUrl, now = () => Date.now(), simSpeed = 1, au
       if (n.clearToken) s.ntfy.token = '';
       if (n.triggers && typeof n.triggers === 'object') for (const k of Object.keys(TRIGGERS)) if (k in n.triggers) s.ntfy.triggers[k] = !!n.triggers[k];
     }
+    if (b.dashboard !== undefined) {
+      if (b.dashboard === null) s.dashboard = null;
+      else {
+        const d = b.dashboard, seen = new Set();
+        if (!Array.isArray(d) || d.length > 24) return bad(res, 'dashboard must be a list of up to 24 widgets');
+        for (const w of d) {
+          if (!w || typeof w.id !== 'string' || !/^[a-z]{2,24}$/.test(w.id) || seen.has(w.id)) return bad(res, 'dashboard widget ids are invalid');
+          if (typeof w.size !== 'string' || !/^[1-4]x[1-4]$/.test(w.size)) return bad(res, 'dashboard widget sizes are invalid');
+          seen.add(w.id);
+        }
+        s.dashboard = d.map((w) => ({ id: w.id, size: w.size }));
+      }
+    }
     if (b.thermostatNode !== undefined) s.thermostatNode = b.thermostatNode ? Number(b.thermostatNode) : null;
     if (b.roomAware) {
       const r = b.roomAware;

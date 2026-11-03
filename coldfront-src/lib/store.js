@@ -16,6 +16,7 @@ const DEFAULTS = () => ({
     humidity: { min: 25, max: 60 },
     costPerHour: 0, // furnace running cost in dollars per hour, 0 = hide cost
     roomAware: { enabled: false, roomId: null, maxOffset: 3 },
+    dashboard: null, // null = default widget layout; otherwise [{id, size:'2x3'}] in display order
     filter: { name: 'Furnace filter', lastChanged: null, intervalDays: 90, remindDaysBefore: 7 }, // set by hand
     ntfy: { enabled: false, server: 'https://ntfy.sh', topic: '', token: '', triggers: DEFAULT_TRIGGERS() },
   },
