@@ -2,7 +2,7 @@
 
 # Patriot Apps
 
-**Twelve self-hosted apps for your Umbrel. One store, no accounts, no cloud.**
+**Thirteen self-hosted apps for your Umbrel. One store, no accounts, no cloud.**
 
 Everything you put in these apps stays on your own server.
 
@@ -46,6 +46,9 @@ Umbrel re-checks community stores every so often, so a new app or update can tak
     <td align="center"><a href="#uplink"><img src="patriot-uplink/icon.svg" width="84" alt="Uplink"><br><b>Uplink</b></a><br><sub>Private chat and files</sub></td>
     <td align="center"><a href="#disc-ripper"><img src="patriot-disc-ripper/icon.svg" width="84" alt="Disc Ripper"><br><b>Disc Ripper</b></a><br><sub>DVD to Jellyfin</sub></td>
     <td align="center"><a href="#upod"><img src="patriot-ipod-sync/icon.svg" width="84" alt="uPod"><br><b>uPod</b></a><br><sub>Music player and iPod sync</sub></td>
+  </tr>
+  <tr>
+    <td align="center"><a href="#cold-front"><img src="patriot-coldfront/icon.svg" width="84" alt="Cold Front"><br><b>Cold Front</b></a><br><sub>Local thermostat control</sub></td>
   </tr>
 </table>
 
@@ -106,6 +109,19 @@ Umbrel re-checks community stores every so often, so a new app or update can tak
 - Build a ready-to-flash SD card image for a Raspberry Pi Zero 2 W and it becomes a pocket Wi-Fi "Scripture hotspot" that serves the whole Bible with no internet.
 
 No accounts, no tracking. Not affiliated with any publisher, church or ministry. · [Details](bible-terminal-src/README.md)
+
+### Cold Front
+<img src="patriot-coldfront/icon.svg" width="96" align="right" alt="Cold Front icon">
+
+**Take your thermostat back.** Local control of a Z-Wave thermostat (built for the Honeywell T6 Pro Z-Wave) with no cloud, no account and no company deciding what your house does.
+
+- Your own weekly schedule, holds, away mode and safety limits. Changes made at the wall are noticed and either held until the next period or put back.
+- Insights: furnace runtime, cycles, short-cycling, room vs. thermostat differences, humidity and cost.
+- Add Z-Wave temperature and humidity sensors for other rooms, with an optional room-aware mode that nudges the setpoint toward a room you pick.
+- Filter reminder with dates you set by hand, plus ntfy phone alerts for filter changes, lost and restored signal, freezing, no heat, low batteries and more. Every alert is off until you turn it on.
+- Five terminal-style looks, a desktop layout, and a hidden surprise. Starts in Demo mode so you can try it before the hardware arrives.
+
+You need a Z-Wave USB stick (800 series recommended); the [README](coldfront-src/README.md) walks through first-run setup. *An independent hobby project, not affiliated with Honeywell, Zooz, the Z-Wave Alliance or Umbrel.*
 
 ---
 

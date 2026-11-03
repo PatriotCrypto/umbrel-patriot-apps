@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128">
+  <defs>
+    <symbol id="mark" viewBox="0 0 32 32"><g fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="square"><path d="M16 3v26M5 9.500l22 13M27 9.500L5 22.500"/><path d="M12.500 5L16 8.500 19.500 5M12.500 27L16 23.500 19.500 27"/></g></symbol>
+  </defs>
+  <rect width="128" height="128" rx="24" fill="#050a06"/>
+  <rect x="8" y="8" width="112" height="112" rx="18" fill="none" stroke="#1d4a28" stroke-width="3"/>
+  <g stroke="#39ff6a" stroke-width="6" stroke-linecap="square" fill="none">
+    <path d="M64 24v50M31 43l66 24M97 43L31 67"/>
+    <path d="M54 30l10 10 10-10M54 68l10-10 10 10"/>
+  </g>
+  <path d="M28 96l12 8-12 8" stroke="#39ff6a" stroke-width="6" stroke-linecap="square" fill="none" transform="translate(0 -6)"/>
+  <rect x="50" y="100" width="26" height="6" fill="#39ff6a"/>
+</svg>

@@ -1,0 +1,35 @@
+version: "3.7"
+
+services:
+  app_proxy:
+    environment:
+      APP_HOST: patriot-coldfront_web_1
+      APP_PORT: 3971
+
+  web:
+    # pin the manifest-list digest after pushing: ghcr.io/patriotcrypto/coldfront:0.1.0@sha256:...
+    image: ghcr.io/patriotcrypto/coldfront:0.1.0@sha256:4a8b35337316eb5e88c279e07da65fc35856dd2f98c28a41aa5819e8ee440a81
+    restart: on-failure
+    stop_grace_period: 10s
+    environment:
+      DATA_DIR: /data
+      ZWAVE_WS_URL: ws://patriot-coldfront_zwave_1:3000
+    volumes:
+      - ${APP_DATA_DIR}/data:/data
+    depends_on:
+      - zwave
+
+  zwave:
+    image: zwavejs/zwave-js-ui:latest@sha256:ac4874a3cbea61c0c60002a8fd8ae05104cc8eb2eae91aa05bd184972aa06853
+    restart: on-failure
+    stop_grace_period: 15s
+    environment:
+      TZ: America/Chicago
+    ports:
+      - 8091:8091   # Z-Wave JS UI, used once for first-run setup
+    volumes:
+      - ${APP_DATA_DIR}/zwave:/usr/src/app/store
+      - /dev:/dev:ro
+    device_cgroup_rules:
+      - "c 166:* rmw"   # ttyACM (most Z-Wave sticks)
+      - "c 188:* rmw"   # ttyUSB

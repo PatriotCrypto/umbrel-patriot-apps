@@ -1,0 +1,29 @@
+manifestVersion: 1
+id: patriot-coldfront
+category: automation
+name: Cold Front
+version: "0.1.0"
+tagline: Local thermostat control, schedules and insights
+description: >-
+  Cold Front takes over a Z-Wave thermostat (built for the Honeywell T6 Pro Z-Wave) with no cloud and no accounts.
+  Set your own weekly schedule, hold or away settings, safety limits, and see runtime, short-cycling and wall-change insights.
+  Add Z-Wave temperature and humidity sensors for other rooms and Cold Front tracks them too, with an optional room-aware mode.
+
+
+  Needs a Z-Wave USB stick (800 series recommended). The thermostat keeps its own schedule as a fallback if Umbrel is off.
+  Starts in Demo mode so you can try it before the hardware arrives.
+
+
+  Not affiliated with or endorsed by Honeywell, Zooz, the Z-Wave Alliance or Umbrel.
+developer: Patriot
+website: https://github.com/PatriotCrypto/umbrel-patriot-apps
+repo: https://github.com/PatriotCrypto/umbrel-patriot-apps
+support: https://github.com/PatriotCrypto/umbrel-patriot-apps/issues
+port: 3971
+gallery: []
+path: ""
+defaultUsername: ""
+defaultPassword: ""
+releaseNotes: First release.
+submitter: Patriot
+submission: https://github.com/PatriotCrypto/umbrel-patriot-apps
