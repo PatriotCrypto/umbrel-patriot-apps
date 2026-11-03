@@ -177,3 +177,11 @@ test('dashboard layout saves, validates, and resets', async () => {
   assert.equal(st.settings.dashboard, null);
   t.close();
 });
+
+test('greeting name saves and trims', async () => {
+  const t = await boot();
+  assert.equal((await t.j('/api/settings', 'PUT', { name: '  Wyley  ' })).status, 200);
+  const st = await (await t.j('/api/state')).json();
+  assert.equal(st.settings.name, 'Wyley');
+  t.close();
+});

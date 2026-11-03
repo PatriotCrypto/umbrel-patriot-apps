@@ -10,7 +10,19 @@
   var pending = null, pendTimer = null, range = 24, activeTab = 'dashboard', schedDirty = false, settingsLoaded = false;
   var INS = null, EVT = null;
   var FONT = '-apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", Inter, Roboto, sans-serif';
-  var COL = { heat: '#ffb347', cool: '#5fd0ff', text: '#ffffff', mute: 'rgba(255,255,255,.62)', faint: 'rgba(255,255,255,.38)' };
+  var THEMES = {
+    dark: { heat: '#ffb347', cool: '#5fd0ff', ink: '#ffffff', mute: 'rgba(255,255,255,.62)', faint: 'rgba(255,255,255,.38)', grid: 'rgba(255,255,255,.08)', grid2: 'rgba(255,255,255,.05)', lane: 'rgba(255,255,255,.07)', dialTrack: 'rgba(255,255,255,.12)', dialBand: 'rgba(255,255,255,.3)', fillTop: 'rgba(255,255,255,.22)', fillBot: 'rgba(255,255,255,0)', halo: 'rgba(255,255,255,.3)', hover: 'rgba(255,255,255,.4)', pillFg: '#08203f', tipBg: 'rgba(10,24,50,.96)', tipEdge: 'rgba(255,255,255,.2)', tipText: '#ffffff', base: 'rgba(255,255,255,.12)' },
+    light: { heat: '#e07a00', cool: '#1388d4', ink: '#0f2440', mute: 'rgba(15,36,64,.66)', faint: 'rgba(15,36,64,.42)', grid: 'rgba(15,36,64,.09)', grid2: 'rgba(15,36,64,.05)', lane: 'rgba(15,36,64,.08)', dialTrack: 'rgba(15,36,64,.10)', dialBand: 'rgba(31,111,255,.22)', fillTop: 'rgba(31,111,255,.20)', fillBot: 'rgba(31,111,255,0)', halo: 'rgba(31,111,255,.25)', hover: 'rgba(15,36,64,.4)', pillFg: '#ffffff', tipBg: 'rgba(255,255,255,.97)', tipEdge: 'rgba(15,36,64,.18)', tipText: '#0f2440', base: 'rgba(15,36,64,.14)' }
+  };
+  var COL = {};
+  function applyTheme(t) {
+    if (!THEMES[t]) t = 'light';
+    document.documentElement.setAttribute('data-theme', t);
+    var m = document.querySelector('meta[name=theme-color]'); if (m) m.setAttribute('content', t === 'light' ? '#eaf4ff' : '#060d1c');
+    Object.keys(THEMES[t]).forEach(function (k) { COL[k] = THEMES[t][k]; });
+    COL.text = COL.ink;
+  }
+  applyTheme(document.documentElement.getAttribute('data-theme'));
 
   function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
   function toast(m) { var t = $('#toast'); t.textContent = m; t.hidden = false; clearTimeout(toast.t); toast.t = setTimeout(function () { t.hidden = true; }, 2600); }
@@ -34,8 +46,9 @@
     $$('.tabs button').forEach(function (b) { b.classList.toggle('active', b.dataset.tab === t); });
     $$('.tab').forEach(function (s) { s.classList.toggle('active', s.id === 'tab-' + t); });
     $('#pageTitle').textContent = TITLES[t];
-    $('#pageSub').textContent = t === 'dashboard' ? new Date().toLocaleDateString([], { weekday: 'long', month: 'long', day: 'numeric' }) : '';
-    $('#dashTools').hidden = t !== 'dashboard';
+    $('#hero').hidden = t !== 'dashboard'; $('#pagehead').hidden = t === 'dashboard';
+    document.body.classList.toggle('onDash', t === 'dashboard');
+    greet();
     window.scrollTo(0, 0);
     if (t === 'dashboard') setTimeout(function () { if (inst.chart) inst.chart.chart.draw(); }, 0);
     if (t === 'schedule' && !sched) loadSchedule();
@@ -44,6 +57,14 @@
     if (t === 'rooms') renderRooms();
   }
 
+  function greet() {
+    var d = new Date(), h = d.getHours(), g = h >= 5 && h < 12 ? 'Good morning' : h >= 12 && h < 17 ? 'Good afternoon' : 'Good evening';
+    var n = S && S.settings && S.settings.name;
+    $('#greet').textContent = g + (n ? ', ' + n : '') + '.';
+    $('#heroDate').textContent = d.toLocaleDateString([], { weekday: 'long', month: 'long', day: 'numeric' });
+  }
+  setInterval(greet, 60000);
+
   // ---- thermostat helpers
   function pair() { return pending || (S && S.desired ? { heat: S.desired.heat, cool: S.desired.cool } : (S && S.thermostat ? { heat: S.thermostat.heat, cool: S.thermostat.cool } : null)); }
   function dialSvg() {
@@ -51,14 +72,14 @@
     var cx = 150, cy = 136, r = 108, a0 = 135, sweep = 270, lo = 50, hi = 90;
     function pt(v, rr) { var a = (a0 + sweep * (Math.min(hi, Math.max(lo, v)) - lo) / (hi - lo)) * Math.PI / 180; return [cx + rr * Math.cos(a), cy + rr * Math.sin(a)]; }
     function arc(v1, v2, col, w) { var s = pt(v1, r), e = pt(v2, r), large = (v2 - v1) / (hi - lo) * sweep > 180 ? 1 : 0; return '<path d="M' + s[0].toFixed(1) + ' ' + s[1].toFixed(1) + 'A' + r + ' ' + r + ' 0 ' + large + ' 1 ' + e[0].toFixed(1) + ' ' + e[1].toFixed(1) + '" fill="none" stroke="' + col + '" stroke-width="' + w + '" stroke-linecap="round"/>'; }
-    var h = arc(lo, hi, 'rgba(255,255,255,.12)', 14);
-    if (p && p.heat < p.cool) h += arc(p.heat, p.cool, 'rgba(255,255,255,.3)', 14);
+    var h = arc(lo, hi, COL.dialTrack, 14);
+    if (p && p.heat < p.cool) h += arc(p.heat, p.cool, COL.dialBand, 14);
     if (p) { var m1 = pt(p.heat, r), m2 = pt(p.cool, r); h += '<circle cx="' + m1[0].toFixed(1) + '" cy="' + m1[1].toFixed(1) + '" r="11" fill="' + COL.heat + '" stroke="#fff" stroke-width="3"/><circle cx="' + m2[0].toFixed(1) + '" cy="' + m2[1].toFixed(1) + '" r="11" fill="' + COL.cool + '" stroke="#fff" stroke-width="3"/>'; }
-    if (t && t.temp != null) { var c = pt(t.temp, r - 28); h += '<circle cx="' + c[0].toFixed(1) + '" cy="' + c[1].toFixed(1) + '" r="5" fill="#fff"/>'; }
+    if (t && t.temp != null) { var c = pt(t.temp, r - 28); h += '<circle cx="' + c[0].toFixed(1) + '" cy="' + c[1].toFixed(1) + '" r="5" fill="' + COL.ink + '"/>'; }
     var op = t ? ({ heating: 'Heating', cooling: 'Cooling', fan: 'Fan running', idle: 'Idle' }[t.opState] || '') : '';
     var opc = t && t.opState === 'heating' ? COL.heat : t && t.opState === 'cooling' ? COL.cool : COL.mute;
     h += '<text x="150" y="112" text-anchor="middle" font-size="15" font-weight="600" fill="' + opc + '">' + op + '</text>';
-    h += '<text x="150" y="162" text-anchor="middle" font-size="58" font-weight="700" fill="#fff" letter-spacing="-2">' + fmtT(t && t.temp) + '°</text>';
+    h += '<text x="150" y="162" text-anchor="middle" font-size="58" font-weight="700" fill="' + COL.ink + '" letter-spacing="-2">' + fmtT(t && t.temp) + '°</text>';
     h += '<text x="150" y="188" text-anchor="middle" font-size="14" fill="' + COL.mute + '">' + (t && t.humidity != null ? Math.round(t.humidity) + '% humidity' : 'indoor') + '</text>';
     return '<svg viewBox="22 18 256 202" role="img" aria-label="Indoor temperature">' + h + '</svg>';
   }
@@ -164,7 +185,7 @@
       init: function (b) { b.innerHTML = '<div class="fil"></div>'; },
       update: function (b, i) {
         var f = S.filter, el = $('.fil', b), tiny = i.card.classList.contains('h1') && i.card.classList.contains('w1');
-        if (!f.configured) { el.innerHTML = '<p class="hint" style="margin-top:0">Set a change date to get reminders.</p><button class="btn sm">Set up</button>'; $('button', el).onclick = function () { showTab('settings'); }; return; }
+        if (!f.configured) { el.innerHTML = '<p class="hint" style="margin-top:0">Set a change date.</p><button class="btn sm">Set up</button>'; $('button', el).onclick = function () { showTab('settings'); }; return; }
         var pct = Math.max(0, Math.min(100, Math.round(f.daysSince / f.intervalDays * 100)));
         var msg = f.state === 'overdue' ? 'Overdue ' + (-f.daysLeft) + ' d' : f.daysLeft === 0 ? 'Due today' : f.daysLeft + ' day' + (f.daysLeft === 1 ? '' : 's') + ' left';
         el.innerHTML = '<div class="fbody ' + esc(f.state) + '"><div class="big">' + esc(msg) + '</div><div class="fbar"></div></div>'.replace('<div class="fbar"></div>', '<div class="fbar"><i style="width:' + pct + '%"></i></div><div class="hint" style="margin:0 0 ' + (tiny ? 0 : 10) + 'px">' + esc(f.name) + ' · due ' + esc(f.dueDate) + '</div>') + (tiny ? '' : '<button class="btn sm">Changed today</button>');
@@ -411,19 +432,19 @@
       // horizontal grid + degree labels
       for (var v = mn; v <= mx + 1e-6; v += step) {
         var gy = Math.round(Y(v)) + .5;
-        x.strokeStyle = 'rgba(255,255,255,.08)'; x.beginPath(); x.moveTo(L, gy); x.lineTo(W - R, gy); x.stroke();
+        x.strokeStyle = COL.grid; x.beginPath(); x.moveTo(L, gy); x.lineTo(W - R, gy); x.stroke();
         x.fillStyle = COL.mute; x.textAlign = 'right'; x.fillText(Math.round(v) + '°', L - 8, gy + 4);
       }
       // time ticks
       x.textAlign = 'center';
       xticks(t0, t1, st.hrs).forEach(function (k) {
         var px = X(k.t), w = x.measureText(k.l).width;
-        x.strokeStyle = 'rgba(255,255,255,.05)'; x.beginPath(); x.moveTo(Math.round(px) + .5, T); x.lineTo(Math.round(px) + .5, T + ph); x.stroke();
+        x.strokeStyle = COL.grid2; x.beginPath(); x.moveTo(Math.round(px) + .5, T); x.lineTo(Math.round(px) + .5, T + ph); x.stroke();
         x.fillStyle = COL.mute; x.fillText(k.l, Math.max(L + w / 2, Math.min(W - R - w / 2, px)), H - 8);
       });
       // run lane
       var sy = T + ph + 10;
-      x.fillStyle = 'rgba(255,255,255,.07)'; rr(x, L, sy, pw, 8, 4); x.fill();
+      x.fillStyle = COL.lane; rr(x, L, sy, pw, 8, 4); x.fill();
       h.runs.forEach(function (r) {
         if (r.kind === 'fan') return;
         var a = Math.max(r.start, t0), b = Math.min(r.end || t1, t1); if (b <= a) return;
@@ -441,18 +462,18 @@
       // indoor line + soft fill
       var pts = vis.filter(function (p) { return p.in != null; });
       if (pts.length > 1) {
-        var gr = x.createLinearGradient(0, T, 0, T + ph); gr.addColorStop(0, 'rgba(255,255,255,.22)'); gr.addColorStop(1, 'rgba(255,255,255,0)');
+        var gr = x.createLinearGradient(0, T, 0, T + ph); gr.addColorStop(0, COL.fillTop); gr.addColorStop(1, COL.fillBot);
         x.beginPath(); pts.forEach(function (p, i) { if (i) x.lineTo(X(p.t), Y(p.in)); else x.moveTo(X(p.t), Y(p.in)); });
         x.lineTo(X(pts[pts.length - 1].t), T + ph); x.lineTo(X(pts[0].t), T + ph); x.closePath(); x.fillStyle = gr; x.fill();
-        x.strokeStyle = '#fff'; x.lineWidth = 2.6; x.lineJoin = 'round'; x.lineCap = 'round'; x.beginPath();
+        x.strokeStyle = COL.ink; x.lineWidth = 2.6; x.lineJoin = 'round'; x.lineCap = 'round'; x.beginPath();
         pts.forEach(function (p, i) { if (i) x.lineTo(X(p.t), Y(p.in)); else x.moveTo(X(p.t), Y(p.in)); }); x.stroke();
         var last = pts[pts.length - 1], lx = X(last.t), ly = Y(last.in);
-        x.fillStyle = 'rgba(255,255,255,.3)'; x.beginPath(); x.arc(lx, ly, 8, 0, 7); x.fill();
-        x.fillStyle = '#fff'; x.beginPath(); x.arc(lx, ly, 4.5, 0, 7); x.fill();
+        x.fillStyle = COL.halo; x.beginPath(); x.arc(lx, ly, 8, 0, 7); x.fill();
+        x.fillStyle = COL.ink; x.beginPath(); x.arc(lx, ly, 4.5, 0, 7); x.fill();
         if (st.hx == null) {
           var lab = fmtT(last.in) + '°', lw = x.measureText(lab).width + 16, bx = Math.min(lx - lw / 2, W - R - lw), by = Math.max(T, ly - 34);
-          x.fillStyle = '#fff'; rr(x, Math.max(L, bx), by, lw, 22, 11); x.fill();
-          x.fillStyle = '#08203f'; x.font = '600 12px ' + FONT; x.textAlign = 'center'; x.fillText(lab, Math.max(L, bx) + lw / 2, by + 15); x.font = '11px ' + FONT;
+          x.fillStyle = COL.ink; rr(x, Math.max(L, bx), by, lw, 22, 11); x.fill();
+          x.fillStyle = COL.pillFg; x.font = '600 12px ' + FONT; x.textAlign = 'center'; x.fillText(lab, Math.max(L, bx) + lw / 2, by + 15); x.font = '11px ' + FONT;
         }
       }
       // hover readout
@@ -460,17 +481,17 @@
         var tt = t0 + (st.hx - L) / pw * (t1 - t0), best = pts[0];
         pts.forEach(function (p) { if (Math.abs(p.t - tt) < Math.abs(best.t - tt)) best = p; });
         var hx = X(best.t);
-        x.strokeStyle = 'rgba(255,255,255,.4)'; x.lineWidth = 1; x.beginPath(); x.moveTo(Math.round(hx) + .5, T); x.lineTo(Math.round(hx) + .5, T + ph); x.stroke();
-        x.fillStyle = '#fff'; x.beginPath(); x.arc(hx, Y(best.in), 5, 0, 7); x.fill();
+        x.strokeStyle = COL.hover; x.lineWidth = 1; x.beginPath(); x.moveTo(Math.round(hx) + .5, T); x.lineTo(Math.round(hx) + .5, T + ph); x.stroke();
+        x.fillStyle = COL.ink; x.beginPath(); x.arc(hx, Y(best.in), 5, 0, 7); x.fill();
         var lines = [new Date(best.t).toLocaleString([], { weekday: 'short', hour: 'numeric', minute: '2-digit' }), 'Indoor  ' + fmtT(best.in) + '°'];
         tg.forEach(function (k) { if (best[k] != null) lines.push((k === 'heat' ? 'Heat target  ' : 'Cool target  ') + fmtT(best[k]) + '°'); });
         var run = h.runs.filter(function (r) { return r.kind !== 'fan' && r.start <= best.t && (r.end || t1) >= best.t; })[0];
         if (run) lines.push(run.kind === 'cooling' ? 'AC running' : 'Furnace running');
         x.font = '12px ' + FONT; var bw = 0; lines.forEach(function (l) { bw = Math.max(bw, x.measureText(l).width); }); bw += 22;
         var bh = lines.length * 18 + 14, bx2 = hx + 14 + bw > W - R ? hx - 14 - bw : hx + 14;
-        x.fillStyle = 'rgba(10,24,50,.96)'; x.strokeStyle = 'rgba(255,255,255,.2)'; rr(x, bx2, T + 6, bw, bh, 12); x.fill(); x.stroke();
+        x.fillStyle = COL.tipBg; x.strokeStyle = COL.tipEdge; rr(x, bx2, T + 6, bw, bh, 12); x.fill(); x.stroke();
         x.textAlign = 'left';
-        lines.forEach(function (l, i) { x.fillStyle = i === 0 ? COL.mute : (i === lines.length - 1 && run ? (run.kind === 'cooling' ? COL.cool : COL.heat) : '#fff'); x.fillText(l, bx2 + 11, T + 6 + 19 + i * 18); });
+        lines.forEach(function (l, i) { x.fillStyle = i === 0 ? COL.mute : (i === lines.length - 1 && run ? (run.kind === 'cooling' ? COL.cool : COL.heat) : COL.tipText); x.fillText(l, bx2 + 11, T + 6 + 19 + i * 18); });
       }
     }
     function pos(e) { var r = canvas.getBoundingClientRect(); st.hx = e.clientX - r.left; draw(); }
@@ -493,7 +514,7 @@
     var x = c.getContext('2d'); x.setTransform(dpr, 0, 0, dpr, 0, 0); x.clearRect(0, 0, W, H);
     var d = daily.slice(-7); if (!d.length) return;
     var mx = Math.max.apply(null, d.map(function (r) { return r.heatMin + r.coolMin; }).concat([60])) / 60, bw = (W - 20) / d.length, base = H - 26, top = 24;
-    x.strokeStyle = 'rgba(255,255,255,.12)'; x.beginPath(); x.moveTo(10, base + .5); x.lineTo(W - 10, base + .5); x.stroke();
+    x.strokeStyle = COL.base; x.beginPath(); x.moveTo(10, base + .5); x.lineTo(W - 10, base + .5); x.stroke();
     d.forEach(function (r, i) {
       var w = Math.min(bw * .5, 54), bx = 10 + i * bw + (bw - w) / 2, hh = r.heatMin / 60 / mx * (base - top), ch = r.coolMin / 60 / mx * (base - top);
       if (hh > 0) { x.fillStyle = COL.heat; rr(x, bx, base - hh, w, hh, Math.min(8, hh / 2)); x.fill(); }
@@ -501,7 +522,7 @@
       x.textAlign = 'center'; x.font = '12px ' + FONT; x.fillStyle = COL.mute;
       x.fillText(new Date(r.date + 'T12:00:00').toLocaleDateString([], { weekday: 'short' }), bx + w / 2, H - 8);
       var tot = r.heatMin + r.coolMin;
-      if (tot) { x.fillStyle = '#fff'; x.font = '600 12px ' + FONT; x.fillText(hrs1(tot), bx + w / 2, base - hh - ch - 8); }
+      if (tot) { x.fillStyle = COL.ink; x.font = '600 12px ' + FONT; x.fillText(hrs1(tot), bx + w / 2, base - hh - ch - 8); }
     });
   }
 
@@ -536,7 +557,7 @@
     if (!S || (settingsLoaded && !force)) return;
     settingsLoaded = true;
     var s = S.settings, l = s.limits;
-    $('#setEnforce').checked = s.enforce; $('#setWall').value = s.wallChange;
+    $('#setName').value = s.name || ''; $('#setEnforce').checked = s.enforce; $('#setWall').value = s.wallChange;
     $('#setRA').checked = s.roomAware.enabled; $('#setMax').value = s.roomAware.maxOffset;
     $('#setRoom').innerHTML = S.sensors.map(function (r) { return '<option value="' + esc(r.nodeId) + '"' + (String(s.roomAware.roomId) === String(r.nodeId) ? ' selected' : '') + '>' + esc(r.name) + '</option>'; }).join('') || '<option value="">(no sensors yet)</option>';
     $('#limHeatMin').value = l.heatMin; $('#limHeatMax').value = l.heatMax; $('#limCoolMin').value = l.coolMin; $('#limCoolMax').value = l.coolMax; $('#limGap').value = l.minGap;
@@ -554,7 +575,7 @@
   };
   $('#saveSettings').onclick = function () {
     var body = {
-      enforce: $('#setEnforce').checked, wallChange: $('#setWall').value,
+      name: $('#setName').value.trim(), enforce: $('#setEnforce').checked, wallChange: $('#setWall').value,
       roomAware: { enabled: $('#setRA').checked, roomId: $('#setRoom').value || null, maxOffset: +$('#setMax').value },
       limits: { heatMin: +$('#limHeatMin').value, heatMax: +$('#limHeatMax').value, coolMin: +$('#limCoolMin').value, coolMax: +$('#limCoolMax').value, minGap: +$('#limGap').value },
       humidity: { min: +$('#humMin').value, max: +$('#humMax').value }, costPerHour: +$('#setCost').value, tz: $('#setTz').value.trim()
@@ -606,9 +627,20 @@
   $('#noteIn').addEventListener('keydown', function (e) { kp = (e.key === KON[kp]) ? kp + 1 : (e.key === KON[0] ? 1 : 0); if (kp === KON.length) { kp = 0; egg('/coldfront'); } });
 
 
+  // ---- light / dark toggle
+  $('#themeBtn').onclick = function () {
+    var t = document.documentElement.getAttribute('data-theme') === 'light' ? 'dark' : 'light';
+    applyTheme(t);
+    try { localStorage.setItem('cf.theme', t); } catch (e) { /* storage blocked */ }
+    updateWidgets();
+    if (inst.chart && inst.chart.chart) inst.chart.chart.draw();
+    if (insChart) insChart.draw();
+    drawBars(lastDaily);
+  };
+
   // ---- polling
   function renderGlobal() {
-    $('#demoBadge').hidden = S.mode !== 'demo';
+    $('#demoBadge').hidden = S.mode !== 'demo'; $('#demoBadge2').hidden = S.mode !== 'demo'; greet();
     $('#alerts').innerHTML = S.alerts.map(function (a) { return '<div class="alert ' + esc(a.level) + '">' + esc(a.text) + '</div>'; }).join('');
   }
   function refresh() {

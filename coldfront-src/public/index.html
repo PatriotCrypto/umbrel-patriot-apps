@@ -7,8 +7,10 @@
 <title>Cold Front</title>
 <link rel="icon" href="icon.svg" type="image/svg+xml">
 <link rel="stylesheet" href="style.css">
+<script>(function(){var t="light";try{var v=localStorage.getItem("cf.theme");if(v==="dark"||v==="light")t=v}catch(e){}document.documentElement.setAttribute("data-theme",t)})()</script>
 </head>
 <body>
+<button id="themeBtn" class="themebtn" aria-label="Switch between light and dark" title="Light / dark"><svg class="sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M2 12h2M20 12h2M4.900 4.900l1.400 1.400M17.700 17.700l1.400 1.400M19.100 4.900l-1.400 1.400M6.300 17.700l-1.400 1.400"/></svg><svg class="moon" viewBox="0 0 24 24"><path d="M20 14.500A8 8 0 0 1 9.500 4 8 8 0 1 0 20 14.500z"/></svg></button>
 <header class="top">
   <div class="brand"><svg class="logo" viewBox="0 0 32 32" aria-hidden="true"><use href="icon.svg#mark"/></svg><span>Cold Front</span></div>
   <div id="demoBadge" class="badge demo" hidden>Demo data</div>
@@ -17,21 +19,25 @@
 <div id="alerts"></div>
 
 <main>
-  <div class="pagehead">
-    <div><h1 id="pageTitle">Dashboard</h1><p id="pageSub" class="sub"></p></div>
+  <div id="hero" class="hero">
+    <img class="herologo" src="icon.svg" alt="Cold Front">
+    <h1 id="greet">Hello.</h1>
+    <p class="sub"><span id="heroDate"></span><span id="demoBadge2" class="badge" hidden>Demo data</span></p>
     <div id="dashTools" class="dashtools">
       <button id="resetDash" class="btn" hidden>Reset layout</button>
       <button id="editDash" class="btn">Customize</button>
     </div>
   </div>
+  <div id="pagehead" class="pagehead" hidden><h1 id="pageTitle"></h1></div>
 
   <section id="tab-dashboard" class="tab active">
     <div id="addTray" class="tray" hidden></div>
     <div id="dash" class="dash"></div>
   </section>
 
-  <section id="tab-schedule" class="tab">
-    <div class="card">
+  <section id="tab-schedule" class="tab cols">
+<div class="col">
+<div class="card">
       <div class="row spread"><h3>Weekly schedule</h3><button id="saveSched" class="btn primary">Save</button></div>
       <div id="dayTabs" class="daytabs"></div>
       <div id="periods"></div>
@@ -42,53 +48,64 @@
       </div>
       <p class="hint" id="schedHint"></p>
     </div>
-    <div class="card">
+</div>
+<div class="col">
+<div class="card">
       <h3>Wall fallback</h3>
       <p class="hint">Key this into the thermostat itself so the house still follows a schedule if Umbrel is ever off. The T6 Pro holds four periods a day.</p>
       <div id="wall"></div>
     </div>
+</div>
   </section>
 
-  <section id="tab-rooms" class="tab">
-    <div class="card"><h3>Room sensors</h3><div id="roomList"></div></div>
-    <div class="card"><h3>Add a sensor</h3>
+  <section id="tab-rooms" class="tab cols">
+<div class="col">
+<div class="card"><h3>Room sensors</h3><div id="roomList"></div></div>
+</div>
+<div class="col">
+<div class="card"><h3>Add a sensor</h3>
       <ol class="steps">
         <li>Buy a Z-Wave temperature and humidity sensor (US 908 MHz). Zooz ZSE44 and Aeotec TriSensor 8 are common picks.</li>
         <li>Open Z-Wave JS UI (link in Settings), choose <b>Manage Nodes → Add</b>, and wake the sensor as its manual says.</li>
         <li>It appears here within a minute. Give it a name below.</li>
       </ol>
     </div>
+</div>
   </section>
 
-  <section id="tab-insights" class="tab">
-    <div class="card">
+  <section id="tab-insights" class="tab cols">
+<div class="col">
+<div class="card">
       <div class="row spread"><h3>Temperature</h3><div class="seg small" id="rangeSeg"><button data-h="24">24 h</button><button data-h="72">3 d</button><button data-h="168">7 d</button></div></div>
       <div class="chartbox"><canvas id="chart"></canvas></div>
       <div class="legend" id="chartLegend"></div>
     </div>
-    <div class="card"><h3>What I noticed</h3><ul id="findings" class="findings"></ul></div>
-    <div class="card"><h3>Daily runtime</h3><div class="chartbox short"><canvas id="bars"></canvas></div><div class="legend"><span class="k heat">Heating</span><span class="k cool">Cooling</span></div><div id="totals" class="hint"></div></div>
-    <div class="card"><h3>Rooms, last 24 h</h3><div id="roomStats"></div></div>
-    <div class="card">
+<div class="card"><h3>What I noticed</h3><ul id="findings" class="findings"></ul></div>
+<div class="card"><h3>Rooms, last 24 h</h3><div id="roomStats"></div></div>
+</div>
+<div class="col">
+<div class="card"><h3>Daily runtime</h3><div class="chartbox short"><canvas id="bars"></canvas></div><div class="legend"><span class="k heat">Heating</span><span class="k cool">Cooling</span></div><div id="totals" class="hint"></div></div>
+<div class="card">
       <h3>Log</h3>
       <form id="noteForm" class="row gap"><input id="noteIn" type="text" maxlength="300" placeholder="Add a note…" autocomplete="off"><button class="btn">Add</button></form>
       <ul id="events" class="events"></ul>
     </div>
+</div>
   </section>
 
   <section id="tab-future" class="tab">
-    <div class="card"><h3>Future features</h3><p class="hint">Planned, not built yet. Each one needs a Z-Wave device on the same USB stick. Tell me which you want first. Buy US-frequency (908 MHz) Z-Wave devices, ideally 800 series, and check the listing mentions Z-Wave JS or Home Assistant.</p></div>
+    <div class="card"><h3>Planned add-ons</h3><p class="hint">Planned, not built yet. Each one needs a Z-Wave device on the same USB stick. Tell me which you want first. Buy US-frequency (908 MHz) Z-Wave devices, ideally 800 series, and check the listing mentions Z-Wave JS or Home Assistant.</p></div>
     <div class="card future"><div class="fh"><b>Water leak sensor</b><span class="badge">PLANNED</span></div><p>Alert on the Dashboard and by ntfy when water shows up near the furnace, water heater or basement floor. Catches a failed condensate pump or leaking tank early.</p><p class="hint">Buy: Z-Wave water leak sensor (battery).</p></div>
     <div class="card future"><div class="fh"><b>Door and window sensors</b><span class="badge">PLANNED</span></div><p>Pause heating or cooling when a door has been open for 10 minutes or more. Insights would show how often doors get left open.</p><p class="hint">Buy: Z-Wave door/window contact sensors (battery).</p></div>
     <div class="card future"><div class="fh"><b>Humidifier / dehumidifier plug</b><span class="badge">PLANNED</span></div><p>Run a plug-in dehumidifier or humidifier from a room's humidity reading and your humidity limits.</p><p class="hint">Buy: Z-Wave smart plug rated for the appliance. Never put the furnace itself on a plug.</p></div>
     <div class="card future"><div class="fh"><b>Supply and return air probes</b><span class="badge">PLANNED</span></div><p>Measure the temperature difference across the furnace. A drop in it can point to a dirty filter or a weak heat exchanger. This would be the best diagnostic of the list.</p><p class="hint">Buy: Z-Wave temperature sensor with an external probe (check the product supports a probe).</p></div>
     <div class="card future"><div class="fh"><b>Outdoor temperature</b><span class="badge">PLANNED</span></div><p>Compare furnace runtime against real outdoor temperatures. Can use a Z-Wave outdoor sensor, or weather data from the internet at no cost.</p><p class="hint">Buy: optional. Weather data needs no hardware.</p></div>
     <div class="card future"><div class="fh"><b>Furnace energy monitor</b><span class="badge">PLANNED</span></div><p>Real electricity use and cost for the blower and furnace, instead of the runtime-times-rate estimate.</p><p class="hint">Buy: clamp-on energy meter at the electrical panel. Use an electrician to install it.</p></div>
-    <div class="card future"><div class="fh"><b>Skip: smoke and CO alarms</b><span class="badge">NOT PLANNED</span></div><p>Keep these as standalone alarms. Life-safety devices should not depend on this app.</p></div>
   </section>
 
-  <section id="tab-settings" class="tab">
-    <div class="card">
+  <section id="tab-settings" class="tab cols">
+<div class="col">
+<div class="card">
       <h3>Connection</h3>
       <div id="conn"></div>
       <div class="row gap wrap"><button id="modeToggle" class="btn"></button></div>
@@ -103,7 +120,7 @@
         </ol>
       </details>
     </div>
-    <div class="card">
+<div class="card">
       <h3>Filter reminder</h3>
       <p class="hint">You set the dates by hand. Cold Front counts the days and reminds you.</p>
       <div class="grid2">
@@ -114,7 +131,7 @@
       </div>
       <div class="row gap wrap"><button id="saveFilter" class="btn primary">Save filter</button><button id="filterToday" class="btn">Changed today</button><span id="filterMsg" class="hint"></span></div>
     </div>
-    <div class="card">
+<div class="card">
       <h3>Notifications (ntfy)</h3>
       <p class="hint">Sends push alerts to your phone through <b>ntfy</b>. Install the ntfy app, subscribe to a topic name only you know, and enter it here. Every alert below is off until you turn it on. Anyone who knows an ntfy.sh topic can read it, so pick a long random name or use your own ntfy server.</p>
       <label class="check"><input type="checkbox" id="nEnabled"> Notifications on (master switch)</label>
@@ -128,8 +145,11 @@
       <div id="nTriggers" class="triggers"></div>
       <div class="row gap wrap"><button id="saveNtfy" class="btn primary">Save notifications</button><button id="testNtfy" class="btn">Send test</button><span id="ntfyMsg" class="hint"></span></div>
     </div>
-    <div class="card">
+</div>
+<div class="col">
+<div class="card">
       <h3>Control</h3>
+      <label>Your name (shown in the Dashboard greeting) <input id="setName" type="text" maxlength="30" placeholder="Optional" autocomplete="off"></label>
       <label class="check"><input type="checkbox" id="setEnforce"> Cold Front sets the thermostat to follow the schedule</label>
       <label>If someone changes it at the wall
         <select id="setWall"><option value="hold">Hold that setting until the next period</option><option value="revert">Put the schedule back</option></select>
@@ -138,7 +158,7 @@
       <div class="row gap wrap"><select id="setRoom"></select><label class="inline">Max nudge <input id="setMax" type="number" min="0" max="5" step="1" style="width:5.5em"> °F</label></div>
       <p class="hint">Room-aware raises the heat setpoint when that room is colder than the schedule target, and lowers the cool setpoint when it is warmer. It re-checks every 10 minutes and never goes past your safety limits.</p>
     </div>
-    <div class="card">
+<div class="card">
       <h3>Safety limits</h3>
       <p class="hint">Nothing Cold Front sends can go outside these, whatever the schedule or a hold says.</p>
       <div class="grid2">
@@ -151,12 +171,13 @@
       </div>
       <div class="row gap"><button id="saveSettings" class="btn primary">Save settings</button><span id="settingsMsg" class="hint"></span></div>
     </div>
-    <div class="card">
+<div class="card">
       <h3>Backup</h3>
       <div class="row gap wrap"><a id="dlBackup" class="btn" href="/api/backup" download="coldfront-backup.json">Download backup</a><label class="btn">Restore<input id="restoreFile" type="file" accept="application/json" hidden></label></div>
       <p class="hint">A rolling 7-day backup also lives in the app's data folder.</p>
     </div>
-    <div class="card about"><h3>About</h3><p>Cold Front <span id="ver"></span>. Local thermostat control for Umbrel, built for the Honeywell T6 Pro Z-Wave and a Z-Wave USB stick. No cloud, no accounts. MIT licensed. Not affiliated with or endorsed by Honeywell, Z-Wave Alliance, Zooz or Umbrel.</p></div>
+<div class="card about"><h3>About</h3><p>Cold Front <span id="ver"></span>. Local thermostat control for Umbrel, built for the Honeywell T6 Pro Z-Wave and a Z-Wave USB stick. No cloud, no accounts. MIT licensed. Not affiliated with or endorsed by Honeywell, Z-Wave Alliance, Zooz or Umbrel.</p></div>
+</div>
   </section>
 </main>
 

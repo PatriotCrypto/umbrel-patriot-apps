@@ -145,6 +145,7 @@ function createApp({ dataDir, zwaveUrl, now = () => Date.now(), simSpeed = 1, au
       if (n.clearToken) s.ntfy.token = '';
       if (n.triggers && typeof n.triggers === 'object') for (const k of Object.keys(TRIGGERS)) if (k in n.triggers) s.ntfy.triggers[k] = !!n.triggers[k];
     }
+    if (b.name !== undefined) s.name = String(b.name).trim().slice(0, 30);
     if (b.dashboard !== undefined) {
       if (b.dashboard === null) s.dashboard = null;
       else {

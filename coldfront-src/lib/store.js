@@ -7,6 +7,7 @@ const { DEFAULT_TRIGGERS } = require('./notify');
 const DEFAULTS = () => ({
   version: 1,
   settings: {
+    name: '', // shown in the Dashboard greeting
     mode: 'demo', // 'demo' = built-in simulator, 'live' = Z-Wave JS server
     tz: process.env.TZ || 'America/New_York',
     enforce: true, // push the schedule to the thermostat
