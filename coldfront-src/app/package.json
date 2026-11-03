@@ -1,6 +1,6 @@
 {
   "name": "coldfront",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Local thermostat control room for Umbrel: schedules, room sensors, insights",
   "private": true,
   "license": "MIT",

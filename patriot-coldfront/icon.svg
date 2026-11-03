@@ -1,13 +1,13 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128">
   <defs>
-    <symbol id="mark" viewBox="0 0 32 32"><g fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="square"><path d="M16 3v26M5 9.500l22 13M27 9.500L5 22.500"/><path d="M12.500 5L16 8.500 19.500 5M12.500 27L16 23.500 19.500 27"/></g></symbol>
+    <linearGradient id="bg" x1="0.1" y1="0" x2="0.9" y2="1"><stop offset="0" stop-color="#5fd0ff"/><stop offset="0.55" stop-color="#3d8bff"/><stop offset="1" stop-color="#4a45e8"/></linearGradient>
+    <radialGradient id="glow" cx="0.3" cy="0.15" r="0.9"><stop offset="0" stop-color="#ffffff" stop-opacity="0.35"/><stop offset="0.6" stop-color="#ffffff" stop-opacity="0"/></radialGradient>
+    <symbol id="mark" viewBox="32 32 64 64"><g fill="none" stroke="currentColor" stroke-width="6" stroke-linecap="round"><path d="M64 64L64.00 40.00M64.00 49.00L57.45 44.41M64.00 49.00L70.55 44.41M64 64L84.78 52.00M76.99 56.50L77.69 48.53M76.99 56.50L84.24 59.88M64 64L84.78 76.00M76.99 71.50L84.24 68.12M76.99 71.50L77.69 79.47M64 64L64.00 88.00M64.00 79.00L70.55 83.59M64.00 79.00L57.45 83.59M64 64L43.22 76.00M51.01 71.50L50.31 79.47M51.01 71.50L43.76 68.12M64 64L43.22 52.00M51.01 56.50L43.76 59.88M51.01 56.50L50.31 48.53"/></g></symbol>
   </defs>
-  <rect width="128" height="128" rx="24" fill="#050a06"/>
-  <rect x="8" y="8" width="112" height="112" rx="18" fill="none" stroke="#1d4a28" stroke-width="3"/>
-  <g stroke="#39ff6a" stroke-width="6" stroke-linecap="square" fill="none">
-    <path d="M64 24v50M31 43l66 24M97 43L31 67"/>
-    <path d="M54 30l10 10 10-10M54 68l10-10 10 10"/>
-  </g>
-  <path d="M28 96l12 8-12 8" stroke="#39ff6a" stroke-width="6" stroke-linecap="square" fill="none" transform="translate(0 -6)"/>
-  <rect x="50" y="100" width="26" height="6" fill="#39ff6a"/>
+  <rect width="128" height="128" rx="28" fill="url(#bg)"/>
+  <rect width="128" height="128" rx="28" fill="url(#glow)"/>
+  <path d="M30.77 97.23A47 47 0 1 1 97.23 97.23" fill="none" stroke="#ffffff" stroke-opacity="0.35" stroke-width="7" stroke-linecap="round"/>
+  <circle cx="21.40" cy="44.14" r="8" fill="#ffb347"/>
+  <circle cx="106.60" cy="44.14" r="8" fill="#ffffff"/>
+  <g fill="none" stroke="#ffffff" stroke-width="6" stroke-linecap="round"><path d="M64 64L64.00 40.00M64.00 49.00L57.45 44.41M64.00 49.00L70.55 44.41M64 64L84.78 52.00M76.99 56.50L77.69 48.53M76.99 56.50L84.24 59.88M64 64L84.78 76.00M76.99 71.50L84.24 68.12M76.99 71.50L77.69 79.47M64 64L64.00 88.00M64.00 79.00L70.55 83.59M64.00 79.00L57.45 83.59M64 64L43.22 76.00M51.01 71.50L50.31 79.47M51.01 71.50L43.76 68.12M64 64L43.22 52.00M51.01 56.50L43.76 59.88M51.01 56.50L50.31 48.53"/></g>
 </svg>
