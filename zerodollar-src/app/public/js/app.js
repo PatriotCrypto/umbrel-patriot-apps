@@ -1,6 +1,7 @@
 import { h, icon, clear, monthLabel, shiftMonth, monthNow, modal, guard, toast } from './ui.js';
 import { S, loadMeta, setMonth, setTheme, currentTheme, THEMES } from './state.js';
 import { openTxEditor } from './txeditor.js';
+import { api } from './api.js';
 
 const ROUTES = {
   budget: { title: 'Budget', icon: 'budget', month: true, load: () => import('./views/budget.js') },
@@ -34,7 +35,7 @@ function shell() {
   const side = h('aside', { class: 'side' },
     h('div', { class: 'brand' }, h('img', { src: '/icon.png', alt: '' }), 'ZeroDollar'),
     nav, h('div', { class: 'grow' }),
-    h('div', { class: 'foot' }, S.meta.settings.householdName || 'Every dollar planned'));
+    h('div', { class: 'foot' + (S.meta.settings.householdName ? '' : ' plain'), title: 'Household name (Settings)' }, S.meta.settings.householdName || 'Every dollar planned'));
   const title = h('h1', { id: 'page-title' });
   const monthbar = h('div', { class: 'monthbar', id: 'monthbar' },
     h('button', { 'aria-label': 'Previous month', onclick: () => step(-1) }, icon('left')),
@@ -121,7 +122,32 @@ function rain() {
   setTimeout(() => { box.remove(); msg.remove(); }, 5600);
 }
 
+function loginScreen() {
+  const pw = h('input', { type: 'password', autocomplete: 'current-password', placeholder: 'Password', autofocus: true, 'aria-label': 'Password' });
+  const msg = h('div', { class: 'muted', style: { color: 'var(--bad)', minHeight: '20px', fontSize: '13.5px' } });
+  const go = async () => {
+    msg.textContent = '';
+    try {
+      await api.post('/auth/login', { password: pw.value });
+      location.reload();
+    } catch (e) {
+      msg.textContent = e.message;
+      pw.select();
+    }
+  };
+  pw.addEventListener('keydown', (e) => e.key === 'Enter' && go());
+  app.replaceChildren(h('div', { class: 'login' }, h('div', { class: 'card' },
+    h('img', { src: '/icon.png', alt: '' }), h('h1', { style: { fontSize: '22px' } }, 'ZeroDollar'), h('div', { class: 'muted' }, 'Enter your password to continue.'),
+    pw, msg, h('button', { class: 'btn primary', onclick: go }, 'Sign in'))));
+  pw.focus();
+}
+window.addEventListener('zd-auth', () => loginScreen());
+
 async function boot() {
+  try {
+    const a = await api.get('/auth/status');
+    if (a.required && !a.authed) return loginScreen();
+  } catch {}
   try {
     await loadMeta();
   } catch (e) {

@@ -1,9 +1,14 @@
 import { h, todayLocal } from '../ui.js';
 import { api } from '../api.js';
-import { S, fmt } from '../state.js';
+import { S, fmt, groupColor } from '../state.js';
 import { pieChart, stackedBars, multiLine, colorFor } from '../charts.js';
 
 const st = { range: 'ytd', group: '', item: '', pieGroup: '', savings: true };
+/** Items within one group get lighter and darker steps of the group's own colour. */
+function shade(hex, i, n) {
+  const t = n <= 1 ? 0 : i / (n - 1); // 0 = base, 1 = lightest
+  return `color-mix(in srgb, ${hex} ${Math.round(100 - t * 55)}%, white)`;
+}
 const sum = (a) => a.reduce((n, v) => n + v, 0);
 
 export async function render(root, ctx) {
@@ -20,7 +25,7 @@ export async function render(root, ctx) {
     groupTotals.set(s.groupId, g);
   }
   const groups = [...groupTotals.values()].sort((a, b) => b.total - a.total);
-  const gColor = new Map(groups.map((g, i) => [g.id, colorFor(i)]));
+  const gColor = new Map(groups.map((g) => [g.id, groupColor(g.id)]));
   if (st.pieGroup && !groupTotals.has(st.pieGroup)) st.pieGroup = '';
   if (st.group && !groupTotals.has(st.group)) { st.group = ''; st.item = ''; }
 
@@ -46,7 +51,7 @@ export async function render(root, ctx) {
   if (!st.pieGroup) slices = groups.map((g) => ({ label: g.name, value: g.total, color: gColor.get(g.id), pick: g.id }));
   else {
     slices = d.series.filter((s) => s.groupId === st.pieGroup).map((s) => ({ label: s.name, value: sum(s.values) })).filter((s) => s.value > 0).sort((a, b) => b.value - a.value);
-    slices.forEach((s, i) => (s.color = colorFor(i)));
+    slices.forEach((s, i) => (s.color = shade(groupColor(st.pieGroup), i, slices.length)));
   }
   const pieTotal = sum(slices.map((s) => s.value));
   const spanLabel = st.range === 'ytd' ? 'year to date' : /^\d{4}$/.test(st.range) ? st.range : `past ${st.range} months`;
@@ -67,7 +72,7 @@ export async function render(root, ctx) {
   if (!st.group) ds = groups.map((g) => ({ name: g.name, color: gColor.get(g.id), values: d.months.map((_, i) => sum(d.series.filter((s) => s.groupId === g.id).map((s) => s.values[i]))) }));
   else {
     const pick = st.item ? items.filter((s) => (s.catId || 'uncat') === st.item) : items;
-    ds = pick.map((s, i) => ({ name: s.name, color: colorFor(i), values: s.values })).sort((a, b) => sum(b.values) - sum(a.values));
+    ds = pick.map((s, i) => ({ name: s.name, color: shade(groupColor(st.group), i, pick.length), values: s.values })).sort((a, b) => sum(b.values) - sum(a.values));
   }
   const monthsWithData = d.months.filter((_, i) => ds.some((s) => s.values[i] > 0)).length || 1;
   const avgSpent = Math.round(sum(ds.map((s) => sum(s.values))) / monthsWithData);
@@ -78,7 +83,8 @@ export async function render(root, ctx) {
     stackedBars(labels, ds, { short, label: 'Spending by month', avg: avgSpent }));
 
   /* ---- Monthly income ---- */
-  const inc = d.income.map((s, i) => ({ name: s.name, color: colorFor(i + 1), values: s.values }));
+  const incBase = S.meta.groups.find((g) => g.kind === 'income');
+  const inc = d.income.map((s, i) => ({ name: s.name, color: shade(incBase ? groupColor(incBase.id) : colorFor(0), i, d.income.length), values: s.values }));
   const incMonths = d.months.filter((_, i) => inc.some((s) => s.values[i] > 0)).length || 1;
   const monthlyIncome = h('section', { class: 'card pad stack' },
     h('h3', { style: { fontSize: '17px', textAlign: 'center' } }, 'Monthly income'), legend(inc),

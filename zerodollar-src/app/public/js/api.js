@@ -11,6 +11,7 @@ async function req(method, url, body) {
   }
   const isJson = (res.headers.get('content-type') || '').includes('json');
   const data = isJson ? await res.json() : null;
+  if (res.status === 401 && data?.auth) window.dispatchEvent(new Event('zd-auth'));
   if (!res.ok) throw new Error(data?.error || `Request failed (${res.status})`);
   return data;
 }

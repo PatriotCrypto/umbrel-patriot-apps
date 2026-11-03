@@ -6,7 +6,7 @@ export function h(tag, attrs, ...kids) {
     for (const [k, v] of Object.entries(attrs)) {
       if (v == null || v === false) continue;
       if (k === 'class') el.className = v;
-      else if (k === 'style' && typeof v === 'object') Object.assign(el.style, v);
+      else if (k === 'style' && typeof v === 'object') { for (const [sk, sv] of Object.entries(v)) { if (sk.startsWith('--')) el.style.setProperty(sk, sv); else el.style[sk] = sv; } }
       else if (k.startsWith('on') && typeof v === 'function') el.addEventListener(k.slice(2), v);
       else if (k === 'value') el.value = v;
       else if (k in el && k !== 'list' && k !== 'form') el[k] = v;
@@ -165,4 +165,16 @@ export function debounce(fn, ms = 250) {
     clearTimeout(t);
     t = setTimeout(() => fn(...a), ms);
   };
+}
+
+/** A month calendar of day numbers you can tap to pick several. Returns {el, get()}. */
+export function dayPicker(selected = [], onChange) {
+  const on = new Set(selected);
+  const el = h('div', { class: 'days', role: 'group', 'aria-label': 'Days of the month' });
+  const paint = () => el.querySelectorAll('button').forEach((b) => b.setAttribute('aria-pressed', on.has(+b.textContent) ? 'true' : 'false'));
+  for (let d = 1; d <= 31; d++) {
+    el.append(h('button', { type: 'button', onclick: () => { on.has(d) ? on.delete(d) : on.add(d); paint(); onChange?.([...on].sort((a, b) => a - b)); } }, String(d)));
+  }
+  paint();
+  return { el, get: () => [...on].sort((a, b) => a - b) };
 }

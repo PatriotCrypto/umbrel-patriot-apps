@@ -7,6 +7,7 @@ const CURRENCIES = ['USD', 'CAD', 'EUR', 'GBP', 'AUD', 'NZD', 'MXN', 'JPY', 'CHF
 
 export async function render(root, ctx) {
   const set = S.meta.settings;
+  const [authSt, nt] = await Promise.all([api.get('/auth/status'), api.get('/ntfy')]);
 
   /* looks */
   const looks = h('div', { class: 'cards', style: { gridTemplateColumns: 'repeat(auto-fill,minmax(150px,1fr))' } }, THEMES.map((t) => {
@@ -66,6 +67,8 @@ export async function render(root, ctx) {
       h('div', { class: 'grid2' }, h('label', { class: 'f' }, 'Currency', cur), h('label', { class: 'f' }, 'Number format (locale)', loc),
         h('label', { class: 'f' }, 'Statement date order', ord), h('label', { class: 'f' }, 'Match window (days either side)', win), h('label', { class: 'f' }, 'Household name', hh)),
       h('div', null, h('button', { class: 'btn primary', onclick: savePrefs }, 'Save preferences'))),
+    reminderSection(nt, ctx),
+    securitySection(authSt, ctx),
     section('Import from EveryDollar', 'Bring a month of your budget across. In EveryDollar, open the month and choose Download CSV (the Budget Items file, named like 10-2026-EveryDollar-BudgetItems.csv). Do one month at a time, oldest first, to fill in Insights.',
       h('div', { class: 'row wrap' }, h('label', { class: 'btn', for: 'ed-file', tabIndex: 0 }, icon('upload'), 'Choose Budget Items CSV…'), edIn)),
     section('Your data', 'Everything lives in one file on your Umbrel. A daily snapshot is kept for two weeks.',
@@ -157,4 +160,66 @@ async function openEveryDollar(csv, fileName, ctx) {
       h('p', { class: 'muted', style: { margin: 0, fontSize: '12.5px' } }, 'Nothing is deleted. Importing the same file again only updates planned amounts. Due days are not in EveryDollar’s file: click an item on the Budget page to set them.')].filter(Boolean));
   }
   paint();
+}
+
+const DOW = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+
+function reminderSection(nt, ctx) {
+  const on = h('input', { type: 'checkbox', checked: nt.enabled });
+  const server = h('input', { value: nt.server, placeholder: 'https://ntfy.sh' });
+  const topic = h('input', { value: nt.topic, placeholder: 'a private, hard-to-guess name', maxLength: 64, autocomplete: 'off', spellcheck: false });
+  const token = h('input', { type: 'password', placeholder: nt.hasToken ? 'Saved. Leave blank to keep it' : 'Only if your ntfy server needs one', autocomplete: 'off' });
+  const appUrl = h('input', { value: nt.appUrl, placeholder: 'Optional: http://umbrel.local:3973 (opens when you tap a notification)' });
+  const tz = h('input', { value: nt.timezone && nt.timezone !== 'America/New_York' ? nt.timezone : (Intl.DateTimeFormat().resolvedOptions().timeZone || nt.timezone), placeholder: 'America/New_York' });
+  const wOn = h('input', { type: 'checkbox', checked: nt.weekly.enabled });
+  const wDay = h('select', null, DOW.map((d, i) => h('option', { value: i }, d)));
+  wDay.value = nt.weekly.day;
+  const wTime = h('input', { type: 'time', value: nt.weekly.time });
+  const mOn = h('input', { type: 'checkbox', checked: nt.monthly.enabled });
+  const mDay = h('select', null, Array.from({ length: 28 }, (_, i) => h('option', { value: i + 1 }, 'Day ' + (i + 1))));
+  mDay.value = nt.monthly.day;
+  const mTime = h('input', { type: 'time', value: nt.monthly.time });
+  const body = () => ({ enabled: on.checked, server: server.value, topic: topic.value, appUrl: appUrl.value, timezone: tz.value.trim(), ...(token.value ? { token: token.value } : {}),
+    weekly: { enabled: wOn.checked, day: +wDay.value, time: wTime.value }, monthly: { enabled: mOn.checked, day: +mDay.value, time: mTime.value } });
+  const save = async (quiet) => { const r = await guard(() => api.put('/ntfy', body())); if (r && !quiet) { toast('Saved'); ctx.refresh(); } return r; };
+  return section('Reminders (ntfy)', 'Get a push notification on your phone each week to review transactions, and each month to reconcile your accounts and plan next month. ntfy is a free notification service; install its app and subscribe to your topic.',
+    h('label', { class: 'row' }, on, 'Send reminders'),
+    h('div', { class: 'grid2' },
+      h('label', { class: 'f' }, 'ntfy server', server),
+      h('label', { class: 'f' }, 'Topic', topic),
+      h('label', { class: 'f' }, 'Access token (optional)', token),
+      h('label', { class: 'f' }, 'Your time zone', tz)),
+    h('div', null, h('button', { class: 'btn sm', onclick: () => { const a = crypto.getRandomValues(new Uint8Array(9)); topic.value = 'zerodollar-' + [...a].map((b) => b.toString(36).padStart(2, '0')).join('').slice(0, 14); } }, 'Make up a private topic')),
+    h('div', { class: 'card pad stack', style: { boxShadow: 'none', background: 'var(--surface2)' } },
+      h('label', { class: 'row' }, wOn, h('b', null, 'Every week: review transactions')),
+      h('div', { class: 'grid2' }, h('label', { class: 'f' }, 'Day', wDay), h('label', { class: 'f' }, 'Time', wTime))),
+    h('div', { class: 'card pad stack', style: { boxShadow: 'none', background: 'var(--surface2)' } },
+      h('label', { class: 'row' }, mOn, h('b', null, 'Every month: reconcile and plan next month')),
+      h('div', { class: 'grid2' }, h('label', { class: 'f' }, 'Day of the month', mDay), h('label', { class: 'f' }, 'Time', mTime))),
+    h('p', { class: 'muted', style: { margin: 0, fontSize: '13px' } }, 'Anyone who knows your topic name can read the reminders, so keep it private. They contain counts and dates, never account numbers. Reminders go out while ZeroDollar is running, once each, at or after the time you choose.'),
+    h('div', { class: 'row wrap' },
+      h('button', { class: 'btn primary', onclick: () => save(false) }, 'Save reminders'),
+      h('button', { class: 'btn', onclick: async () => { if (!(await save(true))) return; if (await guard(() => api.post('/ntfy/test'))) toast('Test sent. Check your phone.'); } }, 'Send a test')));
+}
+
+function securitySection(a, ctx) {
+  const cur = h('input', { type: 'password', autocomplete: 'current-password', placeholder: 'Current password' });
+  const p1 = h('input', { type: 'password', autocomplete: 'new-password', placeholder: a.required ? 'New password (8+ characters)' : 'Choose a password (8+ characters)' });
+  const p2 = h('input', { type: 'password', autocomplete: 'new-password', placeholder: 'Type it again' });
+  const save = async () => {
+    if (p1.value !== p2.value) return toast('The two passwords do not match', true);
+    if (await guard(() => api.post('/auth/password', { current: cur.value, password: p1.value }))) { toast(a.required ? 'Password changed' : 'Password set. ZeroDollar will ask for it from now on.'); ctx.refresh(); }
+  };
+  return section('Password', a.required ? 'ZeroDollar asks for your password before showing anything. You stay signed in on this device for 30 days.' : 'Optional. Add a password so anyone who opens ZeroDollar on your network has to sign in first.',
+    a.required ? h('label', { class: 'f' }, 'Current password', cur) : null,
+    h('div', { class: 'grid2' }, h('label', { class: 'f' }, a.required ? 'New password' : 'Password', p1), h('label', { class: 'f' }, 'Confirm', p2)),
+    h('div', { class: 'row wrap' },
+      h('button', { class: 'btn primary', onclick: save }, a.required ? 'Change password' : 'Set password'),
+      a.required ? h('button', { class: 'btn', onclick: async () => { await guard(() => api.post('/auth/logout')); location.reload(); } }, 'Sign out') : null,
+      a.required ? h('button', { class: 'btn danger', onclick: async () => {
+        if (!cur.value) return toast('Type your current password above first', true);
+        if (!(await confirmDialog('Anyone who can open ZeroDollar will see your budget without signing in.', { ok: 'Remove password', danger: true }))) return;
+        if (await guard(() => api.post('/auth/remove', { current: cur.value }))) { toast('Password removed'); ctx.refresh(); }
+      } }, 'Remove password') : null),
+    h('p', { class: 'muted', style: { margin: 0, fontSize: '13px' } }, 'There is no “forgot password” email, because nothing leaves your Umbrel. If you lose it, delete the file private.json in the app\'s data folder and restart the app; your budget is untouched. The home-screen widget shows only your left-to-budget total and does not use the password. Your Umbrel login still guards the app too.'));
 }

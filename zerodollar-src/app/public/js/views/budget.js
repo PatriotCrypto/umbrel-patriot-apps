@@ -1,6 +1,7 @@
-import { h, icon, modal, toast, guard, todayLocal, dayLabel, monthLabel, confirmDialog, clear } from '../ui.js';
+import { h, icon, modal, toast, guard, todayLocal, dayLabel, monthLabel, confirmDialog, clear, dayPicker } from '../ui.js';
+import { PALETTE } from '../charts.js';
 import { api } from '../api.js';
-import { S, fmt, loadMeta, catName } from '../state.js';
+import { S, fmt, loadMeta, catName, groupColor } from '../state.js';
 import { parseMoney } from '../money.js';
 import { openTxEditor } from '../txeditor.js';
 
@@ -112,7 +113,7 @@ export async function render(root, ctx) {
     refs.set('g:' + g.id, totalEl);
     const isIncome = g.kind === 'income';
     const card = h('section', { class: 'card group' + (editMode ? ' editing' : '') },
-      h('header', null,
+      h('header', { style: { '--gc': groupColor(g.id) } },
         h('h3', null, g.name),
         totalEl,
         editMode && !isIncome ? groupMover(g) : null,
@@ -241,14 +242,21 @@ function addGroup(ctx) {
 
 function renameGroup(g, ctx) {
   const name = h('input', { value: g.name, maxLength: 40 });
+  const full = S.meta.groups.find((x) => x.id === g.id) || g;
+  let color = full.color || null;
+  const sw = h('div', { class: 'swatches', role: 'group', 'aria-label': 'Group color' });
+  const paintSw = () => sw.querySelectorAll('button').forEach((b) => b.setAttribute('aria-pressed', (b.dataset.c || '') === (color || '') ? 'true' : 'false'));
+  sw.append(h('button', { type: 'button', class: 'none', 'data-c': '', title: 'Automatic', onclick: () => { color = null; paintSw(); } }, 'Auto'),
+    ...PALETTE.map((c) => h('button', { type: 'button', 'data-c': c, title: c, 'aria-label': 'Color ' + c, style: { background: c }, onclick: () => { color = c; paintSw(); } })));
+  paintSw();
   const m = modal({
-    title: 'Edit group', body: h('label', { class: 'f' }, 'Name', name),
+    title: 'Edit group', body: [h('label', { class: 'f' }, 'Name', name), h('div', { class: 'f' }, 'Color (also used on the Insights page)', sw)],
     footer: [
       g.kind === 'income' ? null : h('button', { class: 'btn danger', style: { marginRight: 'auto' }, onclick: async () => {
         if (!(await confirmDialog(`Remove the “${g.name}” group? It must be empty.`, { ok: 'Remove', danger: true }))) return;
         if (await guard(() => api.del('/groups/' + g.id))) { await loadMeta(); m.close(); ctx.refresh(); }
       } }, 'Remove group'),
-      h('button', { class: 'btn primary', onclick: async () => { if (await guard(() => api.patch('/groups/' + g.id, { name: name.value }))) { await loadMeta(); m.close(); ctx.refresh(); } } }, 'Save')]
+      h('button', { class: 'btn primary', onclick: async () => { if (await guard(() => api.patch('/groups/' + g.id, { name: name.value, color }))) { await loadMeta(); m.close(); ctx.refresh(); } } }, 'Save')]
   });
 }
 
@@ -271,14 +279,14 @@ export function editCategory(c, ctx) {
   const income = full.type === 'income';
   const debt = full.type === 'debt';
   const locked = income || debt;
-  const payDays = h('input', { placeholder: 'e.g. 5, 20', value: (full.payDays || []).join(', ') });
-  const parsePayDays = () => payDays.value.split(/[\s,]+/).filter(Boolean).map(Number);
+  const payDays = dayPicker(full.payDays || []);
+  const parsePayDays = () => payDays.get();
   const m = modal({
     title: 'Edit category',
     body: [
       h('label', { class: 'f' }, 'Name', name),
       h('div', { class: 'grid2' }, income ? null : h('label', { class: 'f' }, 'Group', group), income ? null : h('label', { class: 'f' }, 'Bill due on day', due)),
-      income ? h('label', { class: 'f' }, 'Paid on these days of the month', payDays, h('span', { class: 'muted', style: { fontSize: '12.5px' } }, 'Used by Paycheck Planning to split this income across paychecks.')) : null,
+      income ? h('div', { class: 'f' }, 'Paid on these days of the month', payDays.el, h('span', { class: 'muted', style: { fontSize: '12.5px' } }, 'Tap every day you get paid. Paycheck Planning splits this income across them.')) : null,
       debt ? h('p', { class: 'muted', style: { margin: 0, fontSize: '13px' } }, h('a', { href: '#/debt', onclick: () => m.close() }, 'Balance, interest rate and minimum payment are on the Debt page.')) : null,
       locked ? null : h('label', { class: 'f' }, 'Type', kind),
       locked ? null : fundBox

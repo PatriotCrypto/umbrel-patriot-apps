@@ -66,7 +66,8 @@ Umbrel re-checks community stores every so often, so a new app or update can tak
 - Net worth tracker with goals and history, plus a Bitcoin wallet tracker for public addresses and xpubs (point it at your own Mempool app to keep lookups private).
 - Import a month from EveryDollar's Budget Items CSV. Every item and group is editable.
 - A Due this week list on the Budget page, plus backup, restore and CSV export.
-- Four looks.
+- Optional password, and phone reminders through ntfy: weekly to review transactions, monthly to reconcile and plan the next month.
+- Color-coded groups that carry through to Insights, a pay-day calendar for each income, and two looks: Daylight and Midnight.
 
 *An independent community app. Not affiliated with or endorsed by Ramsey Solutions, EveryDollar or Umbrel, and it does not give financial advice.* · [Details](zerodollar-src/README.md)
 

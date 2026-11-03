@@ -1,4 +1,4 @@
-import { h, icon, modal, guard, toast, todayLocal, monthLabel, shortDate } from '../ui.js';
+import { h, icon, modal, guard, toast, todayLocal, monthLabel, shortDate, dayPicker } from '../ui.js';
 import { api } from '../api.js';
 import { S, fmt, loadMeta } from '../state.js';
 import { parseMoney } from '../money.js';
@@ -121,20 +121,20 @@ async function editPaychecks(p, catId, ctx) {
     tot.textContent = `Scheduled ${fmt(n)} of ${fmt(planned)} planned${n === planned ? ' ✓' : n > planned ? ' · more than planned' : ` · ${fmt(planned - n)} left to place`}`;
     tot.style.color = n > planned ? 'var(--warn)' : '';
   }
-  const days = h('input', { placeholder: 'e.g. 5, 20', value: (cat?.payDays || []).join(', ') });
+  const days = dayPicker(cat?.payDays || []);
   const remember = h('input', { type: 'checkbox', checked: true, id: 'rem-pd' });
-  const parseDays = () => days.value.split(/[\s,]+/).filter(Boolean).map(Number);
+  const parseDays = () => days.get();
   const m = modal({
     title: `${cat?.name || 'Income'} paychecks`, wide: true,
     body: [
       h('p', { class: 'muted', style: { margin: 0 } }, `Planned for ${monthLabel(S.month, S.meta.settings.locale)}: ${fmt(planned)}. Enter each paycheck's date and amount, or split the plan evenly across pay days.`),
       list, h('div', null, h('button', { class: 'btn sm', onclick: () => { addRow(`${S.month}-15`, 0); } }, icon('plus'), 'Add paycheck')), tot,
       h('div', { class: 'card pad stack', style: { boxShadow: 'none', background: 'var(--surface2)' } },
-        h('label', { class: 'f' }, 'Split evenly on these days of the month', days),
+        h('div', { class: 'f' }, 'Split evenly on these days of the month', days.el),
         h('label', { class: 'row', for: 'rem-pd', style: { fontSize: '13px' } }, remember, 'Use these pay days every month'),
         h('div', null, h('button', { class: 'btn sm', onclick: async () => {
           const d = parseDays();
-          if (!d.length || d.some((x) => !(x >= 1 && x <= 31))) return toast('Enter day numbers like 5, 20', true);
+          if (!d.length || d.some((x) => !(x >= 1 && x <= 31))) return toast('Tap the days you get paid', true);
           if (await guard(() => api.post(`/paycheck/${S.month}/split`, { catId, days: d, remember: remember.checked }))) { await loadMeta(); m.close(); ctx.refresh(); }
         } }, 'Split evenly')))
     ],

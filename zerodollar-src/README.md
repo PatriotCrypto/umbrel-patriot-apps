@@ -17,7 +17,10 @@ ZeroDollar is an independent community app. It is not affiliated with, endorsed 
 - Bitcoin tracker: public addresses and xpub/ypub/zpub keys (never seed phrases or private keys, which are refused), or a manual amount. Lookups use mempool.space by default; set the address of your own Mempool app on Umbrel to keep them on your network
 - Import from EveryDollar: Settings, Import. Use the "Budget Items" CSV (columns Group, Item, Planned, Spent, Remaining), one month at a time. Debt balances come from Remaining; interest rates and due days are not in EveryDollar's file
 - Due this week list on the Budget page; every item and group can be renamed, moved, given a due day or pay days, and reordered
-- Four looks, JSON backup and restore, CSV export, daily snapshots, Umbrel home-screen widget
+- Optional password (scrypt hash, 30-day sign-in, lockout after repeated wrong tries). The home-screen widget stays open because Umbrel calls it without a cookie; it shows only the left-to-budget total. If you forget the password, delete `private.json` in the app data folder and restart; the budget is untouched
+- ntfy reminders: weekly (review transactions) and monthly (reconcile and set up next month), each sent once at or after the time you choose while the app is running. Use your own ntfy server or ntfy.sh with a private topic; an optional access token is kept in `private.json`, which is not part of backups
+- Group colors you pick on the Budget page are reused on Insights; each income has a calendar for its pay days; signature-style household name; Daylight and Midnight looks
+- JSON backup and restore, CSV export, daily snapshots, Umbrel home-screen widget
 
 ## Install
 Umbrel Settings → App Store → ⋯ → Community App Stores → add `https://github.com/PatriotCrypto/umbrel-patriot-apps`.

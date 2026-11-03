@@ -1,6 +1,7 @@
 import { uid } from './util.js';
+import { DEFAULT_NTFY } from './ntfy.js';
 
-export const SCHEMA_VERSION = 2;
+export const SCHEMA_VERSION = 3;
 
 export const ACCOUNT_TYPES = ['checking', 'savings', 'credit', 'cash'];
 export const CATEGORY_TYPES = ['expense', 'income', 'fund', 'debt'];
@@ -39,7 +40,8 @@ export function defaultState() {
       dateOrder: 'mdy',
       householdName: '',
       btcLookups: true,
-      btcApi: 'https://mempool.space/api'
+      btcApi: 'https://mempool.space/api',
+      ntfy: structuredClone(DEFAULT_NTFY)
     },
     accounts: [{ id: uid('a_'), name: 'Checking', type: 'checking', openingBalance: 0, archived: false }],
     groups,
@@ -65,6 +67,8 @@ export function migrate(s) {
   const d = defaultState();
   const out = { ...d, ...s };
   out.settings = { ...d.settings, ...(s.settings || {}) };
+  const n = out.settings.ntfy && typeof out.settings.ntfy === 'object' ? out.settings.ntfy : {};
+  out.settings.ntfy = { ...DEFAULT_NTFY, ...n, weekly: { ...DEFAULT_NTFY.weekly, ...(n.weekly || {}) }, monthly: { ...DEFAULT_NTFY.monthly, ...(n.monthly || {}) } };
   for (const k of ['accounts', 'groups', 'categories', 'transactions', 'debts', 'statements']) {
     if (!Array.isArray(out[k])) out[k] = [];
   }

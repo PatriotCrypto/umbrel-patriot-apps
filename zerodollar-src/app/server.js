@@ -4,6 +4,9 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { Store } from './lib/store.js';
+import { PrivateStore } from './lib/private.js';
+import { Auth, cookieValue, validatePassword, checkPassword } from './lib/auth.js';
+import { normalizeNtfy, sendNtfy, runReminders, localParts } from './lib/ntfy.js';
 import { defaultState, migrate, ACCOUNT_TYPES } from './lib/schema.js';
 import {
   HttpError, bad, notFound, uid, isDate, isMonth, clampStr, asCents, todayStr, monthEnd, addMonths, normPayee
@@ -41,7 +44,95 @@ export function createApp({ dataDir = process.env.DATA_DIR || '/data', publicDir
   app.use(express.json({ limit: '60mb' }));
 
   const st = () => store.state;
+  const priv = new PrivateStore(dataDir);
+  const auth = new Auth(priv);
   const api = express.Router();
+
+  /* ------------------------------------------------------------ password */
+  const COOKIE = 'zd_session';
+  const sessionOf = (req) => cookieValue(req.headers.cookie, COOKIE);
+  const setCookie = (res, token, maxAge) => res.setHeader('Set-Cookie', `${COOKIE}=${token}; HttpOnly; SameSite=Strict; Path=/; Max-Age=${maxAge}`);
+  api.get('/auth/status', (req, res) => res.json({ required: auth.required, authed: !auth.required || auth.valid(sessionOf(req)) }));
+  api.post('/auth/login', (req, res) => {
+    if (!auth.required) return res.json({ ok: true });
+    auth.throttle(req.ip);
+    if (!checkPassword(req.body?.password, priv.data.auth)) {
+      auth.failed(req.ip);
+      throw new HttpError(401, 'That password is not right.');
+    }
+    auth.ok(req.ip);
+    setCookie(res, auth.newSession(), 30 * 86400);
+    res.json({ ok: true });
+  });
+  api.post('/auth/logout', (req, res) => {
+    auth.drop(sessionOf(req));
+    setCookie(res, '', 0);
+    res.json({ ok: true });
+  });
+  // everything below needs a session once a password exists
+  api.use((req, _res, next) => {
+    if (auth.required && !auth.valid(sessionOf(req))) {
+      const e = new HttpError(401, 'Sign in to continue.');
+      e.auth = true;
+      throw e;
+    }
+    next();
+  });
+  api.post('/auth/password', (req, res) => {
+    const { current, password } = req.body || {};
+    if (auth.required) {
+      auth.throttle(req.ip);
+      if (!checkPassword(current, priv.data.auth)) {
+        auth.failed(req.ip);
+        throw new HttpError(403, 'Your current password is not right.');
+      }
+      auth.ok(req.ip);
+    }
+    validatePassword(password);
+    auth.setPassword(password);
+    setCookie(res, auth.newSession(), 30 * 86400);
+    res.json({ ok: true });
+  });
+  api.post('/auth/remove', (req, res) => {
+    if (!auth.required) return res.json({ ok: true });
+    auth.throttle(req.ip);
+    if (!checkPassword(req.body?.current, priv.data.auth)) {
+      auth.failed(req.ip);
+      throw new HttpError(403, 'Your current password is not right.');
+    }
+    auth.ok(req.ip);
+    auth.clear();
+    setCookie(res, '', 0);
+    res.json({ ok: true });
+  });
+
+  /* ------------------------------------------------------------ reminders */
+  const ntfyView = () => ({ ...st().settings.ntfy, hasToken: !!priv.data.ntfyToken });
+  api.get('/ntfy', (_req, res) => res.json(ntfyView()));
+  api.put('/ntfy', (req, res) => {
+    const next = normalizeNtfy(st().settings.ntfy, req.body);
+    if (req.body?.token !== undefined) {
+      priv.data.ntfyToken = String(req.body.token || '').trim().slice(0, 200);
+      priv.save();
+    }
+    store.update((s) => {
+      s.settings.ntfy = next;
+    });
+    res.json(ntfyView());
+  });
+  api.post('/ntfy/test', async (_req, res, next) => {
+    try {
+      await sendNtfy(st().settings.ntfy, priv.data.ntfyToken, { title: 'ZeroDollar test', message: 'It works. Reminders will arrive here.', tags: 'tada' }, app.locals.fetch || fetch);
+      res.json({ ok: true });
+    } catch (e) {
+      next(e.status ? e : new HttpError(502, e.message));
+    }
+  });
+  const checkReminders = async (now = new Date()) => {
+    const out = await runReminders({ state: st(), token: priv.data.ntfyToken, sent: priv.data.sent, now, fetchImpl: app.locals.fetch || fetch });
+    if (out.length) priv.save();
+    return out;
+  };
 
   /* ---------------------------------------------------------- validators */
   const needMonth = (m) => {
@@ -455,6 +546,11 @@ export function createApp({ dataDir = process.env.DATA_DIR || '/data', publicDir
         const n = clampStr(req.body.name, 40);
         if (!n) throw bad('Give the group a name');
         g.name = n;
+      }
+      if (req.body?.color !== undefined) {
+        if (req.body.color === null || req.body.color === '') delete g.color;
+        else if (/^#[0-9a-fA-F]{6}$/.test(req.body.color)) g.color = req.body.color.toLowerCase();
+        else throw bad('Pick a colour from the list');
       }
       if (Number.isInteger(req.body?.sort)) g.sort = req.body.sort;
       return g;
@@ -965,7 +1061,8 @@ export function createApp({ dataDir = process.env.DATA_DIR || '/data', publicDir
 
   // eslint-disable-next-line no-unused-vars
   app.use((err, req, res, _next) => {
-    if (err instanceof HttpError) return res.status(err.status).json({ error: err.message });
+    if (err instanceof HttpError) return res.status(err.status).json({ error: err.message, ...(err.auth ? { auth: true } : {}) });
+    if (err.status === 429) return res.status(429).json({ error: err.message });
     if (err.status === 400 && err.message) return res.status(400).json({ error: err.message }); // validation errors from lib/bitcoin.js
     if (err.type === 'entity.too.large') return res.status(413).json({ error: 'That file is too large' });
     if (err instanceof SyntaxError && 'body' in err) return res.status(400).json({ error: 'Invalid JSON' });
@@ -973,7 +1070,9 @@ export function createApp({ dataDir = process.env.DATA_DIR || '/data', publicDir
     res.status(500).json({ error: 'Something went wrong on the server' });
   });
 
-  return { app, store };
+  const timer = process.env.ZD_NO_TIMER ? null : setInterval(() => checkReminders().catch((e) => console.error('reminders:', e.message)), 60000);
+  timer?.unref();
+  return { app, store, priv, auth, checkReminders };
 }
 
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
@@ -987,3 +1086,4 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
 
 void normPayee;
 void splitEvenly;
+void localParts;

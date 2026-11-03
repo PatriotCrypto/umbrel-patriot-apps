@@ -10,7 +10,7 @@
 <link rel="stylesheet" href="/css/app.css">
 <script>
   // Apply the saved look before first paint so there is no flash.
-  try { var t = localStorage.getItem('zd.theme'); if (t) document.documentElement.dataset.theme = t; } catch (e) {}
+  try { var t = localStorage.getItem('zd.theme'); if (t === 'daylight' || t === 'midnight') document.documentElement.dataset.theme = t; } catch (e) {}
 </script>
 </head>
 <body>
