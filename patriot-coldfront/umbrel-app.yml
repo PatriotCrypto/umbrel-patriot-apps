@@ -2,7 +2,7 @@ manifestVersion: 1
 id: patriot-coldfront
 category: automation
 name: Cold Front
-version: "0.3.0"
+version: "0.3.1"
 tagline: Local thermostat control, schedules and insights
 description: >-
   Cold Front takes over a Z-Wave thermostat (built for the Honeywell T6 Pro Z-Wave) with no cloud and no accounts.
@@ -24,7 +24,43 @@ gallery: []
 path: ""
 defaultUsername: ""
 defaultPassword: ""
-releaseNotes: "Water leak sensor support with alerts and ntfy notifications, a tidier Rooms page, clearer setup steps, and the Future page is gone."
+releaseNotes: "Adds two Umbrel home-screen widgets: a status tile (indoor temperature, target, status, humidity, water leak alert) and a furnace filter card."
 submitter: Patriot
 submission: https://github.com/PatriotCrypto/umbrel-patriot-apps
 icon: https://raw.githubusercontent.com/PatriotCrypto/umbrel-patriot-apps/main/patriot-coldfront/icon.svg
+widgets:
+  - id: "status"
+    type: "four-stats"
+    refresh: "30s"
+    endpoint: "web:3971/api/widget/status"
+    link: ""
+    example:
+      type: "four-stats"
+      link: ""
+      items:
+        - title: "Indoor"
+          text: "69.5"
+          subtext: "°F"
+        - title: "Target"
+          text: "68-76"
+          subtext: "°F"
+        - title: "Status"
+          text: "Idle"
+          subtext: "auto"
+        - title: "Humidity"
+          text: "38"
+          subtext: "%"
+
+  - id: "filter"
+    type: "text-with-progress"
+    refresh: "60s"
+    endpoint: "web:3971/api/widget/filter"
+    link: ""
+    example:
+      type: "text-with-progress"
+      link: ""
+      title: "Furnace filter"
+      text: "49 days"
+      subtext: "/ 90 days"
+      progressLabel: "41 days left"
+      progress: 0.54

@@ -199,3 +199,35 @@ test('demo leak button flips the pretend water sensor and raises the alert', asy
   assert.ok(s.alerts.some((a) => a.key === 'leak31' && a.level === 'bad'));
   t.close();
 });
+
+test('Umbrel widget endpoint returns four-stats with indoor temp, target, status and humidity', async () => {
+  const t = await boot();
+  let w = await (await t.j('/api/widget/status')).json();
+  assert.equal(w.type, 'four-stats');
+  assert.equal(w.items.length, 4);
+  assert.deepEqual(w.items.map((i) => i.title), ['Indoor', 'Target', 'Status', 'Humidity']);
+  assert.ok(Number(w.items[0].text) > 50);
+  assert.match(w.items[1].text, /^\d+-\d+$/); // demo runs in auto mode: heat-cool
+  await t.j('/api/demo/leak', 'POST', { wet: true });
+  w = await (await t.j('/api/widget/status')).json();
+  assert.equal(w.items[2].title, 'ALERT');
+  assert.equal(w.items[2].text, 'Water leak');
+  t.close();
+});
+
+test('Umbrel filter widget is text-with-progress with progress between 0 and 1', async () => {
+  const t = await boot();
+  let w = await (await t.j('/api/widget/filter')).json();
+  assert.equal(w.type, 'text-with-progress');
+  assert.equal(w.progress, 0);
+  assert.equal(w.text, 'Not set');
+  const d = new Date(Date.now() - 30 * 86400000).toISOString().slice(0, 10);
+  const r = await t.j('/api/settings', 'PUT', { filter: { lastChanged: d, intervalDays: 90, name: 'Furnace filter' } });
+  assert.equal(r.status, 200);
+  w = await (await t.j('/api/widget/filter')).json();
+  assert.match(w.text, /^(29|30|31) days$/);
+  assert.equal(w.subtext, '/ 90 days');
+  assert.ok(w.progress > 0.3 && w.progress < 0.37);
+  assert.match(w.progressLabel, /days left$/);
+  t.close();
+});

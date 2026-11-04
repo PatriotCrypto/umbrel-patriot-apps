@@ -119,7 +119,7 @@ No accounts, no tracking. Not affiliated with any publisher, church or ministry.
 - Insights: furnace runtime, cycles, short-cycling, room vs. thermostat differences, humidity and cost.
 - Add Z-Wave temperature and humidity sensors for other rooms, with an optional room-aware mode that nudges the setpoint toward a room you pick.
 - Filter reminder with dates you set by hand, plus ntfy phone alerts for filter changes, lost and restored signal, freezing, no heat, low batteries and more. Every alert is off until you turn it on.
-- An UmbrelOS-style home screen with a greeting, a customizable widget Dashboard (drag, resize, add and remove), a dock, light and dark modes, a clear temperature chart, water leak alerts, phone and desktop layouts, and a hidden surprise. Starts in Demo mode so you can try it before the hardware arrives.
+- An UmbrelOS-style home screen with a greeting, a customizable widget Dashboard (drag, resize, add and remove), a dock, light and dark modes, a clear temperature chart, water leak alerts, two Umbrel home-screen widgets, phone and desktop layouts, and a hidden surprise. Starts in Demo mode so you can try it before the hardware arrives.
 
 You need a Z-Wave USB stick (800 series recommended); the [README](coldfront-src/README.md) walks through first-run setup. *An independent hobby project, not affiliated with Honeywell, Zooz, the Z-Wave Alliance or Umbrel.*
 

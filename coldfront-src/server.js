@@ -52,6 +52,53 @@ function createApp({ dataDir, zwaveUrl, now = () => Date.now(), simSpeed = 1, au
 
   app.get('/healthz', (req, res) => res.json({ ok: true }));
 
+  // Umbrel home-screen widget ("four-stats"). Umbrel fetches this from inside the app network, so it carries no login and only shows summary numbers.
+  app.get('/api/widget/status', (req, res) => {
+    const st = engine.state();
+    const t = st.thermostat;
+    const num = (v) => (v == null || Number.isNaN(Number(v)) ? '--' : String(Math.round(Number(v) * 10) / 10));
+    const wet = (st.leaks || []).find((l) => l.wet);
+    const label = { heating: 'Heating', cooling: 'Cooling', fan: 'Fan', idle: 'Idle' };
+    let target = '--';
+    if (t) {
+      if (t.mode === 'heat') target = num(t.heat);
+      else if (t.mode === 'cool') target = num(t.cool);
+      else if (t.mode === 'auto') target = `${num(t.heat)}-${num(t.cool)}`;
+      else if (t.mode === 'off') target = 'Off';
+    }
+    const status = wet ? { title: 'ALERT', text: 'Water leak', subtext: wet.name }
+      : !t ? { title: 'Status', text: 'No thermostat', subtext: st.adapter?.connected ? 'paired?' : 'not connected' }
+      : { title: 'Status', text: label[t.opState] || 'Idle', subtext: st.hold ? 'hold' : st.away ? 'away' : t.mode };
+    res.set('Cache-Control', 'no-store');
+    res.json({
+      type: 'four-stats',
+      link: '',
+      items: [
+        { title: 'Indoor', text: num(t?.temp), subtext: '°F' },
+        { title: 'Target', text: target, subtext: t && t.mode !== 'off' ? '°F' : '' },
+        status,
+        { title: 'Humidity', text: t?.humidity == null ? '--' : String(Math.round(t.humidity)), subtext: '%' },
+      ],
+    });
+  });
+
+  // Second Umbrel widget ("text-with-progress", same card style as the built-in Storage widget): how used-up the furnace filter is.
+  app.get('/api/widget/filter', (req, res) => {
+    const f = filterStatus(store.data.settings.filter, now(), store.data.settings.tz);
+    res.set('Cache-Control', 'no-store');
+    if (!f.configured) return res.json({ type: 'text-with-progress', link: '', title: f.name, text: 'Not set', subtext: '', progressLabel: 'Add a change date in Cold Front', progress: 0 });
+    const plural = (n) => `${n} day${n === 1 ? '' : 's'}`;
+    res.json({
+      type: 'text-with-progress',
+      link: '',
+      title: f.name,
+      text: plural(Math.max(f.daysSince, 0)),
+      subtext: `/ ${plural(f.intervalDays)}`,
+      progressLabel: f.daysLeft < 0 ? `${plural(-f.daysLeft)} overdue` : f.daysLeft === 0 ? 'Due today' : `${plural(f.daysLeft)} left`,
+      progress: Math.min(1, Math.max(0, f.daysSince / f.intervalDays)),
+    });
+  });
+
   app.get('/api/state', (req, res) => {
     const st = engine.state();
     const filter = filterStatus(store.data.settings.filter, now(), store.data.settings.tz);
