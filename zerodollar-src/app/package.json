@@ -1,6 +1,6 @@
 {
   "name": "zerodollar",
-  "version": "0.3.1",
+  "version": "0.3.2",
   "description": "Self-hosted zero-based budget for Umbrel: plan every dollar, quick-add spending, reconcile against bank statements.",
   "type": "module",
   "main": "server.js",
