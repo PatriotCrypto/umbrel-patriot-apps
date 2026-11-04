@@ -5,7 +5,7 @@ services:
       APP_HOST: patriot-zerodollar_web_1
       APP_PORT: 3973
   web:
-    image: ghcr.io/patriotcrypto/zerodollar:0.3.3@sha256:6dd53261620667935fed021a286573a1fcf0a308740ca8ef24eeb52e7a1ddca7
+    image: ghcr.io/patriotcrypto/zerodollar:0.4.0@sha256:f6fa081108ff719895892f4ec2f2d61bee595444d72399a1807d1367db8630c2
     restart: on-failure
     stop_grace_period: 15s
     environment:
