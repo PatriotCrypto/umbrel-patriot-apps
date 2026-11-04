@@ -43,7 +43,7 @@ export async function render(root, ctx) {
     h('h3', { style: { fontSize: '16px' } }, 'Lookups'),
     h('label', { class: 'row' }, on, 'Look up balances and the price online'),
     h('label', { class: 'f' }, 'Mempool API address', api_),
-    h('p', { class: 'muted', style: { margin: 0, fontSize: '13px' } }, 'Your addresses are sent to this service to read their public balances. To keep that on your own network, install the Mempool app on your Umbrel and enter its address here, for example http://umbrel.local:3006/api (check the port in the Mempool app). Only public information is ever used. Never enter a seed phrase or private key.'),
+    h('p', { class: 'muted', style: { margin: 0, fontSize: '13px' } }, 'Your addresses are sent to this service to read their public balances. To keep that on your own network, install the Mempool app on your Umbrel and enter its address here, for example http://192.168.1.50:3006/api. Use your Umbrel's IP address, not a .local name, and end the address with /api (check the port in the Mempool app). Only public information is ever used. Never enter a seed phrase or private key.'),
     h('div', null, h('button', { class: 'btn', onclick: async () => { if (await guard(() => api.put('/settings', { btcLookups: on.checked, btcApi: api_.value }))) { await loadMeta(); toast('Saved'); ctx.refresh(); } } }, 'Save lookup settings')));
 
   root.append(h('div', { class: 'page', style: { maxWidth: '820px' } }, hero, list, settings));

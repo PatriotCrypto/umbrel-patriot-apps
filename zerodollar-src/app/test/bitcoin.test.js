@@ -178,3 +178,21 @@ test('classifyInput rejects private keys, seeds, and garbage with status 400', (
     assert.throws(() => classifyInput(bad), (e) => e.status === 400 && e.message.length > 5, String(bad));
   }
 });
+
+test('api address: a bare address gets /api added, a full one is kept', () => {
+  assert.equal(normalizeApi('http://192.168.1.50:3006'), 'http://192.168.1.50:3006/api');
+  assert.equal(normalizeApi('http://192.168.1.50:3006/'), 'http://192.168.1.50:3006/api');
+  assert.equal(normalizeApi('http://192.168.1.50:3006/api'), 'http://192.168.1.50:3006/api');
+  assert.equal(normalizeApi('https://mempool.space/api/'), 'https://mempool.space/api');
+});
+
+test('lookup errors say what to fix', async () => {
+  const html = async () => ({ ok: true, text: async () => '<!doctype html><html></html>' });
+  await assert.rejects(() => lookupAddress('http://x:3006', 'bc1qar0srrr7xfkvy5l643lydnw9re59gtzzwf5mdq', { fetch: html }), /web page.*\/api/);
+  const dns = async () => { const e = new TypeError('fetch failed'); e.cause = { code: 'ENOTFOUND' }; throw e; };
+  await assert.rejects(() => lookupAddress('http://umbrel.local:3006/api', 'bc1qar0srrr7xfkvy5l643lydnw9re59gtzzwf5mdq', { fetch: dns }), /\.local.*IP address/);
+  const refused = async () => { const e = new TypeError('fetch failed'); e.cause = { code: 'ECONNREFUSED' }; throw e; };
+  await assert.rejects(() => lookupAddress('http://1.2.3.4:3006/api', 'bc1qar0srrr7xfkvy5l643lydnw9re59gtzzwf5mdq', { fetch: refused }), /refused.*port/);
+  const good = async () => ({ ok: true, text: async () => JSON.stringify({ chain_stats: { funded_txo_sum: 5, spent_txo_sum: 1, tx_count: 1 }, mempool_stats: {} }) });
+  assert.equal((await lookupAddress('http://x/api', 'bc1qar0srrr7xfkvy5l643lydnw9re59gtzzwf5mdq', { fetch: good })).confirmed, 4);
+});

@@ -359,7 +359,7 @@ export function createApp({ dataDir = process.env.DATA_DIR || '/data', publicDir
   const walletView = (w) => ({ id: w.id, name: w.name, kind: w.xpub ? 'xpub' : w.address ? 'address' : 'manual', script: w.script, hint: w.xpub ? w.xpub.slice(0, 8) + '…' + w.xpub.slice(-6) : w.address ? w.address.slice(0, 8) + '…' + w.address.slice(-6) : '', manualSats: w.manualSats || 0, last: w.last || null });
   const btcView = () => {
     const v = btcValue(st());
-    return { wallets: st().wallets.map(walletView), price: v.price, currency: v.currency, priceAt: v.priceAt, sats: v.sats, cents: v.cents, hasPrice: v.hasPrice, lookups: st().settings.btcLookups, api: st().settings.btcApi };
+    return { wallets: st().wallets.map(walletView), price: v.price, currency: v.currency, priceAt: v.priceAt, sats: v.sats, cents: v.cents, hasPrice: v.hasPrice, lookups: st().settings.btcLookups, api: (() => { try { return normalizeApi(st().settings.btcApi); } catch { return st().settings.btcApi; } })() };
   };
   api.get('/btc', (_req, res) => res.json(btcView()));
   api.post('/btc/wallets', (req, res) => {
@@ -410,10 +410,11 @@ export function createApp({ dataDir = process.env.DATA_DIR || '/data', publicDir
     const set = st().settings;
     if (!set.btcLookups) throw bad('Lookups are turned off. Turn them on in Bitcoin settings, or enter amounts by hand.');
     const fetchImpl = app.locals.fetch || fetch;
+    const base = normalizeApi(set.btcApi); // older saved addresses may be missing /api
     const jobs = st().wallets.filter((w) => w.xpub || w.address);
     const results = await Promise.all(jobs.map(async (w) => {
       try {
-        const r = w.xpub ? await scanXpub(set.btcApi, w.xpub, w.script, { fetch: fetchImpl }) : await lookupAddress(set.btcApi, w.address, { fetch: fetchImpl });
+        const r = w.xpub ? await scanXpub(base, w.xpub, w.script, { fetch: fetchImpl }) : await lookupAddress(base, w.address, { fetch: fetchImpl });
         return [w.id, { confirmed: r.confirmed, pending: r.pending, txCount: r.txCount, at: new Date().toISOString() }];
       } catch (e) {
         return [w.id, { ...(w.last || {}), error: e.message, errorAt: new Date().toISOString() }];
@@ -422,7 +423,7 @@ export function createApp({ dataDir = process.env.DATA_DIR || '/data', publicDir
     let price = null;
     let priceError = null;
     try {
-      price = await fetchPrice(set.btcApi, { fetch: fetchImpl });
+      price = await fetchPrice(base, { fetch: fetchImpl });
     } catch (e) {
       priceError = e.message;
     }

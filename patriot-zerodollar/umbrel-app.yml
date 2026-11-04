@@ -2,7 +2,7 @@ manifestVersion: 1.1
 id: patriot-zerodollar
 category: finance
 name: ZeroDollar
-version: "0.3.0"
+version: "0.3.1"
 tagline: Zero-based budgeting that lives on your node
 icon: https://raw.githubusercontent.com/PatriotCrypto/umbrel-patriot-apps/main/patriot-zerodollar/icon.png
 description: >-
@@ -29,7 +29,7 @@ defaultPassword: ""
 submitter: PatriotCrypto
 submission: https://github.com/PatriotCrypto/umbrel-patriot-apps
 releaseNotes: >-
-  New: an optional password for the app; ntfy reminders (weekly to review transactions, monthly to reconcile and set up next month); pick a color for each group and see it on Budget and Insights; a calendar to choose an income's pay days; a larger signature-style household name. The Terminal and Paper looks are gone, leaving Daylight and Midnight.
+  Fixed: the Bitcoin tracker now works with your own Mempool app. A bare address such as http://192.168.1.50:3006 gets /api added for you, and the error messages now say what to fix (use your Umbrel's IP address instead of a .local name, check the port, make sure the Mempool app is running).
 widgets:
   - id: left
     type: text-with-progress

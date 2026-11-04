@@ -25,6 +25,8 @@ export function normalizeApi(url) {
   let u;
   try { u = new URL(s); } catch { throw httpError('The API address must be a full web address starting with http:// or https://.'); }
   if (u.protocol !== 'http:' && u.protocol !== 'https:') throw httpError('The API address must start with http:// or https://.');
+  // A bare address such as http://192.168.1.50:3006 is the Mempool website. Its data lives under /api.
+  if (u.pathname === '/' || u.pathname === '') return s + '/api';
   return s;
 }
 
@@ -55,17 +57,32 @@ export function deriveAddress(xpub, script, chain, index) {
   return b58c.encode(new Uint8Array([0x00, ...h]));
 }
 
+const NET_HINT = {
+  ENOTFOUND: 'that address could not be found. Names ending in .local usually do not work from inside Umbrel, so use your Umbrel\'s IP address instead (for example http://192.168.1.50:3006/api)',
+  EAI_AGAIN: 'that address could not be found. Use your Umbrel\'s IP address instead of a name (for example http://192.168.1.50:3006/api)',
+  ECONNREFUSED: 'the connection was refused. Check that the Mempool app is running and that the port number is right',
+  EHOSTUNREACH: 'that address cannot be reached from ZeroDollar. Check the IP address',
+  ENETUNREACH: 'that address cannot be reached from ZeroDollar. Check the IP address',
+  ECONNRESET: 'the connection was reset. Try again in a moment'
+};
+
 async function getJson(url, f = globalThis.fetch, timeoutMs = 10000) {
   const ac = new AbortController();
   const timer = setTimeout(() => ac.abort(), timeoutMs);
   try {
     const r = await f(url, { signal: ac.signal, headers: { Accept: 'application/json' } });
-    if (!r.ok) throw new Error(`Bitcoin API returned HTTP ${r.status}`);
-    return await r.json();
+    if (!r.ok) throw new Error(`Bitcoin API returned HTTP ${r.status}. Check the address ends with /api`);
+    if (typeof r.text !== 'function') return await r.json();
+    const text = await r.text();
+    try { return JSON.parse(text); } catch {
+      if (/^\s*</.test(text)) throw new Error('Bitcoin API address returned a web page, not Mempool data. The address should end with /api, for example http://192.168.1.50:3006/api');
+      throw new Error('Bitcoin API sent something that is not Mempool data. Check the address');
+    }
   } catch (e) {
-    if (ac.signal.aborted) throw new Error('Bitcoin API request timed out');
+    if (ac.signal.aborted) throw new Error('Bitcoin API request timed out. Check the address and that the Mempool app is running');
     if (/^Bitcoin API/.test(e.message)) throw e;
-    throw new Error(`Bitcoin API request failed: ${e.message}`);
+    const hint = NET_HINT[e.cause?.code];
+    throw new Error(`Bitcoin API request failed: ${hint || e.cause?.message || e.message}`);
   } finally { clearTimeout(timer); }
 }
 
