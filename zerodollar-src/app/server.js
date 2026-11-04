@@ -17,6 +17,7 @@ import * as S from './lib/statements.js';
 import { simulate } from './lib/debt.js';
 import { paycheckPlan, dueThisWeek, cleanPaychecks, autoPaychecks, splitEvenly } from './lib/paycheck.js';
 import { classifyInput, scanXpub, lookupAddress, fetchPrice, normalizeApi } from './lib/bitcoin.js';
+import { normalizeElectrs, openElectrum, electrumLookup, scanXpubElectrum } from './lib/electrum.js';
 import { netWorthNow, snapshotMonth, goalProgress, cleanAsset, cleanLiability, cleanGoal, btcValue, csvRows, ASSET_CATS, LIABILITY_CATS } from './lib/networth.js';
 import { insights, resolveRange } from './lib/insights.js';
 import { parseEveryDollar, planImport, applyImport, monthFromFileName } from './lib/everydollar.js';
@@ -359,7 +360,7 @@ export function createApp({ dataDir = process.env.DATA_DIR || '/data', publicDir
   const walletView = (w) => ({ id: w.id, name: w.name, kind: w.xpub ? 'xpub' : w.address ? 'address' : 'manual', script: w.script, hint: w.xpub ? w.xpub.slice(0, 8) + '…' + w.xpub.slice(-6) : w.address ? w.address.slice(0, 8) + '…' + w.address.slice(-6) : '', manualSats: w.manualSats || 0, last: w.last || null });
   const btcView = () => {
     const v = btcValue(st());
-    return { wallets: st().wallets.map(walletView), price: v.price, currency: v.currency, priceAt: v.priceAt, sats: v.sats, cents: v.cents, hasPrice: v.hasPrice, lookups: st().settings.btcLookups, api: (() => { try { return normalizeApi(st().settings.btcApi); } catch { return st().settings.btcApi; } })() };
+    return { wallets: st().wallets.map(walletView), price: v.price, currency: v.currency, priceAt: v.priceAt, sats: v.sats, cents: v.cents, hasPrice: v.hasPrice, lookups: st().settings.btcLookups, electrs: st().settings.btcElectrs || '', api: (() => { try { return normalizeApi(st().settings.btcApi); } catch { return st().settings.btcApi; } })() };
   };
   api.get('/btc', (_req, res) => res.json(btcView()));
   api.post('/btc/wallets', (req, res) => {
@@ -405,6 +406,11 @@ export function createApp({ dataDir = process.env.DATA_DIR || '/data', publicDir
     });
     res.json(btcView());
   });
+  // Live status of a running refresh, so the page can show that it is working and not frozen.
+  let btcProgress = { running: false };
+  api.get('/btc/progress', (_req, res) => {
+    res.json(btcProgress.running ? { ...btcProgress, now: Date.now() } : { running: false });
+  });
   api.post('/btc/refresh', async (_req, res, next) => {
     try {
     const set = st().settings;
@@ -412,20 +418,38 @@ export function createApp({ dataDir = process.env.DATA_DIR || '/data', publicDir
     const fetchImpl = app.locals.fetch || fetch;
     const base = normalizeApi(set.btcApi); // older saved addresses may be missing /api
     const jobs = st().wallets.filter((w) => w.xpub || w.address);
-    const results = await Promise.all(jobs.map(async (w) => {
-      try {
-        const r = w.xpub ? await scanXpub(base, w.xpub, w.script, { fetch: fetchImpl }) : await lookupAddress(base, w.address, { fetch: fetchImpl });
-        return [w.id, { confirmed: r.confirmed, pending: r.pending, txCount: r.txCount, at: new Date().toISOString() }];
-      } catch (e) {
-        return [w.id, { ...(w.last || {}), error: e.message, errorAt: new Date().toISOString() }];
-      }
-    }));
-    let price = null;
-    let priceError = null;
+    const prog = { running: true, phase: 'wallets', startedAt: Date.now(), activityAt: Date.now(), wallets: jobs.map((w) => ({ id: w.id, name: w.name, kind: w.xpub ? 'xpub' : 'address', checked: 0, done: false })) };
+    btcProgress = prog;
+    const mark = (id, patch) => { const x = prog.wallets.find((q) => q.id === id); if (x) Object.assign(x, patch); prog.activityAt = Date.now(); };
+    let results, price = null, priceError = null;
+    let ec = null, ecError = null;
     try {
-      price = await fetchPrice(base, { fetch: fetchImpl });
-    } catch (e) {
-      priceError = e.message;
+      if (set.btcElectrs && jobs.length) {
+        try { ec = await (app.locals.openElectrum || openElectrum)(set.btcElectrs); } catch (e) { ecError = e.message; }
+      }
+      results = await Promise.all(jobs.map(async (w) => {
+        try {
+          if (set.btcElectrs && !ec) throw new Error(ecError);
+          const r = ec
+            ? (w.xpub ? await scanXpubElectrum(ec, w.xpub, w.script, { onProgress: (p) => mark(w.id, { checked: p.checked }) }) : await electrumLookup(ec, w.address))
+            : (w.xpub ? await scanXpub(base, w.xpub, w.script, { fetch: fetchImpl, onProgress: (p) => mark(w.id, { checked: p.checked }) }) : await lookupAddress(base, w.address, { fetch: fetchImpl }));
+          mark(w.id, { done: true, checked: w.xpub ? r.checked ?? 0 : 1 });
+          return [w.id, { confirmed: r.confirmed, pending: r.pending, txCount: r.txCount, at: new Date().toISOString() }];
+        } catch (e) {
+          mark(w.id, { done: true, failed: true });
+          return [w.id, { ...(w.last || {}), error: e.message, errorAt: new Date().toISOString() }];
+        }
+      }));
+      if (ec) ec.close();
+      prog.phase = 'price'; prog.activityAt = Date.now();
+      try {
+        price = await fetchPrice(base, { fetch: fetchImpl });
+      } catch (e) {
+        priceError = e.message;
+      }
+    } finally {
+      if (ec) ec.close();
+      prog.running = false;
     }
     store.update((s) => {
       for (const [id, last] of results) {
@@ -986,6 +1010,7 @@ export function createApp({ dataDir = process.env.DATA_DIR || '/data', publicDir
       }
       if (b.btcLookups !== undefined) s.settings.btcLookups = !!b.btcLookups;
       if (b.btcApi !== undefined) s.settings.btcApi = normalizeApi(b.btcApi);
+      if (b.btcElectrs !== undefined) s.settings.btcElectrs = normalizeElectrs(b.btcElectrs);
       if (b.householdName !== undefined) s.settings.householdName = clampStr(b.householdName, 40);
       return s.settings;
     });

@@ -68,7 +68,7 @@ test('scanXpub totals and used', async () => {
   const m = await startMock(table());
   try {
     const r = await scanXpub(m.api, ZPUB, 'wpkh');
-    assert.deepEqual(r, { confirmed: 100000 + 30000 + 7000, pending: 1000, txCount: 1 + 2 + 2, used: 3 });
+    assert.deepEqual(r, { confirmed: 100000 + 30000 + 7000, pending: 1000, txCount: 1 + 2 + 2, used: 3, checked: 46 });
   } finally { await m.close(); }
 });
 
@@ -89,7 +89,7 @@ test('scanXpub with default gap scans a bounded number of addresses and honors m
   const m = await startMock({});
   try {
     const r = await scanXpub(m.api, ZPUB, 'wpkh');
-    assert.deepEqual(r, { confirmed: 0, pending: 0, txCount: 0, used: 0 });
+    assert.deepEqual(r, { confirmed: 0, pending: 0, txCount: 0, used: 0, checked: 40 });
     assert.equal(addrHits(m).length, 40);
     m.hits.length = 0;
     await scanXpub(m.api, ZPUB, 'wpkh', { gap: 1000, maxPerChain: 7 });

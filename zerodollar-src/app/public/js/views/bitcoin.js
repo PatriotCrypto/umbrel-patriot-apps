@@ -11,10 +11,39 @@ const ago = (iso) => {
 
 export async function render(root, ctx) {
   const d = await api.get('/btc');
+  const statusMain = h('span', null, 'Starting…');
+  const statusSub = h('span', { class: 'sub' }, '');
+  const status = h('div', { class: 'working', role: 'status', 'aria-live': 'polite', style: { display: 'none' } }, h('span', { class: 'dot' }), h('div', null, statusMain, statusSub));
+  const clock = (ms) => { const s = Math.max(0, Math.round(ms / 1000)); return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`; };
+  const paint = (p) => {
+    if (!p?.running) return;
+    const done = p.wallets.filter((w) => w.done).length;
+    const busy = p.wallets.filter((w) => !w.done);
+    const idle = p.now - p.activityAt;
+    statusMain.textContent = p.phase === 'price'
+      ? 'Getting the Bitcoin price…'
+      : busy.length
+        ? `Checking ${busy.map((w) => `${w.name}${w.kind === 'xpub' ? ` (${w.checked} address${w.checked === 1 ? '' : 'es'} so far)` : ''}`).join(', ')}…`
+        : 'Finishing up…';
+    statusSub.textContent = `Working for ${clock(p.now - p.startedAt)}${p.wallets.length > 1 ? ` · ${done} of ${p.wallets.length} wallets done` : ''}. ` +
+      (idle > 10000 ? 'Mempool is taking a while to answer. That is normal right after it restarts. ZeroDollar is still waiting.' : 'This can take a few minutes the first time.');
+  };
   const refresh = async (btn) => {
     btn.disabled = true;
     btn.textContent = 'Checking…';
+    status.style.display = '';
+    statusMain.textContent = 'Starting…';
+    statusSub.textContent = 'Working for 0:00.';
+    let alive = true;
+    const poll = async () => {
+      while (alive) {
+        try { paint(await api.get('/btc/progress')); } catch { /* keep trying */ }
+        await new Promise((r) => setTimeout(r, 1500));
+      }
+    };
+    poll();
     const r = await guard(() => api.post('/btc/refresh'));
+    alive = false;
     if (r?.priceError) toast('Balances updated, but the price lookup failed: ' + r.priceError, true);
     ctx.refresh();
   };
@@ -25,7 +54,8 @@ export async function render(root, ctx) {
     h('div', { class: 'btc-big' }, `₿ ${btc(d.sats)}`),
     d.hasPrice ? h('div', { class: 'row wrap', style: { gap: '18px' } }, h('b', { class: 'num', style: { fontSize: '20px' } }, fmt(d.cents)), h('span', { class: 'muted' }, `at ${S.money.fmt(d.price * 100)} per bitcoin · ${ago(d.priceAt)}`))
       : h('div', { class: 'muted' }, d.price == null && !d.priceAt ? 'No price yet. Press Refresh to fetch one.' : `The price service has no ${d.currency} price.`),
-    h('div', { class: 'row wrap' }, rbtn, h('button', { class: 'btn', onclick: () => walletForm(null, ctx) }, icon('plus'), 'Add wallet'), h('a', { class: 'btn ghost', href: '#/networth' }, 'See in net worth')));
+    h('div', { class: 'row wrap' }, rbtn, h('button', { class: 'btn', onclick: () => walletForm(null, ctx) }, icon('plus'), 'Add wallet'), h('a', { class: 'btn ghost', href: '#/networth' }, 'See in net worth')),
+    status);
 
   const list = h('section', { class: 'card', style: { overflow: 'hidden' } },
     d.wallets.length ? d.wallets.map((w) => {
@@ -38,13 +68,17 @@ export async function render(root, ctx) {
     }) : h('div', { class: 'empty' }, h('h3', null, 'No wallets yet'), 'Add a public address or an extended public key (xpub, ypub, zpub), or type in an amount by hand.'));
 
   const api_ = h('input', { value: d.api, placeholder: 'https://mempool.space/api' });
+  const electrs = h('input', { value: d.electrs || '', placeholder: 'e.g. 192.168.1.50:50001', spellcheck: false, autocomplete: 'off', class: 'mono' });
   const on = h('input', { type: 'checkbox', checked: d.lookups });
+  const save = async () => { if (await guard(() => api.put('/settings', { btcLookups: on.checked, btcApi: api_.value, btcElectrs: electrs.value }))) { await loadMeta(); toast('Saved'); ctx.refresh(); } };
   const settings = h('section', { class: 'card pad stack' },
     h('h3', { style: { fontSize: '16px' } }, 'Lookups'),
     h('label', { class: 'row' }, on, 'Look up balances and the price online'),
-    h('label', { class: 'f' }, 'Mempool API address', api_),
-    h('p', { class: 'muted', style: { margin: 0, fontSize: '13px' } }, 'Your addresses are sent to this service to read their public balances. To keep that on your own network, install the Mempool app on your Umbrel and enter its address here, for example http://192.168.1.50:3006/api. Use the IP address of your Umbrel, not a .local name, and end the address with /api (check the port in the Mempool app). Only public information is ever used. Never enter a seed phrase or private key.'),
-    h('div', null, h('button', { class: 'btn', onclick: async () => { if (await guard(() => api.put('/settings', { btcLookups: on.checked, btcApi: api_.value }))) { await loadMeta(); toast('Saved'); ctx.refresh(); } } }, 'Save lookup settings')));
+    h('label', { class: 'f' }, 'Electrs address (recommended on Umbrel)', electrs),
+    h('p', { class: 'muted', style: { margin: 0, fontSize: '13px' } }, 'If you run the Electrs app on your Umbrel, enter its address here, for example 192.168.1.50:50001 (the IP address of your Umbrel, then the port the Electrs app shows). ZeroDollar then reads balances straight from Electrs, which is faster and more reliable than going through Mempool. Leave it empty to use the Mempool address below instead.'),
+    h('label', { class: 'f' }, 'Mempool API address (used for the price, and for balances when Electrs is empty)', api_),
+    h('p', { class: 'muted', style: { margin: 0, fontSize: '13px' } }, 'Your addresses are sent to the service you choose to read their public balances. To keep that on your own network, use your own Electrs app above. For the Mempool address, use the IP address of your Umbrel, not a .local name, and end it with /api, for example http://192.168.1.50:3006/api. Only public information is ever used. Never enter a seed phrase or private key.'),
+    h('div', null, h('button', { class: 'btn', onclick: save }, 'Save lookup settings')));
 
   root.append(h('div', { class: 'page', style: { maxWidth: '820px' } }, hero, list, settings));
 }

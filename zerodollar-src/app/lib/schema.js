@@ -41,6 +41,7 @@ export function defaultState() {
       householdName: '',
       btcLookups: true,
       btcApi: 'https://mempool.space/api',
+      btcElectrs: '',
       ntfy: structuredClone(DEFAULT_NTFY)
     },
     accounts: [{ id: uid('a_'), name: 'Checking', type: 'checking', openingBalance: 0, archived: false }],

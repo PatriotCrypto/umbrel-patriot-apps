@@ -96,3 +96,28 @@ test('net worth composes manual lines with accounts, bitcoin and debts without d
     assert.match(csv, /Net worth/);
   } finally { close(); }
 });
+
+test('bitcoin refresh reports live progress while it runs', async () => {
+  let release;
+  const gate = new Promise((r) => { release = r; });
+  const slow = async (url) => {
+    if (String(url).endsWith('/v1/prices')) return { ok: true, status: 200, json: async () => ({ USD: 1 }) };
+    await gate;
+    return { ok: true, status: 200, json: async () => ({ chain_stats: { funded_txo_sum: 0, spent_txo_sum: 0, tx_count: 0 } }) };
+  };
+  const { call, close } = await boot(slow);
+  try {
+    assert.deepEqual((await call('GET', '/btc/progress')).body, { running: false });
+    await call('POST', '/btc/wallets', { name: 'Trezor', input: ADDR });
+    const pending = call('POST', '/btc/refresh');
+    await new Promise((r) => setTimeout(r, 100));
+    const mid = (await call('GET', '/btc/progress')).body;
+    assert.equal(mid.running, true);
+    assert.equal(mid.wallets[0].name, 'Trezor');
+    assert.equal(mid.wallets[0].done, false);
+    assert.ok(mid.now >= mid.startedAt);
+    release();
+    assert.equal((await pending).status, 200);
+    assert.deepEqual((await call('GET', '/btc/progress')).body, { running: false });
+  } finally { close(); }
+});

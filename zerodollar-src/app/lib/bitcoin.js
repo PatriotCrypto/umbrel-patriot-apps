@@ -123,7 +123,7 @@ export async function lookupAddress(api, address, { fetch: f = globalThis.fetch,
   };
 }
 
-export async function scanXpub(api, xpub, script, { fetch: f = globalThis.fetch, gap = 20, maxPerChain = 400, batch = 2, retryDelayMs = 1500 } = {}) {
+export async function scanXpub(api, xpub, script, { fetch: f = globalThis.fetch, gap = 20, maxPerChain = 400, batch = 2, retryDelayMs = 1500, onProgress } = {}) {
   let confirmed = 0, pending = 0, txCount = 0, used = 0, checked = 0;
   for (const chain of [0, 1]) {
     let i = 0, run = 0;
@@ -142,9 +142,10 @@ export async function scanXpub(api, xpub, script, { fetch: f = globalThis.fetch,
         i++; checked++;
         if (r.txCount > 0) { run = 0; used++; confirmed += r.confirmed; pending += r.pending; txCount += r.txCount; } else run++;
       }
+      if (onProgress) onProgress({ checked, used });
     }
   }
-  return { confirmed, pending, txCount, used };
+  return { confirmed, pending, txCount, used, checked };
 }
 
 export async function fetchPrice(api, { fetch: f = globalThis.fetch } = {}) {
