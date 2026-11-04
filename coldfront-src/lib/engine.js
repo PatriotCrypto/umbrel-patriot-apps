@@ -79,7 +79,7 @@ class Engine {
     const t = snap.thermostat;
     this.last.snap = snap;
     if (!snap.connected) { this.last.status = 'disconnected'; this.last.desired = null; return; }
-    if (!t) { this.last.status = 'no-thermostat'; this.last.desired = null; return; }
+    if (!t) { this.last.status = 'no-thermostat'; this.last.desired = null; this._track(null, snap, nowMs); return; }
 
     this._track(t, snap, nowMs);
     this._expireHold(nowMs);
@@ -150,8 +150,8 @@ class Engine {
   }
 
   _track(t, snap, nowMs) {
-    // run tracking
-    const kind = t.opState === 'heating' || t.opState === 'cooling' || t.opState === 'fan' ? t.opState : null;
+    // run tracking (no thermostat yet: still record room sensors below)
+    const kind = t && (t.opState === 'heating' || t.opState === 'cooling' || t.opState === 'fan') ? t.opState : null;
     if (kind !== (this.openRun ? this.openRun.kind : null)) {
       if (this.openRun) { this.openRun.end = nowMs; this.hist.runs.push(this.openRun); this.openRun = null; }
       if (kind) this.openRun = { kind, start: nowMs };
@@ -161,12 +161,12 @@ class Engine {
       this.lastSampleAt = nowMs;
       const rooms = {};
       for (const r of snap.sensors) rooms[r.nodeId] = { t: r.temp, h: r.humidity };
-      this.hist.samples.push({ t: nowMs, in: t.temp, hum: t.humidity, heat: t.heat, cool: t.cool, op: t.opState, mode: t.mode, rooms });
+      this.hist.samples.push(t ? { t: nowMs, in: t.temp, hum: t.humidity, heat: t.heat, cool: t.cool, op: t.opState, mode: t.mode, rooms } : { t: nowMs, in: null, hum: null, heat: null, cool: null, op: null, mode: null, rooms });
       if (this.persist) { try { this.store.saveHistory(); } catch (e) { console.error('history save failed:', e.message); } }
       if (!this.persist && this.hist.samples.length > 9000) this.hist.samples.splice(0, 500);
     }
     // furnace not heating when the house is cold
-    const cold = t.temp != null && t.heat != null && t.temp < t.heat - 3 && (t.mode === 'heat' || t.mode === 'auto') && t.opState === 'idle';
+    const cold = !!t && t.temp != null && t.heat != null && t.temp < t.heat - 3 && (t.mode === 'heat' || t.mode === 'auto') && t.opState === 'idle';
     if (cold) this.coldSince ||= nowMs; else this.coldSince = null;
   }
 

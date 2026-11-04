@@ -58,6 +58,8 @@ function createApp({ dataDir, zwaveUrl, now = () => Date.now(), simSpeed = 1, au
     const t = st.thermostat;
     const num = (v) => (v == null || Number.isNaN(Number(v)) ? '--' : String(Math.round(Number(v) * 10) / 10));
     const wet = (st.leaks || []).find((l) => l.wet);
+    // no thermostat yet: show the first room sensor so the widget still says something useful
+    const room = (st.sensors || []).find((r) => r.include !== false && r.temp != null) || (st.sensors || [])[0];
     const label = { heating: 'Heating', cooling: 'Cooling', fan: 'Fan', idle: 'Idle' };
     let target = '--';
     if (t) {
@@ -74,10 +76,10 @@ function createApp({ dataDir, zwaveUrl, now = () => Date.now(), simSpeed = 1, au
       type: 'four-stats',
       link: '',
       items: [
-        { title: 'Indoor', text: num(t?.temp), subtext: '°F' },
+        { title: t ? 'Indoor' : (room?.name || 'Indoor'), text: num(t ? t.temp : room?.temp), subtext: '°F' },
         { title: 'Target', text: target, subtext: t && t.mode !== 'off' ? '°F' : '' },
         status,
-        { title: 'Humidity', text: t?.humidity == null ? '--' : String(Math.round(t.humidity)), subtext: '%' },
+        { title: 'Humidity', text: (t ? t.humidity : room?.humidity) == null ? '--' : String(Math.round(t ? t.humidity : room.humidity)), subtext: '%' },
       ],
     });
   });

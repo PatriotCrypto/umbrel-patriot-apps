@@ -173,3 +173,13 @@ test('disconnected adapter is reported, not crashed on', async () => {
   await engine.tick();
   assert.equal(engine.last.status, 'disconnected');
 });
+
+test('room sensors are recorded in history even before a thermostat is paired', async () => {
+  const { engine, adapter, store } = setup();
+  adapter.th = null;
+  adapter.sensors = [{ nodeId: 2, temp: 74, humidity: 54, battery: 100, lastSeen: T0 }];
+  await engine.tick();
+  const s = engine.hist.samples.at(-1);
+  assert.equal(s.in, null);
+  assert.deepEqual(s.rooms[2], { t: 74, h: 54 });
+});
