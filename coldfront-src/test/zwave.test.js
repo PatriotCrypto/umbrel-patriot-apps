@@ -126,3 +126,29 @@ test('no thermostat paired gives a null thermostat, not a crash', () => {
   a.connected = true;
   assert.equal(a.snapshot().thermostat, null);
 });
+
+test('a water leak sensor is listed as a leak sensor, not a room, and reports wet or dry', () => {
+  const a = adapter();
+  a._ingestNode({ nodeId: 9, name: 'Basement water', values: [
+    v(113, 'Water Alarm', 0, { propertyKey: 'Sensor status' }),
+    v(128, 'level', 77),
+  ] });
+  let snap = a.snapshot();
+  assert.equal(snap.leaks.length, 1);
+  assert.deepEqual({ id: snap.leaks[0].nodeId, name: snap.leaks[0].name, wet: snap.leaks[0].wet, battery: snap.leaks[0].battery }, { id: 9, name: 'Basement water', wet: false, battery: 77 });
+  assert.ok(!snap.sensors.some((s) => s.nodeId === 9), 'not in the room list');
+  a._onMessage({ type: 'event', event: { source: 'node', event: 'value updated', nodeId: 9, args: { commandClass: 113, endpoint: 0, property: 'Water Alarm', propertyKey: 'Sensor status', newValue: 2 } } });
+  snap = a.snapshot();
+  assert.equal(snap.leaks[0].wet, true);
+  a._onMessage({ type: 'event', event: { source: 'node', event: 'value updated', nodeId: 9, args: { commandClass: 113, endpoint: 0, property: 'Water Alarm', propertyKey: 'Sensor status', newValue: 0 } } });
+  assert.equal(a.snapshot().leaks[0].wet, false);
+});
+
+test('a node with only a binary water sensor also counts, and room sensors are not mistaken for leak sensors', () => {
+  const a = adapter();
+  a._ingestNode({ nodeId: 10, values: [v(48, 'Water', true)] });
+  const snap = a.snapshot();
+  assert.equal(snap.leaks.find((l) => l.nodeId === 10).wet, true);
+  assert.equal(snap.leaks.length, 1);
+  assert.ok(snap.sensors.some((s) => s.nodeId === 7));
+});

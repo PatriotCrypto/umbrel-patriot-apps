@@ -4,7 +4,7 @@
 const { EventEmitter } = require('node:events');
 const crypto = require('node:crypto');
 
-const CC = { SENSOR: 49, MODE: 64, OPSTATE: 66, SETPOINT: 67, FAN: 68, BATTERY: 128 };
+const CC = { BINARY_SENSOR: 48, SENSOR: 49, MODE: 64, OPSTATE: 66, SETPOINT: 67, FAN: 68, NOTIFICATION: 113, BATTERY: 128 };
 const MODE_NAME = { 0: 'off', 1: 'heat', 2: 'cool', 3: 'auto' };
 const MODE_NUM = { off: 0, heat: 1, cool: 2, auto: 3 };
 const OP_NAME = { 0: 'idle', 1: 'heating', 2: 'cooling', 3: 'fan' };
@@ -128,6 +128,25 @@ class ZWaveAdapter extends EventEmitter {
 
   _get(node, cc, prop, pk, ep = 0) { return node.values.get(keyOf(cc, ep, prop, pk)); }
 
+  /** Is this node a water leak sensor, and is it wet right now? Reads the Water Alarm notification (or a binary Water sensor). */
+  _leakState(node) {
+    let found = false; let wet = false;
+    for (const [, v] of node.values) {
+      const id = v.id || {};
+      if (id.commandClass === CC.NOTIFICATION && /^water alarm$/i.test(String(id.property))) {
+        // "Sensor status" is the leak flag: 0 = dry, 1 or 2 = leak detected. Other water keys (like water level) do not count.
+        if (id.propertyKey === undefined || /sensor status/i.test(String(id.propertyKey))) {
+          found = true;
+          if (typeof v.value === 'number' && v.value !== 0) wet = true;
+        }
+      } else if (id.commandClass === CC.BINARY_SENSOR && /^water$/i.test(String(id.property))) {
+        found = true;
+        if (v.value === true) wet = true;
+      }
+    }
+    return found ? { wet } : null;
+  }
+
   _findThermostat() {
     const has = (n) => this._get(n, CC.SETPOINT, 'setpoint', 1) || this._get(n, CC.SETPOINT, 'setpoint', 2);
     if (this.preferred && this.nodes.get(this.preferred) && has(this.nodes.get(this.preferred))) return this.nodes.get(this.preferred);
@@ -158,8 +177,23 @@ class ZWaveAdapter extends EventEmitter {
         lastSeen: t.lastSeen || Date.now(),
       };
     }
+    out.leaks = [];
     for (const n of this.nodes.values()) {
       if (t && n.nodeId === t.nodeId) continue;
+      const leak = this._leakState(n);
+      if (leak) {
+        const lbat = this._get(n, CC.BATTERY, 'level');
+        const ltemp = this._get(n, CC.SENSOR, 'Air temperature');
+        out.leaks.push({
+          nodeId: n.nodeId,
+          name: n.name || n.location || `Water sensor ${n.nodeId}`,
+          wet: leak.wet,
+          battery: lbat && typeof lbat.value === 'number' ? lbat.value : null,
+          temp: ltemp && typeof ltemp.value === 'number' ? toF(ltemp.value, ltemp.unit) : null,
+          lastSeen: n.lastSeen || Date.now(),
+        });
+        continue; // a leak sensor is listed under water sensors, not rooms
+      }
       const temp = this._get(n, CC.SENSOR, 'Air temperature');
       const hum = this._get(n, CC.SENSOR, 'Humidity');
       if (!temp && !hum) continue;

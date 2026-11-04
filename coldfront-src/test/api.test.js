@@ -185,3 +185,17 @@ test('greeting name saves and trims', async () => {
   assert.equal(st.settings.name, 'Wyley');
   t.close();
 });
+
+test('demo leak button flips the pretend water sensor and raises the alert', async () => {
+  const t = await boot();
+  let s = await (await t.j('/api/state')).json();
+  assert.equal(s.leaks.length, 1);
+  assert.equal(s.leaks[0].wet, false);
+  const r = await t.j('/api/demo/leak', 'POST', { wet: true });
+  assert.equal(r.status, 200);
+  await t.h.engine.tick();
+  s = await (await t.j('/api/state')).json();
+  assert.equal(s.leaks[0].wet, true);
+  assert.ok(s.alerts.some((a) => a.key === 'leak31' && a.level === 'bad'));
+  t.close();
+});

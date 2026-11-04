@@ -17,6 +17,8 @@ const TRIGGERS = {
   humidity: 'Humidity outside your range in a room',
   wallChange: 'Thermostat was changed at the wall or by another app',
   writeFail: 'Cold Front could not change the thermostat',
+  leak: 'Water leak detected (repeats every 30 min while wet)',
+  leakClear: 'Water leak sensor is dry again',
 };
 const DEFAULT_TRIGGERS = () => Object.fromEntries(Object.keys(TRIGGERS).map((k) => [k, false]));
 
@@ -28,13 +30,16 @@ function triggerForAlert(key) {
   if (key === 'hot') return 'hot';
   if (key === 'noheat') return 'noHeat';
   if (key === 'write') return 'writeFail';
+  if (key.startsWith('leak')) return 'leak';
+  if (key.startsWith('lbat')) return 'batteryLow';
+  if (key.startsWith('loff')) return 'sensorOffline';
   if (key.startsWith('hum') || key.startsWith('dry')) return 'humidity';
   if (key.startsWith('bat')) return 'batteryLow';
   if (key.startsWith('off')) return 'sensorOffline';
   return null;
 }
-const PRIORITY = { freeze: 5, hot: 4, noHeat: 4, linkLost: 4, thermostatLost: 4, writeFail: 3, filterOverdue: 3 };
-const TAGS = { freeze: 'cold_face', hot: 'hot_face', noHeat: 'warning', linkLost: 'electric_plug', linkRestored: 'white_check_mark', thermostatLost: 'electric_plug', thermostatRestored: 'white_check_mark', filterDue: 'wrench', filterOverdue: 'wrench', batteryLow: 'battery', sensorOffline: 'electric_plug', humidity: 'droplet', wallChange: 'thermometer', writeFail: 'warning' };
+const PRIORITY = { leak: 5, leakClear: 3, freeze: 5, hot: 4, noHeat: 4, linkLost: 4, thermostatLost: 4, writeFail: 3, filterOverdue: 3 };
+const TAGS = { leak: 'rotating_light,droplet', leakClear: 'white_check_mark', freeze: 'cold_face', hot: 'hot_face', noHeat: 'warning', linkLost: 'electric_plug', linkRestored: 'white_check_mark', thermostatLost: 'electric_plug', thermostatRestored: 'white_check_mark', filterDue: 'wrench', filterOverdue: 'wrench', batteryLow: 'battery', sensorOffline: 'electric_plug', humidity: 'droplet', wallChange: 'thermometer', writeFail: 'warning' };
 const COOLDOWN_MS = 30 * 60000; // the same alert will not send twice inside this window, which stops flapping
 const SIGNAL_DEBOUNCE_MS = 2 * 60000; // a link must stay down this long before we call it lost
 
@@ -49,7 +54,7 @@ function validNtfy(n) {
 class Notifier {
   constructor(store, { now = () => Date.now(), fetchFn = (...a) => fetch(...a), onLog = () => {} } = {}) {
     this.store = store; this.now = now; this.fetch = fetchFn; this.onLog = onLog;
-    this.active = new Set(); this.lastSent = {}; this.downSince = {}; this.wasDown = new Set();
+    this.active = new Set(); this.wetNow = new Map(); this.lastSent = {}; this.downSince = {}; this.wasDown = new Set();
     this.lastEventT = now(); this.primed = false;
   }
 
@@ -84,7 +89,8 @@ class Notifier {
   async evaluate(state) {
     const nowMs = this.now();
     const live = state.mode === 'live';
-    const alerts = state.alerts.filter((a) => a.key !== 'nothermo' && a.key !== 'filter');
+    const alerts = state.alerts.filter((a) => a.key !== 'nothermo' && a.key !== 'filter' && !a.key.startsWith('leak'));
+    await this._leaks(state);
     const keys = new Set(alerts.map((a) => a.key));
 
     if (live) {
@@ -119,6 +125,22 @@ class Notifier {
     if (live) for (const e of fresh) await this._fire('wallChange', 'wall', 'Thermostat changed outside Cold Front', e.msg);
 
     await this._filter(nowMs);
+  }
+
+  // Water is urgent, so it works in demo mode too (the demo test button) and repeats while the sensor stays wet.
+  async _leaks(state) {
+    const wet = state.alerts.filter((a) => a.key.startsWith('leak'));
+    const keys = new Set(wet.map((a) => a.key));
+    for (const a of wet) {
+      this.wetNow.set(a.key, a.text.replace(/^Water detected at (.*)\. Go and check it now\.$/, '$1'));
+      await this._fire('leak', a.key, 'Water leak detected', a.text);
+    }
+    for (const [k, name] of [...this.wetNow]) {
+      if (keys.has(k)) continue;
+      this.wetNow.delete(k);
+      delete this.lastSent[k];
+      await this._fire('leakClear', `${k}clear`, 'Water sensor is dry', `${name} no longer reports water.`, { force: true });
+    }
   }
 
   // The filter reminder is calendar based, so it works in demo mode too.

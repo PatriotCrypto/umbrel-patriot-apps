@@ -38,7 +38,7 @@
   function hrs1(min) { return (Math.round(min / 6) / 10) + ' h'; }
 
   // ---- tabs
-  var TITLES = { dashboard: 'Dashboard', schedule: 'Schedule', rooms: 'Rooms', insights: 'Insights', future: 'Future features', settings: 'Settings' };
+  var TITLES = { dashboard: 'Dashboard', schedule: 'Schedule', rooms: 'Rooms', insights: 'Insights', settings: 'Settings' };
   $$('.tabs button').forEach(function (b) { b.onclick = function () { showTab(b.dataset.tab); }; });
   function showTab(t) {
     if (t !== 'dashboard' && editing) stopEdit();
@@ -367,12 +367,25 @@
   };
 
   // ---- rooms
+  $('#leakTest').onclick = function () {
+    var on = !(S && S.leaks && S.leaks[0] && S.leaks[0].wet);
+    api('POST', '/api/demo/leak', { wet: on }).then(function () { toast(on ? 'Pretend leak on' : 'Pretend leak cleared'); setTimeout(refresh, 300); }).catch(function (e) { toast(e.message); });
+  };
   function renderRooms() {
     if (!S) return;
     $('#roomList').innerHTML = S.sensors.map(function (r) {
       return '<div class="rrow" data-id="' + esc(r.nodeId) + '"><div class="top2"><input type="text" value="' + esc(r.name) + '" maxlength="30" aria-label="Room name"><label class="check" style="margin:0"><input type="checkbox" ' + (r.include ? 'checked' : '') + '> Show</label></div>' +
         '<div class="meta">' + fmtT(r.temp) + '°F' + (r.humidity != null ? ' · ' + Math.round(r.humidity) + '% RH' : '') + (r.battery != null ? ' · battery ' + r.battery + '%' : '') + ' · node ' + esc(r.nodeId) + '</div></div>';
     }).join('') || '<p class="hint">No sensors yet. Any Z-Wave node that reports temperature and is not the thermostat shows up here on its own.</p>';
+    var leaks = S.leaks || [];
+    $('#leakList').innerHTML = leaks.map(function (l) {
+      return '<div class="rrow" data-id="' + esc(l.nodeId) + '"><div class="top2"><input type="text" value="' + esc(l.name) + '" maxlength="30" aria-label="Water sensor name"><span class="leakbadge ' + (l.wet ? 'wet' : 'dry') + '">' + (l.wet ? 'WET' : 'Dry') + '</span></div>' +
+        '<div class="meta">' + (l.battery != null ? 'battery ' + l.battery + '% · ' : '') + 'node ' + esc(l.nodeId) + '</div></div>';
+    }).join('') || '<p class="hint">No water sensor yet. Pair a Z-Wave water leak sensor and it shows up here on its own. A leak shows an alert on every page and can send an ntfy notification (Settings → Notifications).</p>';
+    $$('#leakList .rrow').forEach(function (row) {
+      $('input[type=text]', row).onchange = function () { api('PUT', '/api/rooms/' + encodeURIComponent(row.dataset.id), { name: this.value, include: true }).then(refresh).catch(function (e) { toast(e.message); }); };
+    });
+    $('#leakDemo').hidden = S.mode === 'live';
     $$('#roomList .rrow').forEach(function (row) {
       var save = function () { api('PUT', '/api/rooms/' + encodeURIComponent(row.dataset.id), { name: $('input[type=text]', row).value, include: $('input[type=checkbox]', row).checked }).then(refresh).catch(function (e) { toast(e.message); }); };
       $('input[type=text]', row).onchange = save; $('input[type=checkbox]', row).onchange = save;

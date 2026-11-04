@@ -191,6 +191,13 @@ class Engine {
       if (r.battery != null && r.battery <= 20) out.push({ level: 'warn', key: `bat${r.nodeId}`, text: `${name} battery is at ${r.battery}%.` });
       if (snap.kind !== 'sim' && nowMs - r.lastSeen > 3 * 3600000) out.push({ level: 'warn', key: `off${r.nodeId}`, text: `${name} has not reported in over 3 hours.` });
     }
+    for (const l of snap?.leaks || []) {
+      const name = this.store.data.rooms[l.nodeId]?.name || l.name || `Water sensor ${l.nodeId}`;
+      if (l.wet) out.push({ level: 'bad', key: `leak${l.nodeId}`, text: `Water detected at ${name}. Go and check it now.` });
+      if (l.battery != null && l.battery <= 20) out.push({ level: 'warn', key: `lbat${l.nodeId}`, text: `${name} battery is at ${l.battery}%.` });
+      // water sensors sleep for long stretches, so give them a full day before calling them quiet
+      if (snap.kind !== 'sim' && nowMs - l.lastSeen > 26 * 3600000) out.push({ level: 'warn', key: `loff${l.nodeId}`, text: `${name} has not reported in over a day.` });
+    }
     return out;
   }
 
@@ -208,6 +215,7 @@ class Engine {
       status: this.last.status,
       thermostat: snap?.thermostat || null,
       sensors,
+      leaks: (snap?.leaks || []).map((l) => ({ ...l, name: s.rooms[l.nodeId]?.name || l.name || `Water sensor ${l.nodeId}` })),
       desired: d,
       next: next ? { at: next.at.toISOString(), name: next.period.name, heat: next.period.heat, cool: next.period.cool } : null,
       hold: s.hold, away: s.away,

@@ -30,6 +30,7 @@ class SimAdapter extends EventEmitter {
     this.heat = 68;
     this.cool = 76;
     this.t = now();
+    this.wet = false; // demo water sensor, flipped by the demo test button
   }
 
   start() {
@@ -83,6 +84,7 @@ class SimAdapter extends EventEmitter {
         battery: 60 + ((r.nodeId * 7) % 35),
         lastSeen: this.t,
       })),
+      leaks: [{ nodeId: 31, name: 'Basement water', wet: this.wet, battery: 88, temp: null, lastSeen: this.t }],
     };
   }
 

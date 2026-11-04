@@ -120,3 +120,27 @@ test('filter reminders send once when soon, weekly when overdue, and reset after
   advance(3 * 86400000); await n.evaluate(state([], 'demo')); assert.equal(sent.length, 2);
   advance(5 * 86400000); await n.evaluate(state([], 'demo')); assert.equal(sent.length, 3);
 });
+
+test('water leak sends at once with top priority, repeats after 30 min while wet, and says when it is dry', async () => {
+  const { store, n, sent, advance } = rig();
+  on(store, 'leak', 'leakClear');
+  const wet = [{ level: 'bad', key: 'leak9', text: 'Water detected at Basement water. Go and check it now.' }];
+  await n.evaluate(state(wet, 'demo'));
+  assert.equal(sent.length, 1);
+  assert.equal(sent[0].headers.Priority, '5');
+  assert.match(sent[0].body, /Basement water/);
+  await n.evaluate(state(wet, 'demo'));
+  assert.equal(sent.length, 1, 'no repeat inside the cooldown');
+  advance(31 * 60000);
+  await n.evaluate(state(wet, 'demo'));
+  assert.equal(sent.length, 2, 'repeats after 30 minutes');
+  await n.evaluate(state([], 'demo'));
+  assert.equal(sent.length, 3);
+  assert.match(sent[2].body, /Basement water no longer reports water/);
+});
+
+test('water leak stays silent when its trigger is off', async () => {
+  const { n, sent } = rig();
+  await n.evaluate(state([{ level: 'bad', key: 'leak9', text: 'Water detected at X. Go and check it now.' }], 'live'));
+  assert.equal(sent.length, 0);
+});

@@ -178,6 +178,14 @@ function createApp({ dataDir, zwaveUrl, now = () => Date.now(), simSpeed = 1, au
     res.json({ settings: publicSettings() });
   });
 
+  // Demo only: flip the pretend basement water sensor so alerts and notifications can be tried before real hardware exists.
+  app.post('/api/demo/leak', async (req, res) => {
+    if (store.data.settings.mode === 'live') return bad(res, 'The test button only works in Demo mode', 409);
+    sim.wet = req.body?.wet !== false;
+    await engine.tick(); // so the alert (and any notification) shows right away instead of at the next 30 s tick
+    res.json({ wet: sim.wet });
+  });
+
   app.put('/api/rooms/:id', (req, res) => {
     const id = String(req.params.id).replace(/[^\w-]/g, '').slice(0, 20);
     const name = String(req.body?.name ?? '').trim().slice(0, 30);

@@ -2,7 +2,7 @@ manifestVersion: 1
 id: patriot-coldfront
 category: automation
 name: Cold Front
-version: "0.2.1"
+version: "0.3.0"
 tagline: Local thermostat control, schedules and insights
 description: >-
   Cold Front takes over a Z-Wave thermostat (built for the Honeywell T6 Pro Z-Wave) with no cloud and no accounts.
@@ -24,7 +24,7 @@ gallery: []
 path: ""
 defaultUsername: ""
 defaultPassword: ""
-releaseNotes: "UmbrelOS-style home screen with a greeting, widget Dashboard and dock, tidier Insights, Settings and Future layouts, and a light mode."
+releaseNotes: "Water leak sensor support with alerts and ntfy notifications, a tidier Rooms page, clearer setup steps, and the Future page is gone."
 submitter: Patriot
 submission: https://github.com/PatriotCrypto/umbrel-patriot-apps
 icon: https://raw.githubusercontent.com/PatriotCrypto/umbrel-patriot-apps/main/patriot-coldfront/icon.svg
