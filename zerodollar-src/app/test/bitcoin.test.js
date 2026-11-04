@@ -77,9 +77,9 @@ test('scanXpub gap limit stops scanning', async () => {
   try {
     await scanXpub(m.api, ZPUB, 'wpkh', { gap: 5 });
     const urls = addrHits(m);
-    // chain 0: last used index 3, gap 5 -> stops after index 8 (9 addrs, batches of 5 => 10 requests)
-    // chain 1: last used index 1 -> stops after index 6 (7 addrs => 10 requests)
-    assert.equal(urls.length, 20);
+    // chain 0: last used index 3, gap 5 -> stops after index 8 (9 addrs, batches of 2 => 10 requests)
+    // chain 1: last used index 1 -> stops after index 6 (7 addrs => 8 requests)
+    assert.equal(urls.length, 18);
     const never = deriveAddress(ZPUB, 'wpkh', 0, 40);
     assert.ok(!urls.some((u) => u.endsWith(never)));
   } finally { await m.close(); }
@@ -130,11 +130,11 @@ test('opts.fetch is used when injected', async () => {
 test('HTTP 500 and network errors throw plain errors', async () => {
   const m = await startMock({}, { status: 500 });
   try {
-    await assert.rejects(lookupAddress(m.api, R0), /HTTP 500/);
+    await assert.rejects(lookupAddress(m.api, R0, { retryDelayMs: 0 }), /HTTP 500/);
     await assert.rejects(fetchPrice(m.api), /HTTP 500/);
-    await assert.rejects(scanXpub(m.api, ZPUB, 'wpkh'), /HTTP 500/);
+    await assert.rejects(scanXpub(m.api, ZPUB, 'wpkh', { retryDelayMs: 0 }), /HTTP 500/);
   } finally { await m.close(); }
-  await assert.rejects(lookupAddress(m.api, R0), /Bitcoin API request failed/);
+  await assert.rejects(lookupAddress(m.api, R0, { retryDelayMs: 0 }), /Bitcoin API request failed/);
 });
 
 test('timeout aborts a hung request', async () => {
@@ -142,9 +142,37 @@ test('timeout aborts a hung request', async () => {
   mock.timers.enable({ apis: ['setTimeout'] });
   try {
     const p = assert.rejects(fetchPrice('http://x.test', { fetch: hanging }), /timed out/);
-    mock.timers.tick(10000);
+    mock.timers.tick(15000);
     await p;
   } finally { mock.timers.reset(); }
+});
+
+test('address lookups retry once after a timeout or a 5xx, then give up', async () => {
+  let n = 0;
+  const flaky = async () => { n++; if (n === 1) return { ok: false, status: 504, json: async () => ({}) }; return { ok: true, json: async () => ({ chain_stats: { funded_txo_sum: 9, spent_txo_sum: 2, tx_count: 1 } }) }; };
+  assert.equal((await lookupAddress('http://x/api', R0, { fetch: flaky, retryDelayMs: 0 })).confirmed, 7);
+  assert.equal(n, 2);
+  let k = 0;
+  const down = async () => { k++; return { ok: false, status: 504, json: async () => ({}) }; };
+  await assert.rejects(lookupAddress('http://x/api', R0, { fetch: down, retryDelayMs: 0 }), /HTTP 504.*busy or still starting/);
+  assert.equal(k, 2);
+  let q = 0;
+  const notFound = async () => { q++; return { ok: false, status: 404, json: async () => ({}) }; };
+  await assert.rejects(lookupAddress('http://x/api', R0, { fetch: notFound, retryDelayMs: 0 }), /HTTP 404.*\/api/);
+  assert.equal(q, 1);
+});
+
+test('scanXpub looks up addresses in small batches and says how far it got when it fails', async () => {
+  let inflight = 0, peak = 0, calls = 0;
+  const f = async () => {
+    calls++; inflight++; peak = Math.max(peak, inflight);
+    await new Promise((r) => setTimeout(r, 2));
+    inflight--;
+    if (calls > 4) return { ok: false, status: 504, json: async () => ({}) };
+    return { ok: true, json: async () => ({ chain_stats: { tx_count: 0 } }) };
+  };
+  await assert.rejects(scanXpub('http://x/api', ZPUB, 'wpkh', { fetch: f, retryDelayMs: 0 }), /4 addresses were checked/);
+  assert.ok(peak <= 2, `peak concurrency ${peak}`);
 });
 
 test('normalizeApi', () => {

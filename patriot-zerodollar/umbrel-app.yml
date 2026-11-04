@@ -2,7 +2,7 @@ manifestVersion: 1.1
 id: patriot-zerodollar
 category: finance
 name: ZeroDollar
-version: "0.3.2"
+version: "0.3.3"
 tagline: Zero-based budgeting that lives on your node
 icon: https://raw.githubusercontent.com/PatriotCrypto/umbrel-patriot-apps/main/patriot-zerodollar/icon.png
 description: >-
@@ -29,7 +29,7 @@ defaultPassword: ""
 submitter: PatriotCrypto
 submission: https://github.com/PatriotCrypto/umbrel-patriot-apps
 releaseNotes: >-
-  Fixed: the Bitcoin page crashed with "Something went wrong" in 0.3.1. Your own Mempool app address now works with or without /api, and errors say what to fix.
+  Bitcoin lookups are more patient: ZeroDollar now waits up to 45 seconds for your Mempool app, checks addresses a couple at a time, and retries once. Errors say how far a scan got and what to do next.
 widgets:
   - id: left
     type: text-with-progress

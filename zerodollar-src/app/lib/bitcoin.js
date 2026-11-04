@@ -66,12 +66,24 @@ const NET_HINT = {
   ECONNRESET: 'the connection was reset. Try again in a moment'
 };
 
-async function getJson(url, f = globalThis.fetch, timeoutMs = 10000) {
+// Mempool answers slowly right after it starts or while Electrs is catching up, so be patient.
+const ADDRESS_TIMEOUT_MS = 45000;
+const PRICE_TIMEOUT_MS = 15000;
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+async function getJson(url, f = globalThis.fetch, timeoutMs = PRICE_TIMEOUT_MS) {
   const ac = new AbortController();
   const timer = setTimeout(() => ac.abort(), timeoutMs);
   try {
     const r = await f(url, { signal: ac.signal, headers: { Accept: 'application/json' } });
-    if (!r.ok) throw new Error(`Bitcoin API returned HTTP ${r.status}. Check the address ends with /api`);
+    if (!r.ok) {
+      const busy = r.status >= 500;
+      const err = new Error(busy
+        ? `Bitcoin API returned HTTP ${r.status}. Mempool is busy or still starting up (it can take several minutes after a restart, or while Electrs catches up). Wait a minute and try again`
+        : `Bitcoin API returned HTTP ${r.status}. Check the address ends with /api`);
+      err.retryable = busy;
+      throw err;
+    }
     if (typeof r.text !== 'function') return await r.json();
     const text = await r.text();
     try { return JSON.parse(text); } catch {
@@ -79,15 +91,30 @@ async function getJson(url, f = globalThis.fetch, timeoutMs = 10000) {
       throw new Error('Bitcoin API sent something that is not Mempool data. Check the address');
     }
   } catch (e) {
-    if (ac.signal.aborted) throw new Error('Bitcoin API request timed out. Check the address and that the Mempool app is running');
+    if (ac.signal.aborted) {
+      const err = new Error(`Bitcoin API request timed out after ${Math.round(timeoutMs / 1000)} seconds. Mempool may still be starting up or catching up with Electrs. Check that the Mempool app is running, then try again in a few minutes`);
+      err.retryable = true;
+      throw err;
+    }
     if (/^Bitcoin API/.test(e.message)) throw e;
     const hint = NET_HINT[e.cause?.code];
-    throw new Error(`Bitcoin API request failed: ${hint || e.cause?.message || e.message}`);
+    const err = new Error(`Bitcoin API request failed: ${hint || e.cause?.message || e.message}`);
+    err.retryable = e.cause?.code === 'ECONNRESET';
+    throw err;
   } finally { clearTimeout(timer); }
 }
 
-export async function lookupAddress(api, address, { fetch: f = globalThis.fetch } = {}) {
-  const j = await getJson(`${api}/address/${encodeURIComponent(address)}`, f);
+export async function lookupAddress(api, address, { fetch: f = globalThis.fetch, retryDelayMs = 1500 } = {}) {
+  const url = `${api}/address/${encodeURIComponent(address)}`;
+  let j;
+  try {
+    j = await getJson(url, f, ADDRESS_TIMEOUT_MS);
+  } catch (e) {
+    if (!e.retryable) throw e;
+    // One more try: the first request often warms Mempool and Electrs up.
+    await sleep(retryDelayMs);
+    j = await getJson(url, f, ADDRESS_TIMEOUT_MS);
+  }
   const c = j.chain_stats || {}, m = j.mempool_stats || {};
   return {
     confirmed: (c.funded_txo_sum || 0) - (c.spent_txo_sum || 0),
@@ -96,16 +123,23 @@ export async function lookupAddress(api, address, { fetch: f = globalThis.fetch 
   };
 }
 
-export async function scanXpub(api, xpub, script, { fetch: f = globalThis.fetch, gap = 20, maxPerChain = 400 } = {}) {
-  let confirmed = 0, pending = 0, txCount = 0, used = 0;
+export async function scanXpub(api, xpub, script, { fetch: f = globalThis.fetch, gap = 20, maxPerChain = 400, batch = 2, retryDelayMs = 1500 } = {}) {
+  let confirmed = 0, pending = 0, txCount = 0, used = 0, checked = 0;
   for (const chain of [0, 1]) {
     let i = 0, run = 0;
     while (run < gap && i < maxPerChain) {
-      const n = Math.min(5, maxPerChain - i);
+      const n = Math.min(batch, maxPerChain - i);
       const addrs = Array.from({ length: n }, (_, k) => deriveAddress(xpub, script, chain, i + k));
-      const res = await Promise.all(addrs.map((a) => lookupAddress(api, a, { fetch: f })));
+      let res;
+      try {
+        res = await Promise.all(addrs.map((a) => lookupAddress(api, a, { fetch: f, retryDelayMs })));
+      } catch (e) {
+        const done = checked;
+        e.message += done ? ` (${done} address${done === 1 ? '' : 'es'} were checked before this)` : '';
+        throw e;
+      }
       for (const r of res) {
-        i++;
+        i++; checked++;
         if (r.txCount > 0) { run = 0; used++; confirmed += r.confirmed; pending += r.pending; txCount += r.txCount; } else run++;
       }
     }
