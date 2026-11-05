@@ -8,7 +8,7 @@ services:
 
   web:
     # pin the manifest-list digest after pushing: ghcr.io/patriotcrypto/coldfront:0.1.0@sha256:...
-    image: ghcr.io/patriotcrypto/coldfront:0.3.3@sha256:90027dd017a2ba573cfb730a531c3758d324fec59c8dfcf7816a535dcc105bb3
+    image: ghcr.io/patriotcrypto/coldfront:0.3.4@sha256:0a25667fcae0216f29e86301577a77f4e50edc8808135294ec891f3eb68d2f80
     restart: on-failure
     stop_grace_period: 10s
     environment:

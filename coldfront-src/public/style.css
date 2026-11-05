@@ -239,7 +239,7 @@ h4.sub{margin:18px 0 6px}
 .col .card{margin:0}
 .tab.cols.active{display:grid;grid-template-columns:1fr;gap:var(--gap);align-items:start}
 @media(min-width:900px){.tab.cols.active{grid-template-columns:1fr 1fr}.triggers{grid-template-columns:1fr 1fr}}
-@media(min-width:760px){@media(min-width:1100px){@media(max-width:560px){.card{padding:16px}.grid2{grid-template-columns:1fr}}
+@media(max-width:560px){.card{padding:16px}.grid2{grid-template-columns:1fr}}
 
 .toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(110px + env(safe-area-inset-bottom));background:rgba(12,26,54,.92);border:1px solid var(--edge);border-radius:999px;padding:10px 20px;z-index:60;max-width:90vw;-webkit-backdrop-filter:blur(16px);backdrop-filter:blur(16px);font-size:.9rem}
 .egg{position:fixed;inset:0;background:rgba(3,8,18,.95);z-index:70;display:flex;align-items:center;justify-content:center;flex-direction:column;color:#ffb347;padding:20px;text-align:center}
@@ -311,3 +311,26 @@ h4.sub{margin:18px 0 6px}
 .leakbadge{font-size:.78rem;font-weight:700;padding:5px 12px;border-radius:999px;border:1px solid var(--line);white-space:nowrap}
 .leakbadge.dry{background:rgba(var(--tint),.08);color:var(--mute)}
 .leakbadge.wet{background:#d93a3a;color:#fff;border-color:#d93a3a}
+
+/* ---- phone polish (0.3.4) ---- */
+@media(max-width:560px){
+  main{padding:6px 14px calc(104px + env(safe-area-inset-bottom))}
+  /* iOS Safari zooms the whole page when a field under 16px is focused */
+  input,select,textarea{font-size:16px!important}
+  /* all seven days fit without sideways scrolling */
+  .daytabs{overflow:visible;padding:3px;gap:0}
+  .daytabs button{min-width:0;padding:8px 0;font-size:.88rem}
+  /* schedule: compact remove button instead of a full-width empty bar */
+  .period .x{grid-column:1/-1;justify-self:end;width:auto;height:34px;padding:0 16px;font-size:.9rem;border-radius:999px}
+  .period .x:after{content:" Remove";font-size:.85rem;color:var(--mute)}
+  .period{padding-bottom:12px;border-bottom:1px solid var(--line)}
+  .period:last-of-type{border-bottom:0}
+  /* insights room stats: name on its own line, numbers below */
+  .rstat{grid-template-columns:1fr 1fr 1fr;row-gap:2px}
+  .rstat b{grid-column:1/-1}
+  #wall .rstat span{grid-column:1/-1!important}
+  /* keep the title and Save from crowding each other */
+  .row.spread{gap:10px;flex-wrap:wrap;align-items:center}
+  /* bigger tap targets */
+  .btn{min-height:40px}
+}
