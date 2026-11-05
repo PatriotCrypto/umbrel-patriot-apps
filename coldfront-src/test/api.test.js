@@ -203,6 +203,7 @@ test('demo leak button flips the pretend water sensor and raises the alert', asy
 test('Umbrel widget endpoint returns four-stats with indoor temp, target, status and humidity', async () => {
   const t = await boot();
   let w = await (await t.j('/api/widget/status')).json();
+  assert.equal(w.refresh, '30s'); // umbreld calls ms(refresh) on the response
   assert.equal(w.type, 'four-stats');
   assert.equal(w.items.length, 4);
   assert.deepEqual(w.items.map((i) => i.title), ['Indoor', 'Target', 'Status', 'Humidity']);
@@ -218,6 +219,7 @@ test('Umbrel widget endpoint returns four-stats with indoor temp, target, status
 test('Umbrel filter widget is text-with-progress with progress between 0 and 1', async () => {
   const t = await boot();
   let w = await (await t.j('/api/widget/filter')).json();
+  assert.equal(w.refresh, '60s');
   assert.equal(w.type, 'text-with-progress');
   assert.equal(w.progress, 0);
   assert.equal(w.text, 'Not set');

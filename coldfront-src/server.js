@@ -74,6 +74,7 @@ function createApp({ dataDir, zwaveUrl, now = () => Date.now(), simSpeed = 1, au
     res.set('Cache-Control', 'no-store');
     res.json({
       type: 'four-stats',
+      refresh: '30s', // umbreld reads this from the response itself, so it must be here
       link: '',
       items: [
         { title: t ? 'Indoor' : (room?.name || 'Indoor'), text: num(t ? t.temp : room?.temp), subtext: '°F' },
@@ -88,10 +89,11 @@ function createApp({ dataDir, zwaveUrl, now = () => Date.now(), simSpeed = 1, au
   app.get('/api/widget/filter', (req, res) => {
     const f = filterStatus(store.data.settings.filter, now(), store.data.settings.tz);
     res.set('Cache-Control', 'no-store');
-    if (!f.configured) return res.json({ type: 'text-with-progress', link: '', title: f.name, text: 'Not set', subtext: '', progressLabel: 'Add a change date in Cold Front', progress: 0 });
+    if (!f.configured) return res.json({ type: 'text-with-progress', refresh: '60s', link: '', title: f.name, text: 'Not set', subtext: '', progressLabel: 'Add a change date in Cold Front', progress: 0 });
     const plural = (n) => `${n} day${n === 1 ? '' : 's'}`;
     res.json({
       type: 'text-with-progress',
+      refresh: '60s',
       link: '',
       title: f.name,
       text: plural(Math.max(f.daysSince, 0)),

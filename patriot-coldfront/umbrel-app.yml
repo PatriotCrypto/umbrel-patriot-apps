@@ -2,7 +2,7 @@ manifestVersion: 1
 id: patriot-coldfront
 category: automation
 name: Cold Front
-version: "0.3.2"
+version: "0.3.3"
 tagline: Local thermostat control, schedules and insights
 description: >-
   Cold Front takes over a Z-Wave thermostat (built for the Honeywell T6 Pro Z-Wave) with no cloud and no accounts.
@@ -24,7 +24,7 @@ gallery: []
 path: ""
 defaultUsername: ""
 defaultPassword: ""
-releaseNotes: "Fixes Insights so room temperature and humidity are recorded before a thermostat is paired, and the home-screen status widget now shows your room sensor until the thermostat is added."
+releaseNotes: "Fixes the home-screen widgets so they show data: Umbrel needs a refresh value inside the widget response."
 submitter: Patriot
 submission: https://github.com/PatriotCrypto/umbrel-patriot-apps
 icon: https://raw.githubusercontent.com/PatriotCrypto/umbrel-patriot-apps/main/patriot-coldfront/icon.svg
