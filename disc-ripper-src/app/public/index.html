@@ -108,6 +108,23 @@
         <div class="row"><input id="sKey" type="text" placeholder="Paste a key (starts with T-)" autocomplete="off" spellcheck="false"><button class="btn" id="keySave" type="button">Save key</button><button class="btn" id="keyFetch" type="button">Get the free beta key</button></div>
         <label class="chk"><input type="checkbox" id="sAutoKey"> Fetch a fresh free beta key automatically when it expires</label>
         <span class="hint">MakeMKV does the actual ripping. It is free while in beta, or you can buy a permanent key at makemkv.com.</span></div>
+      <fieldset class="rowset ntfy" id="ntfyBox"><legend class="lab">Phone notifications (ntfy)</legend>
+        <label class="chk"><input type="checkbox" id="nOn"> Send notifications to my phone</label>
+        <span class="hint">Install the free <a href="https://ntfy.sh" target="_blank" rel="noopener noreferrer">ntfy</a> app on your phone, tap +, and subscribe to the topic below on the same server.</span>
+        <div class="ntfy-more" id="nMore">
+          <div class="two"><div class="rowset"><label for="nServer" class="lab">Server</label><input id="nServer" type="url" spellcheck="false" autocomplete="off" placeholder="https://ntfy.sh"></div>
+            <div class="rowset"><label for="nTopic" class="lab">Topic</label><div class="row"><input id="nTopic" type="text" spellcheck="false" autocomplete="off"><button class="btn small" id="nCopy" type="button">Copy</button><button class="btn small" id="nNewTopic" type="button">New</button></div></div></div>
+          <span class="hint">On ntfy.sh anyone who knows the topic name can read it, so keep the random one. Using the ntfy app on your Umbrel instead? Set the server to <code>http://&lt;your Umbrel's address&gt;:13119</code> and fill in its login below.</span>
+          <div class="two"><div class="rowset"><label for="nUser" class="lab">Username <span class="muted">(optional)</span></label><input id="nUser" type="text" autocomplete="off" spellcheck="false"></div>
+            <div class="rowset"><label for="nPass" class="lab">Password or access token <span class="muted">(optional)</span></label><input id="nPass" type="password" autocomplete="new-password"><span class="hint" id="nPassState"></span></div></div>
+          <div class="rowset"><span class="lab">Notify me when</span>
+            <label class="chk"><input type="checkbox" id="nDone"> A disc is finished ripping</label>
+            <label class="chk"><input type="checkbox" id="nConfirm"> A disc needs my OK (name or episodes)</label>
+            <label class="chk"><input type="checkbox" id="nError"> Something goes wrong</label>
+            <label class="chk"><input type="checkbox" id="nStart"> A rip starts</label></div>
+          <div class="row"><button class="btn" id="nTest" type="button">Send a test notification</button><span class="muted small" id="nMsg"></span></div>
+        </div>
+      </fieldset>
       <div class="row"><button class="btn primary" id="sSave" type="button">Save settings</button><span class="muted small" id="sMsg"></span></div>
       <div class="rowset"><span class="lab">Drive not showing up?</span><div class="row"><button class="btn" id="checkBtn" type="button">Check drive</button></div><div id="checkOut" class="pre" hidden></div></div>
     </div>

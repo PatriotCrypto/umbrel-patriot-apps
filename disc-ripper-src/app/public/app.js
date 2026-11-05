@@ -256,15 +256,43 @@ function renderSettings() {
     $('sAuto').value = s.auto ? 'auto' : 'ask'; $('sEject').checked = s.eject; $('sAutoKey').checked = s.autoKey;
     $('sRoot').innerHTML = ST.roots.map((r) => `<option value="${esc(r.id)}" ${r.id === s.root ? 'selected' : ''} ${r.available && r.writable ? '' : 'disabled'}>${esc(r.label)}${r.available && r.writable ? '' : ' (not available)'}</option>`).join('');
     $('sMovies').value = s.movieDir; $('sTv').value = s.tvDir; setsLoaded = true;
+    const n = s.ntfy; $('nOn').checked = n.on; $('nServer').value = n.server; $('nTopic').value = n.topic; $('nUser').value = n.user; $('nPass').value = '';
+    $('nDone').checked = n.events.done; $('nConfirm').checked = n.events.confirm; $('nError').checked = n.events.error; $('nStart').checked = n.events.start; showNtfy();
   }
+  $('nPassState').textContent = s.ntfy.passSet ? 'A password or token is saved. Leave blank to keep it.' : '';
   $('keyState').textContent = s.keySet ? `A key is saved (${s.keyTail}).` : 'No key yet. Press “Get the free beta key” to fetch one.';
 }
 async function saveSettings(extra) {
   note('sMsg', '');
-  const body = { auto: $('sAuto').value === 'auto', eject: $('sEject').checked, autoKey: $('sAutoKey').checked, root: $('sRoot').value, movieDir: $('sMovies').value, tvDir: $('sTv').value, ...extra };
+  const body = { auto: $('sAuto').value === 'auto', eject: $('sEject').checked, autoKey: $('sAutoKey').checked, root: $('sRoot').value, movieDir: $('sMovies').value, tvDir: $('sTv').value, ntfy: ntfyBody(), ...extra };
   try { await api('/api/settings', { method: 'POST', body }); $('sMsg').textContent = 'Saved.'; setsLoaded = false; await poll(); } catch (ex) { $('sMsg').textContent = ex.message; }
 }
 $('sSave').onclick = () => saveSettings();
+// ---------- phone notifications ----------
+function ntfyBody() {
+  const b = { on: $('nOn').checked, server: $('nServer').value.trim() || 'https://ntfy.sh', topic: $('nTopic').value.trim(), user: $('nUser').value.trim(), link: location.origin,
+    events: { done: $('nDone').checked, confirm: $('nConfirm').checked, error: $('nError').checked, start: $('nStart').checked } };
+  if ($('nPass').value) b.pass = $('nPass').value;
+  return b;
+}
+function showNtfy() { $('nMore').hidden = !$('nOn').checked; }
+$('nOn').addEventListener('change', showNtfy);
+$('nCopy').onclick = async () => {
+  const t = $('nTopic').value; let ok = false;
+  try { if (navigator.clipboard && window.isSecureContext) { await navigator.clipboard.writeText(t); ok = true; } } catch {}
+  if (!ok) { const ta = document.createElement('textarea'); ta.value = t; ta.className = 'offscreen'; document.body.appendChild(ta); ta.select(); try { ok = document.execCommand('copy'); } catch {} ta.remove(); }
+  $('nCopy').textContent = ok ? 'Copied' : 'Select it'; setTimeout(() => { $('nCopy').textContent = 'Copy'; }, 1800);
+};
+$('nNewTopic').onclick = async () => {
+  if (!confirm('Make a new topic? Your phone will need to subscribe to the new one.')) return;
+  try { const r = await api('/api/ntfy/topic', { method: 'POST' }); $('nTopic').value = r.settings.ntfy.topic; } catch (ex) { $('nMsg').textContent = ex.message; }
+};
+$('nTest').onclick = async () => {
+  const b = $('nTest'); b.disabled = true; $('nMsg').textContent = 'Saving and sending…';
+  try { await api('/api/settings', { method: 'POST', body: { ntfy: ntfyBody() } }); await api('/api/ntfy/test', { method: 'POST' }); $('nMsg').textContent = 'Sent. Check your phone.'; setsLoaded = false; }
+  catch (ex) { $('nMsg').textContent = ex.message; }
+  b.disabled = false;
+};
 $('keySave').onclick = () => { const k = $('sKey').value.trim(); if (!k) { $('sMsg').textContent = 'Paste a key first.'; return; } saveSettings({ key: k }).then(() => { $('sKey').value = ''; }); };
 $('keyFetch').onclick = async () => { $('sMsg').textContent = 'Fetching…'; try { await api('/api/key/fetch', { method: 'POST' }); $('sMsg').textContent = 'Saved the current free beta key.'; setsLoaded = false; poll(); } catch (ex) { $('sMsg').textContent = ex.message; } };
 $('checkBtn').onclick = async () => {

@@ -4,7 +4,7 @@ storage:
   dataRoot: data
 category: media
 name: Disc Ripper
-version: "0.3.1"
+version: "0.4.0"
 tagline: "Pop in a DVD and walk away. It rips, names it for Jellyfin and ejects."
 description: >-
   Plug a USB DVD drive into your Umbrel, put a disc in, and walk away. Disc Ripper notices the disc, works out whether it is a movie
@@ -41,7 +41,7 @@ folderAccess:
         targetPath: /media
         readOnly: false
 releaseNotes: >-
-  The drive on the main screen is now a real-time 3D model with metal reflections and a shadow. The tray slides out toward you with a disc on it when your drive opens, and the progress bar and time remaining run across the front. Falls back to a simpler drawing if your browser cannot do 3D. Includes three.js (MIT license).
+  New: phone notifications through ntfy. Get a message when a disc finishes ripping, when Disc Ripper needs you to confirm a name, and if something goes wrong. Optional start alert too. Works with ntfy.sh or the ntfy app on your Umbrel. Set it up in Settings, then press Send test.
 submitter: PatriotCrypto
 submission: https://github.com/PatriotCrypto/umbrel-patriot-apps
 dependencies: []

@@ -13,7 +13,7 @@ const { classify } = require('./lib/classify');
 const META = require('./lib/meta');
 const DRV = require('./lib/drive');
 
-const VERSION = '0.3.1';
+const VERSION = '0.4.0';
 const PORT = parseInt(process.env.PORT || '3000', 10);
 const DATA_DIR = path.resolve(process.env.DATA_DIR || '/data');
 const ROOTS = [
@@ -37,16 +37,20 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const rootById = (id) => ROOTS.find((r) => r.id === id);
 
 // ---------- settings, history, memory ----------
-const DEFAULTS = { v: 2, auto: true, eject: true, root: 'media', movieDir: 'Movies', tvDir: 'TV Shows', key: '', autoKey: true };
+const DEFAULTS = { v: 2, auto: true, eject: true, root: 'media', movieDir: 'Movies', tvDir: 'TV Shows', key: '', autoKey: true,
+  ntfy: { on: false, server: 'https://ntfy.sh', topic: '', user: '', pass: '', link: '', events: { done: true, confirm: true, error: true, start: false } } };
 let settings = { ...DEFAULTS };
 let savedSettings = null;
 try { savedSettings = JSON.parse(fs.readFileSync(SETTINGS_FILE, 'utf8')); settings = { ...DEFAULTS, ...savedSettings }; } catch {}
+settings.ntfy = { ...DEFAULTS.ntfy, ...(settings.ntfy || {}), events: { ...DEFAULTS.ntfy.events, ...((settings.ntfy || {}).events || {}) } };
+let newTopic = false; if (!settings.ntfy.topic) { settings.ntfy.topic = 'disc-ripper-' + crypto.randomBytes(8).toString('hex'); newTopic = true; }
 let history = [];
 try { history = JSON.parse(fs.readFileSync(HISTORY_FILE, 'utf8')); } catch {}
 let memory = {};
 try { memory = JSON.parse(fs.readFileSync(MEMORY_FILE, 'utf8')); } catch {}
 const saveJson = (file, v) => { try { fs.writeFileSync(file + '.tmp', JSON.stringify(v)); fs.renameSync(file + '.tmp', file); } catch {} };
 const saveSettings = () => saveJson(SETTINGS_FILE, settings);
+if (newTopic) saveSettings();
 function writeMkConf() {
   const lines = [];
   if (settings.key) lines.push(`app_Key = "${settings.key.replace(/[^A-Za-z0-9@_-]/g, '')}"`);
@@ -55,7 +59,7 @@ function writeMkConf() {
 writeMkConf();
 // 0.2.0: walk-away mode is now the default. Move earlier installs over once.
 if (savedSettings && !(savedSettings.v >= 2)) { settings.v = 2; settings.auto = true; saveJson(SETTINGS_FILE, settings); }
-const pubSettings = () => ({ auto: settings.auto, eject: settings.eject, root: settings.root, movieDir: settings.movieDir, tvDir: settings.tvDir, autoKey: settings.autoKey, keySet: !!settings.key, keyTail: settings.key ? '…' + settings.key.slice(-4) : '' });
+const pubSettings = () => ({ ntfy: { on: settings.ntfy.on, server: settings.ntfy.server, topic: settings.ntfy.topic, user: settings.ntfy.user, passSet: !!settings.ntfy.pass, events: settings.ntfy.events }, auto: settings.auto, eject: settings.eject, root: settings.root, movieDir: settings.movieDir, tvDir: settings.tvDir, autoKey: settings.autoKey, keySet: !!settings.key, keyTail: settings.key ? '…' + settings.key.slice(-4) : '' });
 
 function addHistory(h) { history.unshift({ id: crypto.randomBytes(5).toString('hex'), at: Date.now(), ...h }); history = history.slice(0, 60); saveJson(HISTORY_FILE, history); }
 
@@ -167,7 +171,49 @@ let polling = false;
 const TERMINAL = new Set(['done', 'error']);
 const isActive = (j) => j && !TERMINAL.has(j.stage);
 
-function setStage(job, stage, message) { job.stage = stage; if (TERMINAL.has(stage)) job.finishedAt = Date.now(); if (message !== undefined) job.message = message; }
+function setStage(job, stage, message) {
+  const was = job.stage; job.stage = stage; if (TERMINAL.has(stage)) job.finishedAt = Date.now(); if (message !== undefined) job.message = message;
+  if (stage === 'needs_confirm' && was !== stage) notifyJob(job, 'confirm');
+  if (stage === 'ripping' && !job._startNoted) { job._startNoted = true; notifyJob(job, 'start'); }
+}
+
+// ---------- phone notifications (ntfy) ----------
+// Sent as JSON to the server's root so names with accents or emoji arrive intact.
+async function ntfySend(n, msg) {
+  const body = { topic: n.topic, title: msg.title.slice(0, 250), message: msg.message.slice(0, 3500), priority: msg.priority || 3, tags: msg.tags || [] };
+  if (n.link) body.click = n.link;
+  if (msg.icon) body.icon = msg.icon;
+  const headers = { 'Content-Type': 'application/json' };
+  if (n.pass) headers.Authorization = n.user ? 'Basic ' + Buffer.from(`${n.user}:${n.pass}`).toString('base64') : 'Bearer ' + n.pass;
+  const r = await fetch(n.server.replace(/\/+$/, '') + '/', { method: 'POST', headers, body: JSON.stringify(body), signal: AbortSignal.timeout(12000) });
+  if (!r.ok) {
+    const t = (await r.text().catch(() => '')).slice(0, 200);
+    throw new Error(r.status === 401 || r.status === 403 ? 'the ntfy server refused the login (check the username and password or token)' : `the ntfy server answered ${r.status}${t ? ': ' + t : ''}`);
+  }
+}
+const posterUrl = (p) => { const c = cleanPoster(p); if (!c) return ''; try { return decodeURIComponent(c.slice('/api/poster?u='.length)); } catch { return ''; } };
+const mins = (ms) => { const m = Math.round(ms / 60000); return m < 60 ? `${m} min` : `${Math.floor(m / 60)} h ${m % 60} min`; };
+function notifyJob(job, kind) {
+  const n = settings.ntfy;
+  if (!n.on || !n.topic || !n.events[kind]) return;
+  job._sent = job._sent || {}; if (job._sent[kind]) return; job._sent[kind] = true;
+  const label = (job.label || 'Disc').replace(/_/g, ' ');
+  const name = job.name || label;
+  let msg;
+  if (kind === 'confirm') {
+    const sug = job.suggested || {};
+    const guess = sug.kind === 'tv' && sug.tv ? `${sug.tv.showName} season ${sug.tv.season}` : sug.movie && sug.movie.name ? sug.movie.name : '';
+    msg = { title: 'Disc Ripper needs your OK', message: `"${label}"${guess ? ` looks like ${guess}` : ''}. Open Disc Ripper to check the name and start the rip.`, priority: 4, tags: ['question', 'dvd'] };
+  } else if (kind === 'start') {
+    msg = { title: `Ripping: ${name}`, message: `${job.outputs.length} file${job.outputs.length === 1 ? '' : 's'} to rip. You'll get another notification when it's done.`, priority: 2, tags: ['dvd'] };
+  } else if (kind === 'done') {
+    const files = job.files.length;
+    msg = { title: `Done: ${name}`, message: `Saved ${files} file${files === 1 ? '' : 's'} to your library in ${mins(Date.now() - job.startedAt)}.${job.ejected ? ' The disc is out, ready for the next one.' : ''}${job.autoNote ? '\n' + job.autoNote : ''}`, priority: 3, tags: ['white_check_mark', 'dvd'], icon: job.posterUrl || '' };
+  } else if (kind === 'error') {
+    msg = { title: 'Disc Ripper hit a problem', message: `${label}: ${job.error || 'Something went wrong.'}`, priority: 4, tags: ['warning'] };
+  }
+  if (msg) ntfySend(n, msg).catch((e) => console.error('ntfy', fmtErr(e)));
+}
 function chk(job) { if (job.ctl.signal.aborted) throw new Error('canceled'); }
 
 async function poll() {
@@ -208,6 +254,7 @@ function startJob(dev, st, key) {
     job.error = job.error || (canceled ? 'Stopped.' : fmtErr(e)); setStage(job, 'error', '');
     addHistory({ label: job.label, kind: job.kind || '', name: job.name || '', status: canceled ? 'skipped' : 'error', error: job.error });
     if (settings.eject) await ejectDisc(job);
+    if (!canceled) notifyJob(job, 'error');
   });
 }
 
@@ -478,7 +525,9 @@ async function ripPlan(job, plan) {
     for (let i = built.outs.length - 1; i >= 0; i--) addHistory({ label: job.label, kind: 'movie', name: built.outs[i].movie, status: 'done', files: [job.files[i]].filter(Boolean), poster: cleanPoster((plan.movies[i] || {}).poster), note: i === 0 ? job.autoNote || '' : '' });
   } else addHistory({ label: job.label, kind: plan.kind, name: built.name, status: 'done', files: job.files, poster: cleanPoster((plan.kind === 'tv' ? plan.tv : plan.movie).poster), note: job.autoNote || '' });
   setStage(job, 'done', plan.kind === 'tv' ? `Saved ${job.files.length} episode${job.files.length === 1 ? '' : 's'} to your library.` : plan.kind === 'movies' ? `Saved ${job.files.length} movies to your library.` : 'Saved to your library.');
+  job.posterUrl = posterUrl((plan.kind === 'tv' ? plan.tv : plan.kind === 'movies' ? (plan.movies[0] || {}) : plan.movie).poster);
   if (settings.eject) { await ejectDisc(job); if (job.ejected) job.message += ' The disc is out.'; }
+  notifyJob(job, 'done');
 }
 
 async function ripTitle(job, titleId, outDir, onPct, retried) {
@@ -600,9 +649,29 @@ app.post('/api/settings', wrap(async (req, res) => {
     if (!/^[A-Za-z0-9@_-]{20,200}$/.test(k)) throw new Error("That doesn't look like a MakeMKV key.");
     s.key = k;
   }
+  if (b.ntfy && typeof b.ntfy === 'object') {
+    const n = { ...settings.ntfy, events: { ...settings.ntfy.events } }, x = b.ntfy;
+    if ('on' in x) n.on = !!x.on;
+    if ('server' in x) { const v = String(x.server || '').trim().replace(/\/+$/, ''); if (!/^https?:\/\/[^\s/?#]+(:\d+)?(\/[^\s?#]*)?$/.test(v) || v.length > 200) throw new Error('The ntfy server should look like https://ntfy.sh or http://your-umbrel-address:13119.'); n.server = v; }
+    if ('topic' in x) { const v = String(x.topic || '').trim(); if (!/^[A-Za-z0-9_-]{1,64}$/.test(v)) throw new Error('The topic can use letters, numbers, dashes and underscores, up to 64 characters.'); n.topic = v; }
+    if ('user' in x) n.user = String(x.user || '').trim().slice(0, 100);
+    if (typeof x.pass === 'string' && x.pass) n.pass = x.pass.slice(0, 300);
+    if (x.clearPass) n.pass = '';
+    if ('link' in x) { const v = String(x.link || ''); n.link = /^https?:\/\/[^\s]{1,200}$/.test(v) ? v : ''; }
+    if (x.events && typeof x.events === 'object') for (const k of Object.keys(n.events)) if (k in x.events) n.events[k] = !!x.events[k];
+    s.ntfy = n;
+  }
   settings = s; saveSettings(); writeMkConf();
   res.json({ settings: pubSettings() });
 }));
+app.post('/api/ntfy/test', wrap(async (req, res) => {
+  const n = settings.ntfy;
+  if (!n.topic) throw new Error('Set a topic first.');
+  try { await ntfySend(n, { title: 'Disc Ripper test', message: 'Notifications are working. You will hear from me when a disc is done or needs your OK.', priority: 3, tags: ['dvd', 'tada'] }); }
+  catch (e) { throw new Error(`Couldn't send the test: ${fmtErr(e)}.`); }
+  res.json({ ok: true });
+}));
+app.post('/api/ntfy/topic', wrap(async (req, res) => { settings.ntfy.topic = 'disc-ripper-' + crypto.randomBytes(8).toString('hex'); saveSettings(); res.json({ settings: pubSettings() }); }));
 app.post('/api/key/fetch', wrap(async (req, res) => { await refreshKey(); res.json({ settings: pubSettings() }); }));
 
 // drive check: helps when the drive isn't noticed

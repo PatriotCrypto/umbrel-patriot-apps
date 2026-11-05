@@ -66,7 +66,7 @@ summary.tb span{flex:1}
 .seg button.on{background:var(--surf);color:var(--ink);font-weight:500;box-shadow:0 1px 3px rgba(0,0,0,.18)}
 
 /* form controls */
-input[type=text],input[type=search],input[type=number],select{font:inherit;color:var(--ink);background:var(--surf2);border:1px solid var(--line);border-radius:10px;padding:0 12px;min-height:42px;width:100%}
+input[type=text],input[type=search],input[type=number],input[type=url],input[type=password],select{font:inherit;color:var(--ink);background:var(--surf2);border:1px solid var(--line);border-radius:10px;padding:0 12px;min-height:42px;width:100%}
 input[type=search]{-webkit-appearance:none;appearance:none}
 input::placeholder{color:var(--mut);opacity:.7}
 select{-webkit-appearance:none;appearance:none;padding-right:38px;cursor:pointer;
@@ -224,3 +224,11 @@ input[type=checkbox],input[type=radio]{accent-color:var(--acc);width:18px;height
 .dv-gl{position:relative;width:100%}
 .dv-gl canvas{display:block;width:100%;height:100%}
 .dv.gl .dv-stage{display:none}
+
+/* phone notifications */
+fieldset.ntfy{border:1px solid var(--line);border-radius:12px;padding:14px 16px 16px;margin:0;display:flex;flex-direction:column;gap:10px;min-width:0}
+fieldset.ntfy legend{padding:0 6px}
+.ntfy-more{display:flex;flex-direction:column;gap:12px}
+.ntfy code{font-family:"IBM Plex Mono",ui-monospace,monospace;font-size:12.5px;background:var(--surf2);padding:1px 5px;border-radius:4px}
+#nTopic{flex:1 1 160px;width:auto;min-width:0}
+.offscreen{position:fixed;left:-9999px;top:0;opacity:0}
