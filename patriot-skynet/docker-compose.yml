@@ -8,8 +8,8 @@ services:
 
   web:
     # After pushing the image, replace the tag with the pinned digest:
-    #   ghcr.io/patriotcrypto/skynet:0.1.8@sha256:<manifest-list digest>
-    image: ghcr.io/patriotcrypto/skynet:0.1.8@sha256:7d10b410525d06519dc94964f91f2a81211d82bc36b45d7c32b4a6eff122e88a
+    #   ghcr.io/patriotcrypto/skynet:0.1.9@sha256:<manifest-list digest>
+    image: ghcr.io/patriotcrypto/skynet:0.1.9@sha256:ec587f42d91a9237d95f8b40e2978c86ab7ae5d2707043965ef9c1a38a924d08
     restart: on-failure
     stop_grace_period: 1m
     volumes:
