@@ -86,7 +86,39 @@
     const [st, tr, cv] = await Promise.all([api('state'), api('trails'), api('coverage')]);
     S = st; trails = tr; coverage = cv; header(); if (view === 'nodes') drawNodes(); else if (view === 'contacts') render();
   }
-  async function refreshMsgs() { msgs = await api('messages'); if (view === 'chat') drawMsgs(true); }
+  // Message ping: one short two-note chime, off by default, remembered per browser. Only for incoming texts.
+  const Ping = {
+    ctx: null,
+    on() { try { return localStorage.getItem('sk.ping') === '1'; } catch (_) { return false; } },
+    set(v) { try { localStorage.setItem('sk.ping', v ? '1' : '0'); } catch (_) {} },
+    ready() { try { const C = window.AudioContext || window.webkitAudioContext; if (!C) return null; this.ctx = this.ctx || new C(); if (this.ctx.state === 'suspended') this.ctx.resume(); return this.ctx; } catch (_) { return null; } },
+    play(force) {
+      if (!force && !this.on()) return;
+      const c = this.ready(); if (!c) return;
+      try {
+        const t = c.currentTime;
+        [[880, 0], [1175, 0.13]].forEach(([f, d]) => {
+          const o = c.createOscillator(), g = c.createGain();
+          o.type = 'sine'; o.frequency.value = f;
+          g.gain.setValueAtTime(0.0001, t + d); g.gain.exponentialRampToValueAtTime(0.2, t + d + 0.01); g.gain.exponentialRampToValueAtTime(0.0001, t + d + 0.2);
+          o.connect(g); g.connect(c.destination); o.start(t + d); o.stop(t + d + 0.22);
+        });
+      } catch (_) {}
+    }
+  };
+  document.addEventListener('pointerdown', () => { if (Ping.on()) Ping.ready(); }, { passive: true }); // browsers only allow sound after a tap or click
+  let unread = 0;
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) { unread = 0; document.title = 'Skynet'; } });
+  async function refreshMsgs() {
+    const seen = new Set(msgs.map((m) => m.id));
+    msgs = await api('messages');
+    const fresh = msgs.filter((m) => !seen.has(m.id) && !m.mine);
+    if (fresh.length) {
+      Ping.play();
+      if (document.hidden) { unread += fresh.length; document.title = '(' + unread + ') Skynet'; }
+    }
+    if (view === 'chat') drawMsgs(true);
+  }
 
   function header() {
     $('#callsign').textContent = S.settings.callsign || '';
@@ -354,6 +386,9 @@
         <label>Low battery warning at (%)</label><input id="s_low" value="${s.lowBattery}" inputmode="numeric">
         <label class="chk" style="margin-top:12px"><input type="checkbox" id="s_tiles" ${s.tiles ? 'checked' : ''}> Show OpenStreetMap background on the map</label>
         <div class="small dim">Off by default so the app stays fully private and offline. When on, your browser downloads map tiles from openstreetmap.org.</div></div>
+      <div class="card"><h2>Message ping</h2><label class="chk"><input type="checkbox" id="s_ping" ${Ping.on() ? 'checked' : ''}> Play a short chime when a message arrives</label>
+        <div class="row" style="margin-top:8px"><button class="btn sec" id="pingtest">Test chime</button></div>
+        <div class="small dim">Off by default and set per browser. The Skynet tab has to be open, and your browser only allows sound after you have clicked or tapped the page once. When the tab is in the background, the tab title also shows how many new messages arrived.</div></div>
       <button class="btn" id="save">Save settings</button></div>
     <div><div class="card"><h2>Your data</h2><div class="row"><a class="btn sec" href="/api/backup" download>Download backup</a><button class="btn sec" id="restore">Restore backup</button></div><input type="file" id="rfile" accept=".json,application/json" hidden>
         <div class="small dim" style="margin-top:6px">Backup covers contacts, frequencies, logbook and settings.</div>
@@ -366,6 +401,8 @@
       const m = /^\s*(-?\d{1,3}(?:\.\d+)?)\s*[,;\s]\s*(-?\d{1,3}(?:\.\d+)?)\s*$/.exec(e.target.value);
       if (m) { e.target.value = m[1]; $('#s_lon').value = m[2]; }
     });
+    $('#s_ping').onchange = (e) => { Ping.set(e.target.checked); if (e.target.checked) Ping.play(true); };
+    $('#pingtest').onclick = () => Ping.play(true);
     $('#save').onclick = async () => {
       try {
         S.settings = await api('settings', { method: 'PUT', body: { callsign: $('#s_call').value, mode: $('#s_mode').value, host: $('#s_host').value, port: $('#s_port').value, staleMinutes: $('#s_stale').value, lowBattery: $('#s_low').value, tiles: $('#s_tiles').checked, home: { lat: $('#s_lat').value, lon: $('#s_lon').value } } });
