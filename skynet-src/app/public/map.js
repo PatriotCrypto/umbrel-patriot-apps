@@ -31,7 +31,19 @@
       requestAnimationFrame((x) => this._loop(x));
     }
     css(n) { return getComputedStyle(document.documentElement).getPropertyValue(n).trim(); }
+    _blips(list) {
+      const seen = this.seen || (this.seen = new Set()), first = !this.primed;
+      this.primed = true; this.blips = this.blips || [];
+      for (const a of list) {
+        const k = a.ts + '-' + a.id;
+        if (seen.has(k)) continue;
+        seen.add(k);
+        if (!first && !still) this.blips.push({ from: a.from, to: a.to, dir: a.dir, t: performance.now() });
+      }
+      if (seen.size > 400) { seen.clear(); for (const a of list) seen.add(a.ts + '-' + a.id); }
+    }
     set(data) {
+      if (data.activity) this._blips(data.activity);
       Object.assign(this.data, data);
       if (!this.fitted) this.fit();
       this.draw();
@@ -176,6 +188,24 @@
         g.fillStyle = fg; g.fillText((n.short || n.long || n.id).toUpperCase(), x + 12, y - 1);
         if (typeof n.battery === 'number') { g.fillStyle = low ? warn : dim; g.font = '10px ' + font; g.fillText(n.battery > 100 ? 'PWR' : n.battery + '%', x + 12, y + 11); g.font = '600 11px ' + font; }
         this.hits.push({ id: n.id, x, y });
+      }
+      // packet pulses: rx = from the sender toward the base, tx = from the base outward
+      if (this.blips && this.blips.length) {
+        const DUR = 2600, mp = me ? P(me.lat, me.lon) : null;
+        this.blips = this.blips.filter((b) => now - b.t < DUR);
+        const posOf = (id) => { const n = this.data.nodes.find((q) => q.id === id && typeof q.lat === 'number'); return n ? P(n.lat, n.lon) : null; };
+        for (const b of this.blips) {
+          const k = (now - b.t) / DUR, tx = b.dir === 'tx', col = tx ? acc2 : acc;
+          const a = tx ? mp : posOf(b.from), z2 = tx ? (b.to === '^all' ? null : posOf(b.to)) : mp;
+          g.lineWidth = 2;
+          if (a) { g.strokeStyle = hex2rgba(col, 0.9 * (1 - k)); g.beginPath(); g.arc(a[0], a[1], 8 + k * 46, 0, 7); g.stroke(); }
+          else if (mp && !tx) { g.strokeStyle = hex2rgba(col, 0.9 * (1 - k)); g.beginPath(); g.arc(mp[0], mp[1], 8 + (1 - k) * 46, 0, 7); g.stroke(); } // sender has no GPS: pulse closes in on the base
+          if (a && z2) {
+            const q = Math.min(1, k * 1.8), x = a[0] + (z2[0] - a[0]) * q, y = a[1] + (z2[1] - a[1]) * q;
+            g.strokeStyle = hex2rgba(col, 0.45 * (1 - k)); g.beginPath(); g.moveTo(a[0], a[1]); g.lineTo(x, y); g.stroke();
+            g.fillStyle = hex2rgba(col, 1 - k * 0.6); g.beginPath(); g.arc(x, y, 3.5, 0, 7); g.fill();
+          }
+        }
       }
       if (this.data.home && typeof this.data.home.lat === 'number' && !this.data.nodes.some((n) => n.id === this.data.me && typeof n.lat === 'number')) {
         const [x, y] = P(this.data.home.lat, this.data.home.lon); g.strokeStyle = acc2; g.lineWidth = 2; g.strokeRect(x - 6, y - 6, 12, 12);

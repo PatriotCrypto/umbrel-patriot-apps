@@ -238,3 +238,5 @@ button.fold:focus-visible { outline: 1px solid var(--accent); outline-offset: 3p
 /* filterable checkbox list in forms (contact favorite frequencies) */
 .pickq { margin-bottom: 6px; }
 .pick { max-height: 160px; overflow-y: auto; border: 1px solid var(--line); padding: 6px 8px; display: grid; gap: 4px; }
+.feedrow { font-size: 12px; padding: 4px 0; border-bottom: 1px solid var(--line); }
+.feedrow:last-child { border-bottom: 0; }

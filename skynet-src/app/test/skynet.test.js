@@ -167,6 +167,8 @@ test('live mode: reads a (mock) Meshtastic node over TCP and sends text', async 
     assert.equal(mesh.send('hello roof').ok, true);
     for (let i = 0; i < 20 && !received.length; i++) await wait(50);
     assert.deepEqual(received, ['hello roof']);
+    assert.ok(mesh.activity.some((a) => a.dir === 'rx' && a.from === '!22222222'), 'rx packet logged');
+    assert.ok(mesh.activity.some((a) => a.dir === 'tx' && a.kind === 'text'), 'tx logged');
     assert.ok(mesh.coverage().length >= 1, 'coverage recorded from rover position');
     store.flush();
     assert.ok(JSON.parse(fs.readFileSync(path.join(dir, 'skynet.json'), 'utf8')).nodes['!22222222']);

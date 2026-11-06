@@ -111,7 +111,7 @@
       <div class="grid2 nodes"><div><div class="mapwrap"><canvas id="map"></canvas>
         <div class="mapbar"><button id="zi" aria-label="Zoom in">+</button><button id="zo" aria-label="Zoom out">−</button><button id="zf" aria-label="Fit all" title="Fit all">⌖</button></div></div>
         <div class="row small" style="margin-top:8px"><label class="chk"><input type="checkbox" id="ct" ${showTrails ? 'checked' : ''}> Trails</label><label class="chk"><input type="checkbox" id="cc" ${showCov ? 'checked' : ''}> Coverage</label><span class="dim" id="mapnote"></span></div></div>
-      <div><div class="card tbl" id="nodelist"></div><div class="card" id="nodedetail"></div></div></div>`;
+      <div><div class="card tbl" id="nodelist"></div><div class="card" id="nodedetail"></div><div class="card" id="feed"></div></div></div>`;
     map = new window.MapView($('#map'), (id) => { selected = id; drawNodes(); });
     $('#zi').onclick = () => map.zoom(0.5); $('#zo').onclick = () => map.zoom(-0.5); $('#zf').onclick = () => { map.fit(); map.draw(); };
     $('#ct').onchange = (e) => { showTrails = e.target.checked; drawNodes(); };
@@ -145,9 +145,14 @@
     const n = selected && nodeOf(selected);
     $('#nodedetail').innerHTML = n ? detail(n) : '<div class="dim small">Tap a node on the map or in the list for details.</div>';
     const sc = $('#savec'); if (sc) sc.onclick = () => contactForm({ name: n.long || n.short || '', nodeId: n.id });
-    const noPos = S.nodes.every((x) => typeof x.lat !== 'number');
-    $('#mapnote').textContent = noPos && list.length ? 'No node has reported a GPS position yet.' : '';
-    map.set({ nodes: S.nodes, trails, coverage, me: S.me, home: S.settings.home, showTrails, showCov, tiles: !!S.settings.tiles, selected, staleMinutes: S.settings.staleMinutes, lowBattery: S.settings.lowBattery });
+    const unplaced = S.nodes.filter((x) => typeof x.lat !== 'number');
+    $('#mapnote').textContent = unplaced.length ? 'Not on the map (no GPS position yet): ' + unplaced.map((x) => nodeName(x.id)).join(', ') : '';
+    const act = (S.activity || []).slice(-8).reverse();
+    $('#feed').innerHTML = '<h2>Packets</h2>' + (act.length ? act.map((a) => {
+      const t = new Date(a.ts).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+      return `<div class="feedrow"><span class="mono dim">${esc(t)}</span> <span class="tag ${a.dir === 'tx' ? 'acc' : ''}">${a.dir.toUpperCase()}</span> ${esc(nodeName(a.from))}${a.dir === 'tx' && a.to !== '^all' ? ' → ' + esc(nodeName(a.to)) : ''} · ${esc(a.kind)}${typeof a.snr === 'number' ? ' · ' + a.snr.toFixed(1) + ' dB' : ''}</div>`;
+    }).join('') : '<div class="dim small">No packets yet.</div>');
+    map.set({ activity: S.activity, nodes: S.nodes, trails, coverage, me: S.me, home: S.settings.home, showTrails, showCov, tiles: !!S.settings.tiles, selected, staleMinutes: S.settings.staleMinutes, lowBattery: S.settings.lowBattery });
   }
   function detail(n) {
     const c = contactOf(n.id);
@@ -435,7 +440,7 @@
     es.addEventListener('change', (e) => {
       let w = []; try { w = JSON.parse(e.data); } catch (_) {}
       if (w.includes('messages')) refreshMsgs();
-      if (w.includes('nodes') || w.includes('status')) { clearTimeout(rt); rt = setTimeout(refreshMesh, 300); }
+      if (w.includes('nodes') || w.includes('status') || w.includes('activity')) { clearTimeout(rt); rt = setTimeout(refreshMesh, 300); }
     });
   }
   loadAll().then(() => { header(); render(); connectEvents(); }).catch((e) => { $('#view').innerHTML = '<div class="card"><div class="empty">Could not reach Skynet: ' + esc(e.message) + '</div></div>'; });

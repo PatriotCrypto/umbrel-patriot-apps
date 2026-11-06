@@ -24,13 +24,25 @@ class Mesh extends EventEmitter {
     this.nodes = {};
     this.trails = {};
     this.messages = [];
+    this.activity = []; this.actSeq = 0; // recent packets (memory only), drives the map pulses
+  }
+  _act(dir, from, to, kind, snr) {
+    this.activity.push({ id: ++this.actSeq, ts: Date.now(), dir, from, to: to || '^all', kind, snr: typeof snr === 'number' ? snr : undefined });
+    if (this.activity.length > 30) this.activity.splice(0, this.activity.length - 30);
+    this.emit('change', 'activity');
+  }
+  _packet(p) {
+    const kinds = { 1: 'text', 3: 'position', 4: 'node info', 67: 'telemetry' };
+    const mine = !!this.me && p.from === this.me;
+    if (mine && p.portnum === 1) return; // our own sent text is logged by send()
+    this._act(mine ? 'tx' : 'rx', p.from, p.to, kinds[p.portnum] || 'data', p.snr);
   }
   start() {
     this.stop();
     const s = this.store.data.settings;
     this.mode = s.mode === 'live' ? 'live' : 'demo';
     this.status = { connected: false };
-    this.me = null;
+    this.me = null; this.activity = [];
     if (this.mode === 'live') {
       this.nodes = this.store.data.nodes; this.trails = this.store.data.trails; this.messages = this.store.data.messages;
       this.src = new Live({ host: s.host, port: s.port });
@@ -43,6 +55,7 @@ class Mesh extends EventEmitter {
     src.on('status', (st) => { this.status = { ...this.status, ...st }; this.emit('change', 'status'); });
     src.on('node', (n) => this._node(n));
     src.on('text', (t) => this._text(t));
+    src.on('packet', (p) => this._packet(p));
     src.start();
   }
   stop() {
@@ -59,6 +72,7 @@ class Mesh extends EventEmitter {
     }
     n.lastHeard = Math.max(prev.lastHeard || 0, u.lastHeard || Math.floor(Date.now() / 1000));
     this.nodes[u.id] = n;
+    if (this.mode === 'demo' && u.id !== this.me) this._act('rx', u.id, '^all', typeof u.lat === 'number' ? 'position' : 'telemetry', u.snr);
     if (typeof u.lat === 'number' && typeof u.lon === 'number') this._trail(n.id, u);
     this._persist();
     this.emit('change', 'nodes');
@@ -91,6 +105,7 @@ class Mesh extends EventEmitter {
     const ok = this.src.sendText(text, to || '^all', 0);
     if (!ok) return { ok: false, error: 'send failed' };
     this._text({ from: this.me || 'me', to: to || '^all', text, ts: Date.now() });
+    this._act('tx', this.me || 'me', to || '^all', 'text');
     return { ok: true };
   }
   alerts() {
@@ -121,7 +136,7 @@ class Mesh extends EventEmitter {
   snapshot() {
     return {
       mode: this.mode, status: this.status, me: this.me,
-      nodes: Object.values(this.nodes), alerts: this.alerts(), now: Date.now()
+      nodes: Object.values(this.nodes), alerts: this.alerts(), activity: this.activity.slice(), now: Date.now()
     };
   }
 }

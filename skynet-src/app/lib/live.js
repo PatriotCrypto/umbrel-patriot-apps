@@ -122,6 +122,7 @@ class Live extends EventEmitter {
     else if (ev.type === 'configdone') this.emit('status', { connected: true, synced: true });
     else if (ev.type === 'packet') {
       const p = ev.packet;
+      this.emit('packet', { from: p.from, to: p.to, portnum: p.portnum, snr: p.snr });
       const base = { id: p.from, snr: p.snr, rssi: p.rssi, hops: p.hops, lastHeard: p.rxTime || Math.floor(Date.now() / 1000) };
       try {
         if (p.portnum === PORT_TEXT) {
