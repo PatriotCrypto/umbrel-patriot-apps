@@ -175,6 +175,30 @@ test('live mode: reads a (mock) Meshtastic node over TCP and sends text', async 
   } finally { mesh.stop(); server.close(); }
 });
 
+test('live mode: a node that goes silent without closing is detected and retried', async () => {
+  const net = require('net');
+  let conns = 0, probes = 0;
+  const server = net.createServer((sock) => {
+    conns++;
+    sock.on('data', (d) => { if (d.includes(0x18) || d.length) probes++; }); // never answers, never closes
+    sock.on('error', () => {});
+  });
+  await new Promise((r) => server.listen(0, '127.0.0.1', r));
+  const { Live } = require('../lib/live');
+  const live = new Live({ host: '127.0.0.1', port: server.address().port, quietMs: 600, tickMs: 100 });
+  const states = []; live.on('status', (st) => states.push(st));
+  live.start();
+  try {
+    for (let i = 0; i < 40 && !states.some((x) => x.error === 'no response from node'); i++) await wait(100);
+    assert.ok(states.some((x) => x.connected === true), 'connected first');
+    assert.ok(states.some((x) => x.error === 'no response from node'), 'silence detected');
+    assert.equal(live.connected, false);
+    for (let i = 0; i < 40 && conns < 2; i++) await wait(100);
+    assert.ok(conns >= 2, 'tried to reconnect');
+    assert.ok(probes >= 2, 'probed before giving up');
+  } finally { live.stop(); server.close(); }
+});
+
 test('alerts: silent and low-battery nodes', () => {
   const store = new Store(tmp()), mesh = new Mesh(store);
   mesh.me = '!me';

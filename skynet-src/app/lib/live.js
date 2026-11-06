@@ -64,9 +64,11 @@ function decodeFromRadio(buf) {
 }
 
 class Live extends EventEmitter {
-  constructor({ host, port }) {
+  constructor({ host, port, quietMs, tickMs }) {
     super();
     this.host = host; this.port = port || 4403;
+    this.quietMs = quietMs || 90000; this.tickMs = tickMs || 10000; // silence this long = node is gone
+    this.lastRx = 0; this.lastBeat = 0; this.lastProbe = 0;
     this.sock = null; this.buf = Buffer.alloc(0);
     this.stopped = false; this.retry = 2000; this.connected = false;
     this.myNum = null; this.hb = null; this.pktId = (Math.random() * 0xffffffff) >>> 0;
@@ -84,12 +86,22 @@ class Live extends EventEmitter {
     s.setTimeout(30000);
     s.on('connect', () => {
       this.connected = true; this.retry = 2000;
-      this.emit('status', { connected: true });
+      this.lastRx = this.lastBeat = this.lastProbe = Date.now();
+      this.emit('status', { connected: true, synced: false, error: undefined });
       s.write(frame(pb.wVarint(3, (Math.random() * 0xfffffff + 1) >>> 0))); // want_config_id
       clearInterval(this.hb);
-      this.hb = setInterval(() => { try { s.write(frame(pb.wBytes(7, Buffer.alloc(0)))); } catch (_) {} }, 5 * 60 * 1000);
+      // Watchdog. A node that loses power or Wi-Fi never closes the socket, so silence is the signal.
+      this.hb = setInterval(() => {
+        const now = Date.now(), quiet = now - this.lastRx;
+        try {
+          if (quiet > this.quietMs) { this.connected = false; this.emit('status', { connected: false, error: 'no response from node' }); s.destroy(); return; }
+          if (quiet > this.quietMs * 0.45 && now - this.lastProbe > this.quietMs * 0.2) { // ask for a config dump: a live node always answers
+            this.lastProbe = now; s.write(frame(pb.wVarint(3, (Math.random() * 0xfffffff + 1) >>> 0)));
+          } else if (now - this.lastBeat > 60000) { this.lastBeat = now; s.write(frame(pb.wBytes(7, Buffer.alloc(0)))); }
+        } catch (_) {}
+      }, this.tickMs);
     });
-    s.on('timeout', () => { /* quiet link is normal; heartbeat keeps it alive */ });
+    s.on('timeout', () => { if (!this.connected) s.destroy(); }); // never got through (node off): give up and retry
     s.on('data', (d) => this._data(d));
     s.on('error', (e) => this.emit('status', { connected: false, error: e.code || String(e.message) }));
     s.on('close', () => {
@@ -99,6 +111,7 @@ class Live extends EventEmitter {
     });
   }
   _data(d) {
+    this.lastRx = Date.now();
     this.buf = Buffer.concat([this.buf, d]);
     for (;;) {
       // resync to the start bytes
