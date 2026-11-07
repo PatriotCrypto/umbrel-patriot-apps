@@ -33,30 +33,7 @@ const UMBREL = new Color('#5351f3');
 const BTC = new Color('#f7931a');
 const WINGBITS = new Color('#0b0c0f');
 const WINGBITS_HALO = new Color('#9aa3b8');
-const CAR = new Color('#cf2a2f');
-
-// A plain white car silhouette (side view, generic sedan) for devices named Tesla.
-function carTexture() {
-  const c = document.createElement('canvas');
-  c.width = c.height = 256;
-  const x = c.getContext('2d');
-  x.fillStyle = '#fff';
-  x.beginPath();
-  x.moveTo(26, 150); x.bezierCurveTo(26, 136, 38, 130, 60, 126); x.lineTo(98, 114);
-  x.bezierCurveTo(120, 90, 152, 84, 180, 88); x.bezierCurveTo(202, 92, 216, 112, 226, 126);
-  x.lineTo(236, 134); x.bezierCurveTo(246, 138, 248, 146, 248, 156); x.lineTo(248, 166); x.lineTo(26, 166); x.closePath(); x.fill();
-  x.globalCompositeOperation = 'destination-out';
-  x.beginPath(); x.moveTo(108, 113); x.lineTo(128, 96); x.lineTo(172, 95); x.lineTo(206, 114); x.closePath(); x.fill();
-  x.fillRect(150, 94, 5, 22);
-  for (const cx of [80, 200]) { x.beginPath(); x.arc(cx, 168, 28, 0, TWO_PI); x.fill(); }
-  x.globalCompositeOperation = 'source-over';
-  for (const cx of [80, 200]) {
-    x.beginPath(); x.arc(cx, 168, 21, 0, TWO_PI); x.fill();
-    x.globalCompositeOperation = 'destination-out'; x.beginPath(); x.arc(cx, 168, 13, 0, TWO_PI); x.fill();
-    x.globalCompositeOperation = 'source-over'; x.beginPath(); x.arc(cx, 168, 6, 0, TWO_PI); x.fill();
-  }
-  const t = new Texture(c); t.needsUpdate = true; return t;
-}
+const GLOW_WARM = new Color('#ffb86b');
 // 'btc' (named bitcoin/btc, or found listening on the Bitcoin port), 'umbrel' (named umbrel), 'wingbits' (named wingbits), or null.
 function kindOf(d) {
   const nm = [d.hostname, d.name].filter(Boolean).join(' ');
@@ -144,8 +121,12 @@ function create(container, opts = {}) {
   let logoTex = null;
   let btcTex = null;
   let wbTex = null;
-  const carTex = carTexture();
-  disposables.push(carTex);
+  let carTex = null;
+  if (opts.teslaImage) {
+    const ti = new Image();
+    ti.onload = () => { carTex = new Texture(ti); carTex.needsUpdate = true; disposables.push(carTex); for (const n of nodes.values()) restyle(n); };
+    ti.src = opts.teslaImage;
+  }
   if (opts.wingbitsLogo) {
     const wi = new Image();
     wi.onload = () => { wbTex = new Texture(wi); wbTex.needsUpdate = true; disposables.push(wbTex); for (const n of nodes.values()) restyle(n); };
@@ -384,7 +365,9 @@ function create(container, opts = {}) {
   function layout() { layoutRing(); }
 
   function nodeRadius(d) {
-    if (kindOf(d)) return d.online ? 0.38 : 0.2;
+    const k = kindOf(d);
+    if (k === 'car') return d.online ? 0.62 : 0.3;
+    if (k) return d.online ? 0.38 : 0.2;
     if (!d.online) return 0.13;
     return d.role === 'self' ? 0.3 : d.type === 'server' ? 0.26 : 0.2;
   }
@@ -398,7 +381,7 @@ function create(container, opts = {}) {
     const isNew = !d.known && d.online;
     const kind = kindOf(d);
     const um = !!kind;
-    const kcol = kind === 'btc' ? BTC : kind === 'wingbits' ? WINGBITS : kind === 'car' ? CAR : UMBREL;
+    const kcol = kind === 'btc' ? BTC : kind === 'wingbits' ? WINGBITS : kind === 'car' ? GLOW_WARM : UMBREL;
     const col = um ? (d.online ? kcol : kcol.clone().lerp(T.off, 0.65)) : !d.online ? T.off : isNew ? T.warn : T.node;
     const kmap = kind === 'btc' ? btcTex : kind === 'wingbits' ? wbTex : kind === 'car' ? carTex : logoTex;
     if (kind && kmap && (!n.logo || n.logoKind !== kind)) {
@@ -408,6 +391,7 @@ function create(container, opts = {}) {
       n.logoKind = kind;
       n.group.add(n.logo);
     }
+    n.mesh.visible = !(kind === 'car' && carTex);
     if (n.logo) { n.logo.visible = um; n.logo.material.opacity = (d.online ? 1 : 0.5) * dim; }
     n.mesh.material.color.copy(col);
     n.mesh.material.opacity = (d.online ? 1 : 0.8) * dim;
@@ -677,7 +661,7 @@ function create(container, opts = {}) {
       if (!n.logo || !n.logo.visible) continue;
       const r = nodeRadius(n.dev);
       n.logo.position.copy(camera.position).sub(n.group.position).normalize().multiplyScalar(r * 0.98);
-      n.logo.scale.setScalar(r * 1.4);
+      n.logo.scale.setScalar(r * (n.logoKind === 'car' ? 2.04 : 1.4));
     }
 
     // gateway and dish
