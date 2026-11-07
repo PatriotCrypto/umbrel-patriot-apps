@@ -10,7 +10,7 @@ services:
       PROXY_AUTH_ADD: "false"
 
   web:
-    image: ghcr.io/patriotcrypto/advent:1.1.0@sha256:a6d1512d2bea080bf77e35cc60924e7124c49ae187a06d374c2f7d7a29c9509d
+    image: ghcr.io/patriotcrypto/advent:1.1.1@sha256:6e9524f5d4767c87dc94bbf3ff17c01f57acfe438181c9b22b696ad0ee5b44e1
     restart: on-failure
     stop_grace_period: 15s
     read_only: true
