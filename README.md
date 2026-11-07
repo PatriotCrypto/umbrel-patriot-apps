@@ -2,7 +2,7 @@
 
 # Patriot Apps
 
-**Fourteen self-hosted apps for your Umbrel. One store, no accounts, no cloud.**
+**Fifteen self-hosted apps for your Umbrel. One store, no accounts, no cloud.**
 
 Everything you put in these apps stays on your own server.
 
@@ -50,6 +50,7 @@ Umbrel re-checks community stores every so often, so a new app or update can tak
   <tr>
     <td align="center"><a href="#cold-front"><img src="patriot-coldfront/icon.svg" width="84" alt="Cold Front"><br><b>Cold Front</b></a><br><sub>Local thermostat control</sub></td>
     <td align="center"><a href="#constellation"><img src="constellation-src/app/public/icon.svg" width="84" alt="Constellation"><br><b>Constellation</b></a><br><sub>Your network in 3D</sub></td>
+    <td align="center"><a href="#liberty-ai"><img src="patriot-liberty-ai/icon.svg" width="84" alt="Liberty AI"><br><b>Liberty AI</b></a><br><sub>Server doctor and assistant</sub></td>
   </tr>
 </table>
 
@@ -212,6 +213,22 @@ You need a Wingbits API key (station operators get a free Starter plan). Until y
 - Everything between the two stations is end-to-end encrypted on top of Tailscale's own encryption.
 
 Both of you need the Tailscale app on your Umbrels; the [README](uplink-src/README.md) shows two easy ways to set it up.
+
+---
+
+## AI and server care
+
+### Liberty AI
+<img src="patriot-liberty-ai/icon.svg" width="96" align="right" alt="Liberty AI icon">
+
+**Your home server doctor and ask-anything assistant.** Freedom doesn't need Wi-Fi.
+
+- A Home Server Doctor that checks disk, memory, temperature and your apps, explains problems in plain English, and can send ntfy alerts.
+- Ask questions about your files and apps. Every answer shows its sources.
+- Read-only and permission-first: folders and apps are off until you add them, and each kind of data has its own "may go to a cloud AI" switch, plus a Local-only mode.
+- Use a local model like Ollama, or bring your own Claude key.
+
+It needs read access to Docker and your Umbrel storage, both read-only. Independent project, not affiliated with Anthropic, Ollama or Umbrel. · [Details](liberty-ai-src/README.md)
 
 ---
 
