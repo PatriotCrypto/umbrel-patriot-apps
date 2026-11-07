@@ -1,0 +1,33 @@
+version: "3.7"
+
+services:
+  app_proxy:
+    environment:
+      APP_HOST: patriot-liberty-ai_web_1
+      APP_PORT: 3979
+
+  web:
+    image: ghcr.io/patriotcrypto/liberty-ai:0.1.0@sha256:b5cd3ba9e0d45a273952e3debf55f56f83f3d041376dd4229b68eb73cb727afd
+    restart: on-failure
+    stop_grace_period: 15s
+    read_only: true
+    tmpfs:
+      - /tmp
+    cap_drop:
+      - ALL
+    # Root inside the container is needed to read the Docker socket; DAC_OVERRIDE lets it do that.
+    cap_add:
+      - DAC_OVERRIDE
+    security_opt:
+      - no-new-privileges:true
+    environment:
+      PORT: "3979"
+      DATA_DIR: /data
+      STORAGE_DIR: /storage
+      PROXY_HOST: patriot-liberty-ai_app_proxy_1
+    volumes:
+      - ${APP_DATA_DIR}/data:/data
+      # Read-only: Liberty AI can only look at folders you add inside Umbrel's storage.
+      - ${UMBREL_ROOT}/data/storage:/storage:ro
+      # Read-only socket, used for GET requests only (container list, logs, stats).
+      - /var/run/docker.sock:/var/run/docker.sock:ro
