@@ -2,7 +2,7 @@ manifestVersion: 1
 id: patriot-constellation
 category: networking
 name: Constellation
-version: "0.2.1"
+version: "0.2.2"
 tagline: See every device on your network, in 3D
 description: >-
   Constellation is a quiet observatory for your home network. It discovers every device on your
@@ -32,7 +32,7 @@ path: ""
 defaultUsername: ""
 defaultPassword: ""
 releaseNotes: >-
-  Fixes the Umbrel and Bitcoin logos looking squashed when the map is viewed at an angle.
+  Devices you name Wingbits (for example Wingbits Antenna) now get a black globe with the Wingbits logo.
 icon: https://raw.githubusercontent.com/PatriotCrypto/umbrel-patriot-apps/main/patriot-constellation/icon.svg
 submitter: PatriotCrypto
 submission: https://github.com/PatriotCrypto/umbrel-patriot-apps
