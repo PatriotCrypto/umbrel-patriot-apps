@@ -132,6 +132,30 @@ async function build({ question, mode, focus, settings, provider, deps, now = Da
     }
   }
 
+  if (mode !== 'doctor' && deps.library && deps.library.stats().docs > 0) {
+    const a = allowedFor(settings, 'library', cloud);
+    if (a.ok) {
+      const hits = deps.library.search(q, { k: L.k });
+      if (hits.length) {
+        const top = hits[0].score;
+        for (const h of hits) {
+          if (h.score < top * 0.35) continue;
+          const parts2 = h.path.split('/');
+          add('lib', 'Library: ' + parts2[0].replace(/^\d+\s*/, '') + ' / ' + parts2[parts2.length - 1].replace(/\.txt$/, '') + (h.of > 1 ? ' (part ' + (h.chunk + 1) + ' of ' + h.of + ')' : ''), clip(h.text, L.fileHit), { path: h.path });
+        }
+      }
+    }
+  }
+
+  if (mode !== 'doctor' && deps.kiwix && deps.kiwix.base() && q.trim().length > 3) {
+    const a = allowedFor(settings, 'library', cloud);
+    if (a.ok) {
+      try {
+        for (const h of await deps.kiwix.search(q)) add('lib', 'Reference: ' + h.book + ' / ' + h.title, clip(h.text, L.fileHit + 300), { path: h.path });
+      } catch (e) { /* Kiwix is optional: stay quiet if it is down */ }
+    }
+  }
+
   const context = parts.length ? parts.join('\n\n') : '(No context blocks were available for this question.)';
   return { system: SYSTEM + '\n\nCONTEXT\n' + context, sources, blocked, chars: used, cloud };
 }

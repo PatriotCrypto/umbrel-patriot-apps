@@ -84,7 +84,9 @@ async function resolveInRoot(root, rel) {
 }
 
 class Index {
-  constructor({ root, file }) {
+  constructor({ root, file, maxChunksPerDoc, weights }) {
+    this.maxPer = maxChunksPerDoc || 2000;
+    this.weights = weights || {};
     this.root = root;
     this.file = file;
     this.docs = new Map(); // rel -> { rel, folder, mtime, size, chunks: [] }
@@ -170,7 +172,7 @@ class Index {
             if (total >= MAX_CHUNKS) { this.status.full = true; seen.delete(rel); continue; }
             try {
               const text = await X.extractFile(path.join(dir.abs, ent.name), ent.name);
-              const chunks = chunkText(text).slice(0, 2000);
+              const chunks = chunkText(text).slice(0, this.maxPer);
               if (old) total -= old.chunks.length;
               if (chunks.length) {
                 total += chunks.length;
@@ -261,7 +263,7 @@ class Index {
     for (const [id, s] of score) {
       const c = b.chunks[id];
       const text = this.docs.get(c.rel).chunks[c.i];
-      let v = s * Math.pow(hits.get(id) / terms.length, 1.3);
+      let v = s * Math.pow(hits.get(id) / terms.length, 1.3) * (this.weights[this.docs.get(c.rel).folder] || 1);
       if (q.length > 6 && text.toLowerCase().includes(q)) v *= 1.4;
       ranked.push({ id, score: v });
     }

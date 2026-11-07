@@ -11,6 +11,7 @@ function defaults() {
     ollama: { url: DEFAULTS.ollamaUrl, model: '', numCtx: 4096, numPredict: 400, keepAlive: '2m' },
     // Doctor is optional and off: it polls Docker, which costs CPU for little value.
     doctorOn: false,
+    kiwix: { url: '' },
     anthropic: { model: DEFAULTS.anthropicModel },
     openai: { url: '', model: '' },
     localOnly: false,
@@ -20,6 +21,7 @@ function defaults() {
       logs: { enabled: true, cloud: false },
       apps: { enabled: true, cloud: false },
       files: { enabled: true, cloud: false },
+      library: { enabled: true, cloud: true },
     },
     appsOn: {},
     folders: [],
@@ -62,6 +64,7 @@ function validate(input, cur, known) {
   }
   s.localOnly = bool(input.localOnly, s.localOnly);
   s.doctorOn = bool(input.doctorOn, s.doctorOn);
+  if (input.kiwix && input.kiwix.url !== undefined) s.kiwix.url = httpUrl(input.kiwix.url, 'The Kiwix address', true);
   if (input.sources && typeof input.sources === 'object') {
     for (const k of Object.keys(s.sources)) {
       const v = input.sources[k];

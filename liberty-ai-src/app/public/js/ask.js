@@ -2,8 +2,8 @@
 (function () {
   'use strict';
   const { h, clear, icon, api, stream, md, toast, modal, copyText, S } = LA;
-  const KIND = { health: 'pulse', logs: 'file', app: 'grid', file: 'file' };
-  const KIND_LABEL = { health: 'Server health', logs: 'Logs', app: 'App data', file: 'File' };
+  const KIND = { health: 'pulse', logs: 'file', app: 'grid', file: 'file', lib: 'book' };
+  const KIND_LABEL = { health: 'Server health', logs: 'Logs', app: 'App data', file: 'File', lib: 'Library' };
 
   const chat = { id: null, messages: [], mode: 'chat', busy: false, abort: null, liveEl: null };
   let root = null;

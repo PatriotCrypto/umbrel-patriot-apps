@@ -7,6 +7,7 @@ COPY package.json ./
 COPY server.js ./
 COPY lib ./lib
 COPY public ./public
+COPY library ./library
 RUN mkdir -p /data /storage
 EXPOSE 3979
 HEALTHCHECK --interval=60s --timeout=5s --start-period=20s CMD wget -qO- http://127.0.0.1:${PORT:-3979}/healthz >/dev/null || exit 1

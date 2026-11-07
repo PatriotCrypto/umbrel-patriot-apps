@@ -162,3 +162,8 @@ select.input { appearance: auto; } textarea.input { resize: none; }
 }
 @media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }
 [hidden]{display:none!important}
+.shelf-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:8px;margin:10px 0}
+.shelf{border:1px solid var(--line,rgba(255,255,255,.12));border-radius:12px;padding:8px 12px;background:rgba(255,255,255,.03)}
+.shelf summary{display:flex;align-items:center;gap:8px;cursor:pointer;list-style:none}
+.shelf summary small{margin-left:auto}
+.shelf ul{margin:8px 0 2px;padding-left:4px}

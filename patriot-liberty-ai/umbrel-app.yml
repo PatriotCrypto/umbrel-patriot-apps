@@ -2,12 +2,11 @@ manifestVersion: 1
 id: patriot-liberty-ai
 category: ai
 name: Liberty AI
-version: "0.2.0"
+version: "0.3.0"
 tagline: The Liberty Drive for your Umbrel: offline AI and library
 description: >-
   Liberty AI is the Liberty Drive for your Umbrel: an offline AI assistant plus your own reference library.
-  Put survival guides, manuals, books, medical references and family papers in folders on your Umbrel, add them
-  to the Library, and ask questions in plain English. Answers cite the exact passages they came from, so you can
+  A starter library is built in (founding documents, the KJV Bible, survival, medical, food and homestead, radio, energy, finance, faith and history). Add your own manuals and family papers from folders on your Umbrel, and connect Kiwix for Wikipedia-sized reference, then ask questions in plain English. Answers cite the exact passages they came from, so you can
   check every claim. Instant search works even without the AI.
 
 
@@ -35,8 +34,7 @@ path: ""
 defaultUsername: ""
 defaultPassword: ""
 releaseNotes: >-
-  Now centered on the offline library and ask-anything. Much lighter on CPU and memory: smaller prompts, short model
-  keep-alive, speed settings. New icon. The Server (Doctor) page is optional and off by default. Clearer folder scan reports.
+  Built-in starter library (20+ public-domain books across the Liberty Drive categories) and optional Kiwix connection for Wikipedia and reference sets.
 icon: https://raw.githubusercontent.com/PatriotCrypto/umbrel-patriot-apps/main/patriot-liberty-ai/icon.svg
 submitter: PatriotCrypto
 submission: https://github.com/PatriotCrypto/umbrel-patriot-apps

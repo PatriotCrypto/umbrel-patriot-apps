@@ -6,7 +6,9 @@ The Liberty Drive for your Umbrel: an offline AI assistant and your own referenc
 ## What it does
 
 - **Ask anything.** Answers questions about your server, your apps and your files. Every answer cites numbered sources; tap one to see the exact text the AI was given.
-- **Library.** Add folders (a `Liberty Library` folder of manuals, guides and books works well) from your Umbrel storage and Liberty AI builds a local search index (txt, md, csv, json, html, rtf, docx, odt, epub, pptx, xlsx, and PDF). Hidden files, symlinks and secret-looking names (keys, wallets, passwords, seeds) are never indexed.
+- **Built-in starter library.** Public-domain books across the Liberty Drive shelves: founding documents, KJV Bible, survival, first aid, food and homestead, radio, energy, finance, faith and history. Searched offline, cited like any other source.
+- **Kiwix (optional).** Point it at a kiwix-serve on your Umbrel for Wikipedia, WikiMed, MedlinePlus and other reference sets.
+- **Your own folders.** Add folders (a `Liberty Library` folder of manuals, guides and books works well) from your Umbrel storage and Liberty AI builds a local search index (txt, md, csv, json, html, rtf, docx, odt, epub, pptx, xlsx, and PDF). Hidden files, symlinks and secret-looking names (keys, wallets, passwords, seeds) are never indexed.
 - **Apps.** A switch per app, off by default, for whether Liberty AI may read its data. Patriot Apps with widgets (Rally Point, ZeroDollar, Cold Front) share data today; others show status only until they adopt the contract below.
 - **Light on your hardware.** Small prompts, a short model keep-alive and speed settings, so a CPU-only Umbrel stays usable. Pick a 1B to 3B model.
 - **Server page (optional, off by default).** The old Home Server Doctor: disk, memory, temperature, containers, ntfy alerts.

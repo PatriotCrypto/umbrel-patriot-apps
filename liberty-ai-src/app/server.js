@@ -58,6 +58,8 @@ function createApp(opts = {}) {
   // fill in any settings added by newer versions
   const d0 = cfg.defaults();
   for (const k of Object.keys(d0)) if (state.settings[k] === undefined) state.settings[k] = d0[k];
+  if (!state.settings.kiwix) state.settings.kiwix = { url: '' };
+  if (!state.settings.sources.library) state.settings.sources.library = { enabled: true, cloud: true };
   // 0.2: lighter defaults for people who installed 0.1 (Doctor off, small prompts).
   if (!state.settings.light) {
     state.settings.light = true;
@@ -86,6 +88,13 @@ function createApp(opts = {}) {
   });
   const index = new Index({ root: storageDir, file: path.join(dataDir, 'index.json') });
   index.load();
+  // The built-in starter library ships with the app (public-domain books). Read-only, indexed once.
+  const libDir = opts.libDir || process.env.LIBRARY_DIR || path.join(__dirname, 'library');
+  const { Kiwix } = require('./lib/kiwix');
+  const kiwix = new Kiwix({ fetchImpl, getUrl: () => state.settings.kiwix && state.settings.kiwix.url });
+  const lib = new Index({ root: libDir, file: path.join(dataDir, 'library-index.json'), maxChunksPerDoc: 8000, weights: { '02 Bible': 0.3, '10 Faith and History': 0.6, '11 Kids': 0.5 } });
+  lib.load();
+  const libCats = () => { try { return fs.readdirSync(libDir, { withFileTypes: true }).filter((e) => e.isDirectory()).map((e) => e.name).sort(); } catch (e) { return []; } };
   const connectors = new Connectors(fetchImpl);
   const guard = makeGuard({ proxyHost: opts.proxyHost !== undefined ? opts.proxyHost : process.env.PROXY_HOST, disabled: opts.noGuard !== undefined ? opts.noGuard : (demo || process.env.LIBERTY_NO_GUARD === '1') });
 
@@ -235,6 +244,7 @@ function createApp(opts = {}) {
       docker: docker ? await docker.available() : false,
       health: health ? { at: health.at, score: health.score, crit: health.findings.filter((f) => f.sev === 'crit').length, warn: health.findings.filter((f) => f.sev === 'warn').length } : null,
       files: Object.assign({ root: storageDir }, index.stats()),
+      library: lib.stats(),
     };
   });
 
@@ -303,6 +313,20 @@ function createApp(opts = {}) {
     pdf: index.hasPdf,
   }));
 
+  route('GET', '/api/library', () => {
+    const cats = libCats().map((name) => {
+      const docs = Array.from(lib.docs.values()).filter((d) => d.folder === name);
+      return { name, label: name.replace(/^\d+\s*/, ''), docs: docs.map((d) => d.rel.split('/').pop().replace(/\.txt$/, '')).sort(), chunks: docs.reduce((n, d) => n + d.chunks.length, 0) };
+    });
+    return { categories: cats, status: lib.status, stats: lib.stats() };
+  });
+
+  route('POST', '/api/kiwix/test', async () => {
+    if (!state.settings.kiwix.url) throw new HttpError(400, 'Enter your Kiwix address first');
+    try { const b = await kiwix.listBooks(true); return { ok: true, books: b.map((x) => x.title) }; }
+    catch (e) { throw new HttpError(502, 'Could not reach Kiwix: ' + e.message); }
+  });
+
   route('GET', '/api/fs', async (req, res, c) => {
     const r = await listDirs(storageDir, c.query.get('path') || '');
     if (!r) throw new HttpError(404, 'Folder not found');
@@ -338,7 +362,9 @@ function createApp(opts = {}) {
 
   route('GET', '/api/files/search', (req, res, c) => {
     const q = cleanText(c.query.get('q') || '', 300);
-    return { hits: q ? index.search(q, { k: 8 }).map((h) => Object.assign({}, h, { text: h.text.slice(0, 500) })) : [] };
+    const mine = q ? index.search(q, { k: 8 }).map((h) => Object.assign({}, h, { lib: false, text: h.text.slice(0, 500) })) : [];
+    const theirs = q ? lib.search(q, { k: 8 }).map((h) => Object.assign({}, h, { lib: true, text: h.text.slice(0, 500) })) : [];
+    return { hits: mine.concat(theirs).sort((a, b) => b.score - a.score).slice(0, 10) };
   });
 
   // ----- chats -----
@@ -407,6 +433,8 @@ function createApp(opts = {}) {
           readApp,
           listApps,
           index,
+          library: lib,
+          kiwix,
         },
       });
       emit('meta', { chatId: session.id, provider: provider.label, model: provider.model || '', cloud: provider.cloud });
@@ -556,6 +584,7 @@ function createApp(opts = {}) {
         store.backupDaily();
         loopSample(opts.firstSampleMs !== undefined ? opts.firstSampleMs : 4000);
         // keep the file index fresh once a day, and after a restart if folders exist
+        if (!opts.noAutoScan) setTimeout(() => lib.scan(libCats()).catch(() => {}), 3000).unref();
         if (state.settings.folders.length && !opts.noAutoScan) setTimeout(() => index.scan(state.settings.folders).catch(() => {}), demo ? 200 : 8000).unref();
         resolve(server.address().port);
       });
@@ -565,7 +594,7 @@ function createApp(opts = {}) {
   function stop() {
     stopped = true;
     clearTimeout(sampleTimer);
-    index.cancel();
+    index.cancel(); lib.cancel();
     try { store.saveNow(); } catch (e) { console.error('final save failed:', e.message); }
     return new Promise((r) => { server.close(() => r()); if (server.closeAllConnections) server.closeAllConnections(); });
   }

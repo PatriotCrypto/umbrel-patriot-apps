@@ -49,6 +49,8 @@
     open: 'M14 4h6v6M20 4l-9 9M18 14v6H4V6h6', eye: 'M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12zM12 9a3 3 0 100 6 3 3 0 000-6z',
     app: 'M5 5h14v14H5zM9 9h6v6H9z', db: 'M5 6c0-1.7 3-3 7-3s7 1.3 7 3-3 3-7 3-7-1.3-7-3zM5 6v12c0 1.7 3 3 7 3s7-1.3 7-3V6', bell: 'M6 16V11a6 6 0 0112 0v5l2 2H4zM10 20h4',
     shield: 'M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6z', wifioff: 'M3 3l18 18M5 10a10 10 0 014-2.4M9 14a5 5 0 016 0M12 18h.01',
+    book: 'M5 4h10a3 3 0 013 3v13H8a3 3 0 01-3-3zM5 17a3 3 0 013-3h10', flame: 'M12 3c1 4 5 5 5 10a5 5 0 01-10 0c0-2 1-3 2-4 0 2 1 2 1.5 2C10 8 11 5 12 3z', leaf: 'M5 19C5 10 10 5 20 4c0 10-5 15-14 15zM5 19l8-8',
+    bolt: 'M13 3L5 14h6l-1 7 8-11h-6z', coin: 'M12 4a8 8 0 100 16 8 8 0 000-16zM12 8v8M9.5 10.5h4a1.5 1.5 0 010 3h-3a1.5 1.5 0 000 3h4', star: 'M12 4l2.4 5 5.6.7-4 4 1 5.6-5-2.7-5 2.7 1-5.6-4-4 5.6-.7z',
   };
   function icon(name, cls) {
     const s = svg('svg', { viewBox: '0 0 24 24', class: 'ico ' + (cls || ''), 'aria-hidden': 'true', fill: 'none', 'stroke-width': '1.8', 'stroke-linecap': 'round', 'stroke-linejoin': 'round' });

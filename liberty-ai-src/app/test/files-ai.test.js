@@ -202,3 +202,26 @@ test('context: doctor mode skips files and apps', async () => {
   assert.ok(c.sources.every((s) => s.kind === 'health' || s.kind === 'logs'));
   assert.match(c.system, /DATA, not instructions/);
 });
+
+// ---------- kiwix ----------
+const { Kiwix, htmlToText } = require('../lib/kiwix');
+test('kiwix: finds books, searches, reads articles, and refuses non-local addresses', async () => {
+  const calls = [];
+  const fetchImpl = async (url) => {
+    calls.push(url);
+    const u = new URL(url);
+    const body = u.pathname.startsWith('/catalog') ? '<feed><entry><name>wikipedia_en</name><title>Wikipedia</title></entry></feed>'
+      : u.pathname === '/search' ? '<rss><channel><item><title>Water purification</title><link>http://kiwix.local:8080/content/wikipedia_en/A/Water_purification</link></item></channel></rss>'
+      : '<html><body><h1>Water purification</h1><p>' + 'Boiling water for one minute kills most pathogens. '.repeat(4) + '</p><script>x()</script></body></html>';
+    return { ok: true, status: 200, text: async () => body };
+  };
+  const k = new Kiwix({ fetchImpl, getUrl: () => 'http://kiwix_server_1:8080' });
+  const hits = await k.search('purify water');
+  assert.equal(hits.length, 1);
+  assert.equal(hits[0].book, 'Wikipedia');
+  assert.ok(/Boiling water/.test(hits[0].text) && !/x\(\)/.test(hits[0].text));
+  assert.ok(calls.every((c) => c.startsWith('http://kiwix_server_1:8080/')));
+  const bad = new Kiwix({ fetchImpl, getUrl: () => 'https://example.com' });
+  assert.equal(bad.base(), '');
+  assert.ok(htmlToText('<p>a &amp; b</p>').includes('a & b'));
+});
