@@ -1,6 +1,6 @@
 {
   "name": "liberty-ai",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "description": "A read-only Home Server Doctor and ask-anything assistant for your Umbrel.",
   "license": "MIT",
   "private": true,

@@ -138,7 +138,7 @@ async function build({ question, mode, focus, settings, provider, deps, now = Da
       const hits = deps.library.search(q, { k: L.k });
       if (hits.length) {
         const top = hits[0].score;
-        for (const h of hits) {
+        for (const h of top < 7 ? [] : hits) {
           if (h.score < top * 0.35) continue;
           const parts2 = h.path.split('/');
           add('lib', 'Library: ' + parts2[0].replace(/^\d+\s*/, '') + ' / ' + parts2[parts2.length - 1].replace(/\.txt$/, '') + (h.of > 1 ? ' (part ' + (h.chunk + 1) + ' of ' + h.of + ')' : ''), clip(h.text, L.fileHit), { path: h.path });

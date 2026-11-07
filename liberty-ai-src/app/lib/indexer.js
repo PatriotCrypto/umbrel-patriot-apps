@@ -90,7 +90,7 @@ class Index {
     this.root = root;
     this.file = file;
     this.docs = new Map(); // rel -> { rel, folder, mtime, size, chunks: [] }
-    this.status = { running: false, scanned: 0, indexed: 0, current: '', error: null, startedAt: null, finishedAt: null, skipped: 0, full: false, unreadable: 0, dirs: 0, ext: {}, firstError: null };
+    this.status = { running: false, scanned: 0, indexed: 0, current: '', error: null, startedAt: null, finishedAt: null, skipped: 0, full: false, unreadable: 0, dirs: 0, seen: 0, ext: {}, firstError: null };
     this._built = null;
     this._abort = false;
     this.hasPdf = false;
@@ -133,7 +133,7 @@ class Index {
     if (this.status.running) return false;
     this._abort = false;
     this.hasPdf = await X.hasPdftotext();
-    Object.assign(this.status, { running: true, scanned: 0, indexed: 0, current: '', error: null, skipped: 0, full: false, unreadable: 0, dirs: 0, ext: {}, firstError: null, startedAt: Date.now(), finishedAt: null });
+    Object.assign(this.status, { running: true, scanned: 0, indexed: 0, current: '', error: null, skipped: 0, full: false, unreadable: 0, dirs: 0, seen: 0, ext: {}, firstError: null, startedAt: Date.now(), finishedAt: null });
     const seen = new Set();
     try {
       let total = this.stats().chunks;
@@ -147,13 +147,14 @@ class Index {
           try { ents = await fs.promises.readdir(dir.abs, { withFileTypes: true }); this.status.dirs++; } catch (e) { this.status.unreadable++; if (!this.status.firstError) this.status.firstError = (dir.rel || '/') + ': ' + (e.code || e.message); continue; }
           for (const ent of ents) {
             if (this._abort) break;
-            if (ent.isSymbolicLink()) continue;
+            if (ent.isSymbolicLink()) { this.status.links = (this.status.links || 0) + 1; continue; }
             const rel = dir.rel ? dir.rel + '/' + ent.name : ent.name;
             if (ent.isDirectory()) {
               if (!X.isDenied(ent.name, true) && stack.length < 5000) stack.push({ abs: path.join(dir.abs, ent.name), rel });
               continue;
             }
-            if (!ent.isFile()) continue;
+            if (!ent.isFile()) { this.status.other = (this.status.other || 0) + 1; continue; }
+            this.status.seen++;
             if (X.isDenied(ent.name, false) || !X.supported(ent.name, this.hasPdf)) {
               this.status.skipped++;
               const ex = (path.extname(ent.name).slice(1).toLowerCase() || 'other').slice(0, 8);

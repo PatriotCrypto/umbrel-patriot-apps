@@ -18,7 +18,7 @@
       const r = await api('GET', '/api/fs?path=' + encodeURIComponent(browse));
       if (!pickerEl) return;
       clear(pickerEl);
-      const crumbs = h('div', { class: 'crumbs' }, h('button', { class: 'crumb', type: 'button', onclick: () => { browse = ''; loadPicker(); } }, icon('home'), 'Storage'));
+      const crumbs = h('div', { class: 'crumbs' }, h('button', { class: 'crumb', type: 'button', onclick: () => { browse = ''; loadPicker(); } }, icon('home'), 'Your Umbrel'));
       let acc = '';
       for (const part of r.path ? r.path.split('/') : []) {
         acc = acc ? acc + '/' + part : part;
@@ -35,7 +35,7 @@
       }
       pickerEl.appendChild(list);
       if (r.path) pickerEl.appendChild(h('button', { class: 'btn primary', type: 'button', onclick: () => addFolder(r.path) }, icon('plus'), 'Let Liberty AI search “' + r.path + '”'));
-      else pickerEl.appendChild(h('p', { class: 'muted small', text: 'Open a folder, then choose it. Hidden files and anything that looks like a password, key or wallet are always skipped.' }));
+      else pickerEl.appendChild(h('p', { class: 'muted small', text: 'Start with Home (your Files app: Documents, Downloads and so on). Open a folder, then choose it. Hidden files and anything that looks like a password, key or wallet are always skipped.' }));
     } catch (e) {
       clear(pickerEl);
       pickerEl.appendChild(h('p', { class: 'muted', text: 'I can not see your storage: ' + e.message }));
@@ -70,7 +70,7 @@
             let why = 'No readable documents were found in those folders.';
             if (st.unreadable && st.firstError) why = 'I could not open part of the storage (' + st.firstError + '). The app may not have permission yet.';
             else if (ex) why += ' I skipped files I can not read: ' + ex + '. Add a folder that holds documents (PDF, Word, text, ebooks).';
-            else if (!st.dirs) why = 'The storage looks empty or is not mounted. Folders here come from Umbrel Files.';
+            else if (!st.seen) why = 'Those folders hold no files I can see (' + st.dirs + ' folders looked at). Your own documents from the Umbrel Files app are under Home; app files are under Storage.';
             if (!r.pdf && /\.pdf/.test(ex)) why += ' PDFs need pdftotext, which is missing in this install.';
             statusEl.appendChild(h('div', { class: 'banner warn' }, icon('alert'), h('span', { text: why })));
           }

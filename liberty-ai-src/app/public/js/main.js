@@ -15,7 +15,7 @@
     document.documentElement.setAttribute('data-theme', t);
     try { localStorage.setItem('la.theme', t); } catch (e) { /* ignore */ }
     const m = document.querySelector('meta[name=theme-color]');
-    if (m) m.setAttribute('content', { liberty: '#070d1f', terminal: '#020a04', glass: '#1a1440', daylight: '#f4f6fb' }[t] || '#070d1f');
+    if (m) m.setAttribute('content', { liberty: '#05080f', terminal: '#020a04', glass: '#0f2236', daylight: '#f4f6fb' }[t] || '#070d1f');
   };
 
   LA.refreshState = async () => {
@@ -66,7 +66,7 @@
       const now = Date.now();
       taps = taps.filter((t) => now - t < 3000).concat(now);
       if (taps.length >= 7) { taps = []; LA.freedom(); } else LA.go('ask');
-    } }, h('img', { src: '/icon.svg', alt: '' }), h('span', null, 'Liberty ', h('b', { text: 'AI' })));
+    } }, h('img', { src: '/icon.svg?v=4', alt: '' }), h('span', null, 'Liberty ', h('b', { text: 'AI' })));
     const nav = h('nav', { class: 'tabs', 'aria-label': 'Main' }, TABS.map(([id, label, ic]) => {
       const b = h('button', { class: 'tab', type: 'button', onclick: () => LA.go(id) }, icon(ic), h('span', { text: label }));
       tabEls[id] = b;

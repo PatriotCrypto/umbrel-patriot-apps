@@ -37,7 +37,7 @@ const KEEP_PROMPTS = 20;
 
 function createApp(opts = {}) {
   const dataDir = opts.dataDir || process.env.DATA_DIR || '/data';
-  const storageDir = opts.storageDir || process.env.STORAGE_DIR || '/storage';
+  const storageDir = opts.storageDir || process.env.STORAGE_DIR || '/files';
   const demo = opts.demo !== undefined ? opts.demo : process.env.LIBERTY_DEMO === '1';
   const fetchImpl = opts.fetchImpl || (demo ? demoLib.demoFetch() : fetch);
   fs.mkdirSync(dataDir, { recursive: true });
@@ -58,6 +58,11 @@ function createApp(opts = {}) {
   // fill in any settings added by newer versions
   const d0 = cfg.defaults();
   for (const k of Object.keys(d0)) if (state.settings[k] === undefined) state.settings[k] = d0[k];
+  // 0.4: the storage root now holds Home (the Files app) and Storage side by side.
+  state.settings.folders = state.settings.folders.map((f) => {
+    try { if (!fs.existsSync(path.join(storageDir, f)) && fs.existsSync(path.join(storageDir, 'Storage', f))) return 'Storage/' + f; } catch (e) { /* keep */ }
+    return f;
+  });
   if (!state.settings.kiwix) state.settings.kiwix = { url: '' };
   if (!state.settings.sources.library) state.settings.sources.library = { enabled: true, cloud: true };
   // 0.2: lighter defaults for people who installed 0.1 (Doctor off, small prompts).
@@ -83,7 +88,7 @@ function createApp(opts = {}) {
 
   const doctor = new Doctor({
     docker,
-    roots: opts.roots || { proc: '/proc', sys: '/sys', disks: [{ name: 'Storage', path: storageDir }, { name: 'System', path: dataDir }] },
+    roots: opts.roots || { proc: '/proc', sys: '/sys', disks: [{ name: 'Storage', path: fs.existsSync(path.join(storageDir, 'Storage')) ? path.join(storageDir, 'Storage') : storageDir }, { name: 'System', path: dataDir }] },
     sysFn: demo ? demoLib.demoSystem() : opts.sysFn,
   });
   const index = new Index({ root: storageDir, file: path.join(dataDir, 'index.json') });
@@ -228,6 +233,15 @@ function createApp(opts = {}) {
     routes.push({ method, parts: p.split('/').filter(Boolean), handler, open: !!o.open, limit: o.limit });
   }
 
+  function readMemory() {
+    if (demo) return { availGB: 1.7, swapPct: 61 };
+    try {
+      const t = fs.readFileSync('/proc/meminfo', 'utf8');
+      const g = (k) => { const m = new RegExp('^' + k + ':\\s+(\\d+)', 'm').exec(t); return m ? Number(m[1]) : 0; };
+      const swapT = g('SwapTotal');
+      return { availGB: Math.round((g('MemAvailable') / 1048576) * 10) / 10, swapPct: swapT ? Math.round(((swapT - g('SwapFree')) / swapT) * 100) : 0 };
+    } catch (e) { return null; }
+  }
   const publicSettings = () => Object.assign({}, state.settings, { keys: secrets.has() });
 
   route('GET', '/healthz', () => ({ ok: true, version: VERSION }), { open: true });
@@ -245,6 +259,7 @@ function createApp(opts = {}) {
       health: health ? { at: health.at, score: health.score, crit: health.findings.filter((f) => f.sev === 'crit').length, warn: health.findings.filter((f) => f.sev === 'warn').length } : null,
       files: Object.assign({ root: storageDir }, index.stats()),
       library: lib.stats(),
+      memory: readMemory(),
     };
   });
 

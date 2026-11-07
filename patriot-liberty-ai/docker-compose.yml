@@ -23,11 +23,13 @@ services:
     environment:
       PORT: "3979"
       DATA_DIR: /data
-      STORAGE_DIR: /storage
+      STORAGE_DIR: /files
       PROXY_HOST: patriot-liberty-ai_app_proxy_1
     volumes:
       - ${APP_DATA_DIR}/data:/data
-      # Read-only: Liberty AI can only look at folders you add inside Umbrel's storage.
-      - ${UMBREL_ROOT}/data/storage:/storage:ro
+      # Read-only: Liberty AI can only look at folders you add. Home is your Umbrel Files app
+      # (Documents, Downloads and so on). Storage is where apps keep their files.
+      - ${UMBREL_ROOT}/home:/files/Home:ro
+      - ${UMBREL_ROOT}/data/storage:/files/Storage:ro
       # Read-only socket, used for GET requests only (container list, logs, stats).
       - /var/run/docker.sock:/var/run/docker.sock:ro

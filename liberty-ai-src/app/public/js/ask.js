@@ -144,18 +144,33 @@
     autosize();
     setBusy(true);
     chat.abort = new AbortController();
+    const think = h('div', { class: 'thinking', role: 'status' }, h('span', { class: 'dots' }, h('i'), h('i'), h('i')), h('span', { class: 'tt', text: 'Searching your library…' }), h('span', { class: 'bar' }));
+    const bubEl = el.querySelector('.bub');
+    if (bubEl) bubEl.insertBefore(think, bubEl.firstChild);
+    const t0 = Date.now();
+    let stage = 'Searching your library…';
+    const tick = setInterval(() => {
+      const sec = Math.round((Date.now() - t0) / 1000);
+      let msg = stage;
+      if (stage !== 'Writing…' && sec >= 6) msg = 'Waiting for the model to start (it loads into memory first)…';
+      if (stage !== 'Writing…' && sec >= 25) msg = 'Still working. A busy or low-memory server makes local AI slow. You can stop and try a shorter question.';
+      const tt = think.querySelector('.tt');
+      if (tt) tt.textContent = msg + ' ' + sec + 's';
+    }, 1000);
+    const stopThink = () => { clearInterval(tick); think.remove(); };
     let pending = false;
     const paint = () => { if (pending) return; pending = true; requestAnimationFrame(() => { pending = false; if (chat.liveEl) renderBody(chat.liveEl); scrollDown(false); }); };
     try {
       await stream('/api/chat', { chatId: chat.id, message: text, mode: chat.mode, focus: focus || undefined }, (ev, d) => {
         if (ev === 'meta') { chat.id = d.chatId; bot.provider = d.provider; bot.model = d.model; }
-        else if (ev === 'sources') { bot.sources = d.sources; bot.blocked = d.blocked; paint(); }
-        else if (ev === 'token') { bot.content += d.t; paint(); }
+        else if (ev === 'sources') { bot.sources = d.sources; bot.blocked = d.blocked; stage = d.sources && d.sources.length ? 'Reading ' + d.sources.length + ' passages…' : 'Thinking…'; paint(); }
+        else if (ev === 'token') { if (!bot.content) { stage = 'Writing…'; stopThink(); } bot.content += d.t; paint(); }
         else if (ev === 'error') { bot.error = d.error; }
       }, chat.abort.signal);
     } catch (e) {
       if (e.name !== 'AbortError') bot.error = e.message;
     }
+    stopThink();
     const live = chat.liveEl || el;
     live.classList.remove('live');
     bot.done = true;
@@ -219,6 +234,8 @@
 
   function render(into) {
     root = h('section', { class: 'page ask' });
+    const mem = S.state && S.state.memory;
+    const lowMem = mem && S.state.provider && !S.state.provider.cloud && (mem.availGB < 2.5 || mem.swapPct > 40);
     listEl = h('div', { class: 'chat-list' });
     threadEl = h('div', { class: 'thread', 'aria-live': 'polite' });
     inputEl = h('textarea', { class: 'input', rows: '1', placeholder: 'Ask your library anything…', maxlength: '4000',
@@ -229,6 +246,7 @@
     root.appendChild(h('aside', { class: 'side glass' },
       h('button', { class: 'btn primary block', type: 'button', onclick: newChat }, icon('plus'), 'New chat'), listEl));
     root.appendChild(h('div', { class: 'main' },
+      lowMem ? h('div', { class: 'banner warn mem' }, icon('alert'), h('span', { text: 'Your Umbrel is low on memory (' + mem.availGB + ' GB free, swap ' + mem.swapPct + '% used), so a local AI will be slow. A 1B model (llama3.2:1b) helps, or switch to Claude in Settings so nothing runs on your server.' })) : null,
       h('div', { class: 'ask-top' }, h('button', { class: 'icon-btn menu', type: 'button', title: 'Chats', onclick: () => toggleSide() }, icon('menu')),
         h('span', { class: 'muted small', text: 'Answers cite the sources they used. Tap a number or chip to see exactly what I read.' })),
       threadEl,

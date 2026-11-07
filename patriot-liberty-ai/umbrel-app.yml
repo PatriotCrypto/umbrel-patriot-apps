@@ -2,7 +2,7 @@ manifestVersion: 1
 id: patriot-liberty-ai
 category: ai
 name: Liberty AI
-version: "0.3.0"
+version: "0.4.0"
 tagline: "The Liberty Drive for your Umbrel, with offline AI and library"
 description: >-
   Liberty AI is the Liberty Drive for your Umbrel: an offline AI assistant plus your own reference library.
@@ -34,7 +34,7 @@ path: ""
 defaultUsername: ""
 defaultPassword: ""
 releaseNotes: >-
-  Built-in starter library (20+ public-domain books across the Liberty Drive categories) and optional Kiwix connection for Wikipedia and reference sets.
+  Reads your Umbrel Files app (Home) as well as app storage, so your own documents can be searched. Thinking indicator with progress, low-memory warning, CPU thread setting, new tactical red, white and blue look, and the new icon in the browser tab.
 icon: https://raw.githubusercontent.com/PatriotCrypto/umbrel-patriot-apps/main/patriot-liberty-ai/icon.svg
 submitter: PatriotCrypto
 submission: https://github.com/PatriotCrypto/umbrel-patriot-apps

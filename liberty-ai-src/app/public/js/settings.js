@@ -56,11 +56,12 @@
       const model = h('input', { class: 'input', value: s.ollama.model, list: 'models', placeholder: 'e.g. llama3.2:3b', onchange: (e) => put({ ollama: { model: e.target.value } }) });
       const ctx = h('select', { class: 'input', onchange: (e) => put({ ollama: { numCtx: Number(e.target.value) } }) }, [[2048, 'Light (2048): fastest, least memory'], [4096, 'Balanced (4096)'], [8192, 'Roomy (8192): slow on a CPU']].map(([v, t]) => h('option', { value: String(v), text: t, selected: s.ollama.numCtx === v })));
       const keep = h('select', { class: 'input', onchange: (e) => put({ ollama: { keepAlive: e.target.value } }) }, [['0', 'Unload right away (frees memory, slower next question)'], ['30s', '30 seconds'], ['2m', '2 minutes (recommended)'], ['10m', '10 minutes (uses memory longer)']].map(([v, t]) => h('option', { value: v, text: t, selected: s.ollama.keepAlive === v })));
+      const thr = h('select', { class: 'input', onchange: (e) => put({ ollama: { numThread: Number(e.target.value) } }) }, [[2, '2 (lightest on a busy server)'], [4, '4 (recommended)'], [6, '6'], [8, '8 (fastest, hogs the CPU)']].map(([v, t]) => h('option', { value: String(v), text: t, selected: (s.ollama.numThread || 4) === v })));
       const len = h('select', { class: 'input', onchange: (e) => put({ ollama: { numPredict: Number(e.target.value) } }) }, [[200, 'Short answers (fastest)'], [400, 'Normal'], [800, 'Long']].map(([v, t]) => h('option', { value: String(v), text: t, selected: s.ollama.numPredict === v })));
       sec.appendChild(h('div', { class: 'form' }, field('Ollama address', url, 'On Umbrel this is usually http://ollama_ollama_1:11434'),
         field('Model', h('div', { class: 'row gap' }, model, modelBtn('Find models')), 'On a CPU-only server pick a small model: 1B to 3B (for example llama3.2:3b or qwen2.5:1.5b). Bigger models are slow and use many GB of memory.'), dl,
         field('How much I read at once', ctx, 'Smaller is faster and lighter. Your Ollama app, not Liberty AI, holds the model in memory.'),
-        field('Answer length', len), field('Keep the model loaded', keep, 'After this long idle Ollama frees the memory.')));
+        field('Answer length', len), field('CPU threads for the AI', thr, 'Fewer threads leave room for your other apps.'), field('Keep the model loaded', keep, 'After this long idle Ollama frees the memory.')));
     } else if (s.provider === 'anthropic') {
       const model = h('input', { class: 'input', value: s.anthropic.model, list: 'models', onchange: (e) => put({ anthropic: { model: e.target.value } }) });
       sec.appendChild(h('div', { class: 'form' }, keyBox('anthropicKey', s.keys.anthropic, 'sk-ant-…'),

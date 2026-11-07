@@ -8,7 +8,7 @@ const { DEFAULTS } = require('./providers');
 function defaults() {
   return {
     provider: 'ollama',
-    ollama: { url: DEFAULTS.ollamaUrl, model: '', numCtx: 4096, numPredict: 400, keepAlive: '2m' },
+    ollama: { url: DEFAULTS.ollamaUrl, model: '', numCtx: 4096, numPredict: 400, keepAlive: '2m', numThread: 4 },
     // Doctor is optional and off: it polls Docker, which costs CPU for little value.
     doctorOn: false,
     kiwix: { url: '' },
@@ -53,6 +53,7 @@ function validate(input, cur, known) {
   if (input.ollama) {
     if (input.ollama.url !== undefined) s.ollama.url = httpUrl(input.ollama.url, 'The Ollama address', false);
     if (input.ollama.model !== undefined) s.ollama.model = cleanText(input.ollama.model, 120);
+    if (input.ollama.numThread !== undefined) s.ollama.numThread = Math.round(clamp(input.ollama.numThread, 1, 16));
     if (input.ollama.numPredict !== undefined) s.ollama.numPredict = Math.round(clamp(input.ollama.numPredict, 100, 2000));
     if (input.ollama.keepAlive !== undefined) s.ollama.keepAlive = ['0','30s','2m','10m'].includes(input.ollama.keepAlive) ? input.ollama.keepAlive : s.ollama.keepAlive;
     if (input.ollama.numCtx !== undefined) s.ollama.numCtx = Math.round(clamp(input.ollama.numCtx, 1024, 16384));
