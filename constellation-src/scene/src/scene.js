@@ -367,7 +367,8 @@ function create(container, opts = {}) {
     const kmap = kind === 'btc' ? btcTex : logoTex;
     if (kind && kmap && (!n.logo || n.logoKind !== kind)) {
       if (n.logo) { n.group.remove(n.logo); n.logo.material.dispose(); }
-      n.logo = new Sprite(new SpriteMaterial({ map: kmap, transparent: true, depthWrite: false }));
+      n.logo = new Sprite(new SpriteMaterial({ map: kmap, transparent: true, depthWrite: false, depthTest: false }));
+      n.logo.renderOrder = 5;
       n.logoKind = kind;
       n.group.add(n.logo);
     }
@@ -639,7 +640,7 @@ function create(container, opts = {}) {
     for (const n of nodes.values()) {
       if (!n.logo || !n.logo.visible) continue;
       const r = nodeRadius(n.dev);
-      n.logo.position.copy(camera.position).sub(n.group.position).normalize().multiplyScalar(r * 1.04);
+      n.logo.position.copy(camera.position).sub(n.group.position).normalize().multiplyScalar(r * 0.98);
       n.logo.scale.setScalar(r * 1.4);
     }
 
