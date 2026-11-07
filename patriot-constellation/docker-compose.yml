@@ -2,7 +2,7 @@ version: "3.7"
 
 services:
   server:
-    image: ghcr.io/patriotcrypto/constellation:0.2.4@sha256:0000000000000000000000000000000000000000000000000000000000000000
+    image: ghcr.io/patriotcrypto/constellation:0.2.4@sha256:b9b263a77406e14604792e76d7a7d26cb834322f5e56b3842823804231ec9ee0
     restart: on-failure
     stop_grace_period: 1m
     # Host network so ARP and name lookups can see the real LAN. No app_proxy in front,
