@@ -1,0 +1,42 @@
+manifestVersion: 1
+id: patriot-advent
+category: media
+name: Advent Calendar
+version: "1.0.0"
+tagline: "A Christmas countdown with daily surprises, North Pole cams and a Santa tracker"
+description: >-
+  A Christian Christmas Advent calendar for the whole family. Every day from December 1 to 25 a
+  new door opens with an animated, musical surprise and a verse from the Christmas story (King
+  James Version), from the prophets to the shepherds, the wise men and the manger.
+
+
+  North Pole Command shows "live" spy cams on the elves in the workshop, the reindeer barn and
+  Mrs. Claus's kitchen. As Christmas gets closer the cameras change: Santa checking his list, elves
+  loading the sleigh, reindeer in training. On Christmas Eve, watch the launch and then follow Santa
+  on a globe tracker as he flies toward your town, arriving at bedtime.
+
+
+  Kids can write to Santa (he writes back, with answers written in advance, not by an AI), keep a
+  Christmas list parents can read, and use the Nice List Scanner. Parents set each child's Nice or
+  Naughty status day by day behind a PIN. Plus a carol music box, Snowball Toss, a reindeer quiz,
+  hidden elves, badges, five looks, and dozens of secrets to discover.
+
+
+  Everything is made by the app itself and stays on your Umbrel: no accounts, no internet needed,
+  no tracking, no downloads. Several children can share one calendar.
+developer: PatriotCrypto
+website: https://github.com/PatriotCrypto/umbrel-patriot-apps
+dependencies: []
+repo: https://github.com/PatriotCrypto/umbrel-patriot-apps
+support: https://github.com/PatriotCrypto/umbrel-patriot-apps/issues
+port: 3981
+gallery: []
+path: ""
+defaultUsername: ""
+defaultPassword: ""
+releaseNotes: >-
+  First release. 25 animated doors with daily verses, North Pole cams, Christmas Eve launch and
+  Santa tracker, Santa's letter desk, Nice List Scanner, games, badges and secrets.
+icon: https://raw.githubusercontent.com/PatriotCrypto/umbrel-patriot-apps/main/patriot-advent/icon.svg
+submitter: PatriotCrypto
+submission: https://github.com/PatriotCrypto/umbrel-patriot-apps

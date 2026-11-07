@@ -2,7 +2,7 @@
 
 # Patriot Apps
 
-**Fourteen self-hosted apps for your Umbrel. One store, no accounts, no cloud.**
+**Fifteen self-hosted apps for your Umbrel. One store, no accounts, no cloud.**
 
 Everything you put in these apps stays on your own server.
 
@@ -50,6 +50,7 @@ Umbrel re-checks community stores every so often, so a new app or update can tak
   <tr>
     <td align="center"><a href="#cold-front"><img src="patriot-coldfront/icon.svg" width="84" alt="Cold Front"><br><b>Cold Front</b></a><br><sub>Local thermostat control</sub></td>
     <td align="center"><a href="#constellation"><img src="constellation-src/app/public/icon.svg" width="84" alt="Constellation"><br><b>Constellation</b></a><br><sub>Your network in 3D</sub></td>
+    <td align="center"><a href="#advent-calendar"><img src="patriot-advent/icon.svg" width="84" alt="Advent Calendar"><br><b>Advent Calendar</b></a><br><sub>Christmas countdown for kids</sub></td>
   </tr>
 </table>
 
@@ -212,6 +213,22 @@ You need a Wingbits API key (station operators get a free Starter plan). Until y
 - Everything between the two stations is end-to-end encrypted on top of Tailscale's own encryption.
 
 Both of you need the Tailscale app on your Umbrels; the [README](uplink-src/README.md) shows two easy ways to set it up.
+
+---
+
+## Family
+
+### Advent Calendar
+<img src="patriot-advent/icon.svg" width="96" align="right" alt="Advent Calendar icon">
+
+**A Christian Christmas countdown for kids.** A door a day from December 1 to 25, each with an animated, musical surprise and a verse from the Christmas story.
+
+- North Pole spy cams that change as Christmas gets closer, then the Christmas Eve launch and a Santa tracker that reaches your town at bedtime.
+- Letters to Santa (he writes back, no AI), a Christmas list parents can read, and the Nice List Scanner with the list set by parents day by day.
+- Carol music box, Snowball Toss, Reindeer Quiz, hidden elves, badges, five looks and dozens of secrets.
+- Several children share one calendar. All sounds are made by the app; nothing leaves your Umbrel.
+
+No Umbrel login in front so kids can open it on any home device; the Grown-ups page has a PIN. · [Details](advent-src/README.md)
 
 ---
 

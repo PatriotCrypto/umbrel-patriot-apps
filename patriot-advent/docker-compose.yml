@@ -1,0 +1,27 @@
+version: "3.7"
+
+services:
+  app_proxy:
+    environment:
+      APP_HOST: patriot-advent_web_1
+      APP_PORT: 3981
+      # No Umbrel login in front, so the kids can open it from any device at home.
+      # The grown-ups page has its own PIN.
+      PROXY_AUTH_ADD: "false"
+
+  web:
+    image: ghcr.io/patriotcrypto/advent:1.0.0
+    restart: on-failure
+    stop_grace_period: 15s
+    read_only: true
+    tmpfs:
+      - /tmp
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    environment:
+      PORT: "3981"
+      DATA_DIR: /data
+    volumes:
+      - ${APP_DATA_DIR}/data:/data
