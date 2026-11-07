@@ -49,7 +49,7 @@
     clear(soundBtn);
     const on = S.state.settings.volume > 0;
     soundBtn.appendChild(icon(on ? 'sound' : 'mute'));
-    soundBtn.title = on ? 'Sound is on. Tap for sound and look settings.' : 'Sound is off';
+    soundBtn.title = on ? 'Tap for sound and look settings.' : 'Sound is off';
   }
   function lookDialog() {
     A().unlock();
@@ -58,7 +58,6 @@
     const sw = (label, val, fn) => h('label', { class: 'switch' }, h('input', { type: 'checkbox', checked: val, onchange: (e) => fn(e.target.checked) }), h('span', { class: 'sw' }), h('span', { text: label }));
     const body = h('div', { class: 'form' },
       h('label', null, 'Volume', vol),
-      sw('Music plays when a door opens', s.music, async (v) => { s.music = v; await api('PUT', '/api/look', { music: v }); }),
       sw('Snow on the calendar', s.snow, async (v) => { s.snow = v; await api('PUT', '/api/look', { snow: v }); }),
       h('p', { class: 'small muted', text: 'Look' }),
       AD.themePicker(s.theme, async (t) => { s.theme = t; document.documentElement.setAttribute('data-theme', t); await api('PUT', '/api/look', { theme: t }); A().sfx.sparkle(); body.querySelectorAll('.theme-card').forEach((el) => el.classList.toggle('on', el.classList.contains('th-' + t))); }));
@@ -80,7 +79,7 @@
 
   // The first tap anywhere wakes the sound engine.
   function tapToStart() {
-    const el = h('div', { class: 'tap-start' }, h('div', { class: 'tap-card glass' }, h('span', { class: 'big-emoji', text: '🔔' }), h('h2', { text: 'Tap to light the tree' }), h('p', { class: 'muted small', text: 'This turns on the music and sounds.' })));
+    const el = h('div', { class: 'tap-start' }, h('div', { class: 'tap-card glass' }, h('span', { class: 'big-emoji', text: '🔔' }), h('h2', { text: 'Tap to light the tree' }), h('p', { class: 'muted small', text: 'This turns on the sounds.' })));
     el.addEventListener('click', () => { A().unlock(); A().sfx.jingle(10, 0.1); el.classList.add('hide'); setTimeout(() => el.remove(), 500); }, { once: true });
     document.body.appendChild(el);
   }

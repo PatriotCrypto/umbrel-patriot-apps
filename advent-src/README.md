@@ -1,6 +1,6 @@
 # Advent Calendar
 
-A Christian Christmas Advent calendar for Umbrel, made for kids. A door a day from December 1 to 25, each with an animated, musical surprise and a verse from the Christmas story. Plus North Pole spy cams, a Christmas Eve launch and Santa tracker, letters to Santa, the Nice List Scanner, games, badges and secrets.
+A Christian Christmas Advent calendar for Umbrel, made for kids. A door a day from December 1 to 25, each with an animated surprise and a verse from the Christmas story. Plus North Pole spy cams, a Christmas Eve launch and Santa tracker, letters to Santa, the Nice List Scanner, games, badges and secrets.
 
 ![The calendar](docs/calendar.jpg)
 ![Christmas Day](docs/christmas-day.jpg)
@@ -13,10 +13,9 @@ A Christian Christmas Advent calendar for Umbrel, made for kids. A door a day fr
 - **North Pole Command.** Four "live" cams with a spy-cam look. Early December: the toy workshop, the reindeer barn, the cookie kitchen and the mail room. From the 16th: Santa checking his list, the wrapping room, reindeer training. From the 21st: loading the sleigh, the harness bay, the weather radar. Christmas Eve at 5 PM: liftoff, then the **Santa Tracker**, a globe with Santa's route, stops, gifts delivered and the ETA to your town, which he reaches at the bedtime you set. Christmas Day: Santa snoring by the fire.
 - **Santa's Letter Desk.** Kids write to Santa and he writes back. Anything they say they would like goes on their Christmas list, which parents can read. Santa's replies are written in advance (no AI, no internet) and always point back to Jesus when asked what Christmas is about.
 - **Nice List Scanner.** A hand scanner that reports Nice or Naughty for today. Parents set it per child, per day, behind the PIN.
-- **Fun & Games.** Carol jukebox (a music box playing public-domain carols), Snowball Toss, Reindeer Quiz, the Christmas Story so far, badges, a hidden elf on the calendar every day, and secrets: typed magic words, a famous old video-game code, taps on the star, midnight bells on Christmas Eve, and more.
 - **Several children.** Each child has their own doors, letters, list, badges and elf count. Switch with the name chip at the top.
 - **Five looks.** Bethlehem Night, Cozy Cabin, Candy Cane, Winter Frost and North Pole Command.
-- **Audio.** Every sound (bells, chimes, Santa's laugh, hooves, fireworks, the music box) is synthesized in the browser with the Web Audio API. Nothing is downloaded or recorded.
+- **Audio.** Deliberately quiet: a few soft bells and chimes where they matter (opening a door, the Scanner, badges, the launch), synthesized in the browser with the Web Audio API. No background music, nothing downloaded.
 
 ## For parents
 
@@ -41,6 +40,6 @@ npm test
 DATA_DIR=./.dev-data PORT=3981 node server.js
 ```
 
-Zero dependencies: Node 22, plain JavaScript, canvas and Web Audio. Verses are from the King James Bible (public domain); carols are traditional public-domain tunes transcribed as note sequences.
+Zero dependencies: Node 22, plain JavaScript, canvas and Web Audio. Verses are from the King James Bible (public domain).
 
 MIT licensed. An independent project, not affiliated with Umbrel.

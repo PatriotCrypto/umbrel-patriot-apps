@@ -3,7 +3,7 @@
   'use strict';
   const { h, clear, icon, api, toast, modal, S } = AD;
   const A = () => window.Audio2;
-  const THEMES = [['joy', 'Christmas Joy', 'Bright blue, red and gold'], ['candy', 'Candy Cane', 'Peppermint red and pink'], ['wonderland', 'Winter Wonderland', 'Icy blue, purple and silver'], ['gingerbread', 'Gingerbread', 'Warm brown, cream and candy'], ['aurora', 'Northern Lights', 'Green, teal and violet']];
+  const THEMES = [['joy', 'Midnight', 'Deep navy and gold'], ['candy', 'Crimson', 'Burgundy and cream'], ['wonderland', 'Frost', 'Deep teal and ice'], ['gingerbread', 'Evergreen', 'Forest green and gold'], ['aurora', 'Aurora', 'Indigo, mint and violet']];
 
   // ---------- setup wizard ----------
   function setup(into) {

@@ -1,4 +1,4 @@
-// Fun & Games: the carol jukebox, snowball toss, reindeer quiz, the story, and badges.
+// Fun & Games: snowball toss, reindeer quiz, the story, and badges.
 // Also every secret in the app: Konami code, typed magic words, 5 taps on the star, and more.
 (function () {
   'use strict';
@@ -10,7 +10,7 @@
   function child() { return S.state.children.find((c) => c.id === S.child) || S.state.children[0]; }
   const BADGES = {
     'door:1': ['🚪', 'First Door', 'Opened the very first door'], 'door:25': ['🎄', 'Christmas Morning', 'Opened the Christmas Day door'],
-    wish: ['✉️', 'Dear Santa', 'Sent Santa a wish'], scanner: ['🔍', 'Scanned', 'Used the Nice List Scanner'], jukebox: ['🎵', 'Caroler', 'Played a carol in the jukebox'],
+    wish: ['✉️', 'Dear Santa', 'Sent Santa a wish'], scanner: ['🔍', 'Scanned', 'Used the Nice List Scanner'],
     snowball: ['⛄', 'Snowball Champ', 'Scored 10 in Snowball Toss'], quiz: ['🦌', 'Reindeer Expert', 'Named all the reindeer'], story: ['📖', 'Storyteller', 'Read the whole Christmas story'],
     konami: ['🎮', 'Secret Code', 'Found the secret code'], blizzard: ['🌨️', 'Blizzard', 'Made it snow extra hard'], rudolph: ['🔴', 'Red Nose', 'Found Rudolph'], star7: ['⭐', 'Star Gazer', 'Tapped the star of Bethlehem'],
     elf5: ['🧝', 'Elf Spotter', 'Found 5 hidden elves'], elf25: ['👑', 'Elf Master', 'Found every hidden elf'], midnight: ['🔔', 'Midnight Bells', 'Heard the Christmas Eve bells'], hohoho: ['🎅', 'Ho Ho Ho', 'Made Santa laugh'],
@@ -24,14 +24,6 @@
       c.badges = c.badges || {}; c.badges[key] = Date.now();
       if (r.fresh && BADGES[key]) { A().sfx.success(); toast(BADGES[key][0] + ' New badge: ' + BADGES[key][1] + (msg ? '. ' + msg : ''), 'ok'); }
     } catch (e) { /* ignore */ }
-  }
-
-  // ---------- jukebox ----------
-  function jukebox() {
-    const list = h('div', { class: 'juke' });
-    const paint = () => { clear(list); for (const [key, c] of Object.entries(A().CAROLS)) list.appendChild(h('button', { class: 'juke-row' + (A().playing === key ? ' on' : ''), type: 'button', onclick: () => { A().unlock(); if (A().playing === key) A().music.stop(); else A().music.play(key); paint(); award('jukebox'); } }, icon(A().playing === key ? 'pause' : 'play'), h('span', { text: c.name }))); };
-    paint();
-    modal('Carol Jukebox', h('div', null, h('p', { class: 'muted small', text: 'A little music box plays the old carols. Tap one to start, tap again to stop.' }), list), (close) => [h('button', { class: 'btn', type: 'button', onclick: () => { A().music.stop(); close(); } }, 'Stop and close')]);
   }
 
   // ---------- snowball toss ----------
@@ -187,7 +179,6 @@
     const host = h('section', { class: 'fun-page' },
       h('div', { class: 'page-head' }, h('h2', null, icon('star'), ' Fun & Games'), h('p', { class: 'muted', text: 'Things to do while you wait for Christmas, ' + c.name + '. There are secrets hidden all over this app. Can you find them all?' })),
       h('div', { class: 'fun-grid' },
-        tile('🎵', 'Carol Jukebox', 'A music box full of carols', jukebox),
         tile('⛄', 'Snowball Toss', '30 seconds. Hit the targets!', snowball),
         tile('🦌', 'Reindeer Quiz', 'Do you know your reindeer?', quiz),
         tile('📖', 'The Christmas Story', 'All the verses so far', story),

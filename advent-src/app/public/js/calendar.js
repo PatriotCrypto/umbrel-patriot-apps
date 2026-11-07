@@ -102,9 +102,7 @@
       h('p', { class: 'note', text: day.note }),
       h('div', { class: 'row' },
         h('button', { class: 'btn', type: 'button', onclick: () => { scene.st.clicks = 0; sc.t = 0; if (scene.intro) scene.intro(); } }, icon('refresh'), 'Play again'),
-        h('button', { class: 'btn', type: 'button', onclick: () => { const on = A().music.toggle(scene.music); musicBtn.replaceChildren(icon(on ? 'pause' : 'note'), on ? 'Pause music' : 'Play music'); } }, icon('note'), 'Music'),
         h('button', { class: 'btn primary', type: 'button', onclick: closePlayer }, icon('check'), 'Done')));
-    const musicBtn = card.querySelectorAll('.btn')[1];
     const wrap = h('div', { class: 'player' }, h('button', { class: 'icon-btn close', type: 'button', 'aria-label': 'Close', onclick: closePlayer }, icon('x')), canvas, card, h('p', { class: 'hint', text: 'Tap the picture for sparkles ✨' }));
     document.body.appendChild(wrap);
     const sc = new window.Draw.Scene(canvas, (ctx, W, H, t, dt) => scene.draw(ctx, W, H, t, dt), { onClick: (x, y) => { if (scene.click) scene.click(x, y); } });
@@ -112,7 +110,6 @@
     player = { wrap, sc };
     requestAnimationFrame(() => wrap.classList.add('show'));
     if (scene.intro) scene.intro();
-    if (S.state.settings.music && A().unlocked) A().music.play(scene.music || A().music.forDay(n));
     if (first) setTimeout(() => AD.fun && AD.fun.award('door:' + n, n === 25 ? 'You opened every door. Merry Christmas!' : null), 1500);
     document.addEventListener('keydown', escClose);
   }
@@ -124,7 +121,6 @@
     player.wrap.classList.remove('show');
     const w = player.wrap; setTimeout(() => w.remove(), 300);
     player = null;
-    A().music.stop();
     if (host) paintDoors();
   }
 

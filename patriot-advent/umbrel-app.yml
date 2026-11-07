@@ -2,11 +2,11 @@ manifestVersion: 1
 id: patriot-advent
 category: media
 name: Advent Calendar
-version: "1.1.0"
+version: "1.1.1"
 tagline: "A Christmas countdown with daily surprises, North Pole cams and a Santa tracker"
 description: >-
   A Christian Christmas Advent calendar for the whole family. Every day from December 1 to 25 a
-  new door opens with an animated, musical surprise and a verse from the Christmas story (King
+  new door opens with an animated surprise and a verse from the Christmas story (King
   James Version), from the prophets to the shepherds, the wise men and the manger.
 
 
@@ -18,7 +18,7 @@ description: >-
 
   Kids can write to Santa (he writes back, with answers written in advance, not by an AI), keep a
   Christmas list parents can read, and use the Nice List Scanner. Parents set each child's Nice or
-  Naughty status day by day behind a PIN. Plus a carol music box, Snowball Toss, a reindeer quiz,
+  Naughty status day by day behind a PIN. Plus Snowball Toss, a reindeer quiz,
   hidden elves, badges, five looks, and dozens of secrets to discover.
 
 
@@ -35,10 +35,9 @@ path: ""
 defaultUsername: ""
 defaultPassword: ""
 releaseNotes: >-
-  A whole new look. Every door now opens on a rich, painterly picture that comes alive with light,
-  sparkle and snow. The North Pole cams look like real security footage: night-vision green, grain,
-  static and the odd signal drop. Five bright new themes for kids, a hand-lettered cursive heading
-  font, and a plain light/dark Grown-ups page.
+  Quieter and sleeker. Background music and the jukebox are gone; the app now makes only a few soft
+  bell and chime sounds where they matter (opening a door, the Scanner, badges, the launch). Five
+  rich new looks: Midnight, Crimson, Frost, Evergreen and Aurora.
 icon: https://raw.githubusercontent.com/PatriotCrypto/umbrel-patriot-apps/main/patriot-advent/icon.svg
 submitter: PatriotCrypto
 submission: https://github.com/PatriotCrypto/umbrel-patriot-apps
