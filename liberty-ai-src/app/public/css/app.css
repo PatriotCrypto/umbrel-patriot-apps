@@ -161,3 +161,4 @@ select.input { appearance: auto; } textarea.input { resize: none; }
   .cols { grid-template-columns: 1fr; } .hero { flex-direction: column; text-align: center; } .hero .row { justify-content: center; } .msg.user .bub { max-width: 92%; } .trends { grid-template-columns: 1fr 1fr; }
 }
 @media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }
+[hidden]{display:none!important}

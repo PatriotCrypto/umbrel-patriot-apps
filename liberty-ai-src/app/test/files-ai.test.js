@@ -165,6 +165,7 @@ async function ctxFor(over, provider) {
   await idx.scan(['Docs']);
   const settings = Object.assign(cfg.defaults(), over.settings || {});
   settings.appsOn = { 'patriot-rally-point': true };
+  settings.sources.health = { enabled: true, cloud: true };
   if (over.sources) for (const k of Object.keys(over.sources)) Object.assign(settings.sources[k], over.sources[k]);
   const health = { snap: { system: { uptimeSec: 100, cores: 2, load: [1, 1, 1], mem: { pct: 50, used: 1, total: 2 }, swap: { total: 0 }, disks: [], tempMax: null }, docker: { ok: true }, apps: [], containers: [] },
     findings: [{ id: 'c:x', sev: 'crit', title: 'X keeps restarting', detail: 'd', fix: [], container: 'x_web_1' }] };

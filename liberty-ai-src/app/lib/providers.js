@@ -68,7 +68,7 @@ function ollama(cfg, fetchImpl) {
       try {
         res = await fetchImpl(base + '/api/chat', {
           method: 'POST', headers: { 'Content-Type': 'application/json' }, signal,
-          body: JSON.stringify({ model: cfg.model, messages: msgs, stream: true, keep_alive: '10m', options: { num_ctx: cfg.numCtx || 8192, temperature: 0.3 } }),
+          body: JSON.stringify({ model: cfg.model, messages: msgs, stream: true, keep_alive: cfg.keepAlive || '2m', options: { num_ctx: cfg.numCtx || 4096, num_predict: cfg.numPredict || 400, temperature: 0.3 } }),
         });
       } catch (e) { throw netError(e, 'Ollama'); }
       if (!res.ok) throw await errorFrom(res, 'Ollama');

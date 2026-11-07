@@ -1,14 +1,15 @@
 # Liberty AI
 
-A home server doctor and ask-anything assistant for Umbrel. Born from the Liberty Drive offline-AI USB.
+The Liberty Drive for your Umbrel: an offline AI assistant and your own reference library. Born from the Liberty Drive offline-AI USB.
 *Freedom doesn't need Wi-Fi.*
 
 ## What it does
 
-- **Home Server Doctor.** Checks disk, memory, swap, CPU load, temperature, Docker containers and reclaimable space every 10 minutes. Findings are written in plain English with what to do next. A 0 to 100 health score and a 24-hour trend. Optional ntfy alerts (urgent only by default, once a day per problem).
 - **Ask anything.** Answers questions about your server, your apps and your files. Every answer cites numbered sources; tap one to see the exact text the AI was given.
-- **Files.** Add folders from your Umbrel storage and Liberty AI builds a local search index (txt, md, csv, json, html, rtf, docx, odt, epub, pptx, xlsx, and PDF). Hidden files, symlinks and secret-looking names (keys, wallets, passwords, seeds) are never indexed.
+- **Library.** Add folders (a `Liberty Library` folder of manuals, guides and books works well) from your Umbrel storage and Liberty AI builds a local search index (txt, md, csv, json, html, rtf, docx, odt, epub, pptx, xlsx, and PDF). Hidden files, symlinks and secret-looking names (keys, wallets, passwords, seeds) are never indexed.
 - **Apps.** A switch per app, off by default, for whether Liberty AI may read its data. Patriot Apps with widgets (Rally Point, ZeroDollar, Cold Front) share data today; others show status only until they adopt the contract below.
+- **Light on your hardware.** Small prompts, a short model keep-alive and speed settings, so a CPU-only Umbrel stays usable. Pick a 1B to 3B model.
+- **Server page (optional, off by default).** The old Home Server Doctor: disk, memory, temperature, containers, ntfy alerts.
 - **Your choice of AI.** A local model (Ollama or any OpenAI-compatible server) or your own Claude key. Four looks. There is a secret.
 
 ## Privacy and safety

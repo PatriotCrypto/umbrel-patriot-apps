@@ -88,7 +88,7 @@ class Index {
     this.root = root;
     this.file = file;
     this.docs = new Map(); // rel -> { rel, folder, mtime, size, chunks: [] }
-    this.status = { running: false, scanned: 0, indexed: 0, current: '', error: null, startedAt: null, finishedAt: null, skipped: 0, full: false };
+    this.status = { running: false, scanned: 0, indexed: 0, current: '', error: null, startedAt: null, finishedAt: null, skipped: 0, full: false, unreadable: 0, dirs: 0, ext: {}, firstError: null };
     this._built = null;
     this._abort = false;
     this.hasPdf = false;
@@ -131,7 +131,7 @@ class Index {
     if (this.status.running) return false;
     this._abort = false;
     this.hasPdf = await X.hasPdftotext();
-    Object.assign(this.status, { running: true, scanned: 0, indexed: 0, current: '', error: null, skipped: 0, full: false, startedAt: Date.now(), finishedAt: null });
+    Object.assign(this.status, { running: true, scanned: 0, indexed: 0, current: '', error: null, skipped: 0, full: false, unreadable: 0, dirs: 0, ext: {}, firstError: null, startedAt: Date.now(), finishedAt: null });
     const seen = new Set();
     try {
       let total = this.stats().chunks;
@@ -142,7 +142,7 @@ class Index {
         while (stack.length && !this._abort) {
           const dir = stack.pop();
           let ents;
-          try { ents = await fs.promises.readdir(dir.abs, { withFileTypes: true }); } catch (e) { continue; }
+          try { ents = await fs.promises.readdir(dir.abs, { withFileTypes: true }); this.status.dirs++; } catch (e) { this.status.unreadable++; if (!this.status.firstError) this.status.firstError = (dir.rel || '/') + ': ' + (e.code || e.message); continue; }
           for (const ent of ents) {
             if (this._abort) break;
             if (ent.isSymbolicLink()) continue;
@@ -152,12 +152,18 @@ class Index {
               continue;
             }
             if (!ent.isFile()) continue;
-            if (X.isDenied(ent.name, false) || !X.supported(ent.name, this.hasPdf)) { this.status.skipped++; continue; }
+            if (X.isDenied(ent.name, false) || !X.supported(ent.name, this.hasPdf)) {
+              this.status.skipped++;
+              const ex = (path.extname(ent.name).slice(1).toLowerCase() || 'other').slice(0, 8);
+              const E = this.status.ext;
+              if (E[ex] || Object.keys(E).length < 30) E[ex] = (E[ex] || 0) + 1;
+              continue;
+            }
             this.status.scanned++;
             this.status.current = rel;
             seen.add(rel);
             let st;
-            try { st = await fs.promises.stat(path.join(dir.abs, ent.name)); } catch (e) { continue; }
+            try { st = await fs.promises.stat(path.join(dir.abs, ent.name)); } catch (e) { this.status.unreadable++; continue; }
             if (st.size > MAX_FILE_BYTES || st.size === 0) { seen.delete(rel); continue; }
             const old = this.docs.get(rel);
             if (old && old.mtime === Math.floor(st.mtimeMs) && old.size === st.size && old.folder === r.rel) continue;

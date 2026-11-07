@@ -50,7 +50,7 @@ Umbrel re-checks community stores every so often, so a new app or update can tak
   <tr>
     <td align="center"><a href="#cold-front"><img src="patriot-coldfront/icon.svg" width="84" alt="Cold Front"><br><b>Cold Front</b></a><br><sub>Local thermostat control</sub></td>
     <td align="center"><a href="#constellation"><img src="constellation-src/app/public/icon.svg" width="84" alt="Constellation"><br><b>Constellation</b></a><br><sub>Your network in 3D</sub></td>
-    <td align="center"><a href="#liberty-ai"><img src="patriot-liberty-ai/icon.svg" width="84" alt="Liberty AI"><br><b>Liberty AI</b></a><br><sub>Server doctor and assistant</sub></td>
+    <td align="center"><a href="#liberty-ai"><img src="patriot-liberty-ai/icon.svg" width="84" alt="Liberty AI"><br><b>Liberty AI</b></a><br><sub>Offline AI and library</sub></td>
   </tr>
 </table>
 
@@ -221,14 +221,14 @@ Both of you need the Tailscale app on your Umbrels; the [README](uplink-src/READ
 ### Liberty AI
 <img src="patriot-liberty-ai/icon.svg" width="96" align="right" alt="Liberty AI icon">
 
-**Your home server doctor and ask-anything assistant.** Freedom doesn't need Wi-Fi.
+**The Liberty Drive for your Umbrel.** An offline AI assistant plus your own reference library. Freedom doesn't need Wi-Fi.
 
-- A Home Server Doctor that checks disk, memory, temperature and your apps, explains problems in plain English, and can send ntfy alerts.
-- Ask questions about your files and apps. Every answer shows its sources.
-- Read-only and permission-first: folders and apps are off until you add them, and each kind of data has its own "may go to a cloud AI" switch, plus a Local-only mode.
-- Use a local model like Ollama, or bring your own Claude key.
+- Put manuals, survival guides, books and family papers in folders on your Umbrel, add them to the Library, and ask questions. Every answer shows the passages it came from.
+- Instant search works even without the AI, and a small local model (Ollama) keeps everything on your server. Or bring your own Claude key.
+- Read-only and permission-first: folders and apps are off until you add them, each kind of data has its own "may go to a cloud AI" switch, plus a Local-only mode.
+- An optional Server page can watch disk, memory and apps.
 
-It needs read access to Docker and your Umbrel storage, both read-only. Independent project, not affiliated with Anthropic, Ollama or Umbrel. · [Details](liberty-ai-src/README.md)
+It reads your Umbrel storage read-only. Independent project, not affiliated with Anthropic, Ollama or Umbrel. · [Details](liberty-ai-src/README.md)
 
 ---
 

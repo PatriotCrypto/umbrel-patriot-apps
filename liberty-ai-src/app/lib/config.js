@@ -8,13 +8,15 @@ const { DEFAULTS } = require('./providers');
 function defaults() {
   return {
     provider: 'ollama',
-    ollama: { url: DEFAULTS.ollamaUrl, model: '', numCtx: 8192 },
+    ollama: { url: DEFAULTS.ollamaUrl, model: '', numCtx: 4096, numPredict: 400, keepAlive: '2m' },
+    // Doctor is optional and off: it polls Docker, which costs CPU for little value.
+    doctorOn: false,
     anthropic: { model: DEFAULTS.anthropicModel },
     openai: { url: '', model: '' },
     localOnly: false,
     // enabled: may Liberty AI use this kind of data at all?  cloud: may it go to a cloud AI?
     sources: {
-      health: { enabled: true, cloud: true },
+      health: { enabled: false, cloud: false },
       logs: { enabled: true, cloud: false },
       apps: { enabled: true, cloud: false },
       files: { enabled: true, cloud: false },
@@ -49,7 +51,9 @@ function validate(input, cur, known) {
   if (input.ollama) {
     if (input.ollama.url !== undefined) s.ollama.url = httpUrl(input.ollama.url, 'The Ollama address', false);
     if (input.ollama.model !== undefined) s.ollama.model = cleanText(input.ollama.model, 120);
-    if (input.ollama.numCtx !== undefined) s.ollama.numCtx = Math.round(clamp(input.ollama.numCtx, 2048, 131072));
+    if (input.ollama.numPredict !== undefined) s.ollama.numPredict = Math.round(clamp(input.ollama.numPredict, 100, 2000));
+    if (input.ollama.keepAlive !== undefined) s.ollama.keepAlive = ['0','30s','2m','10m'].includes(input.ollama.keepAlive) ? input.ollama.keepAlive : s.ollama.keepAlive;
+    if (input.ollama.numCtx !== undefined) s.ollama.numCtx = Math.round(clamp(input.ollama.numCtx, 1024, 16384));
   }
   if (input.anthropic && input.anthropic.model !== undefined) s.anthropic.model = cleanText(input.anthropic.model, 120) || DEFAULTS.anthropicModel;
   if (input.openai) {
@@ -57,6 +61,7 @@ function validate(input, cur, known) {
     if (input.openai.model !== undefined) s.openai.model = cleanText(input.openai.model, 120);
   }
   s.localOnly = bool(input.localOnly, s.localOnly);
+  s.doctorOn = bool(input.doctorOn, s.doctorOn);
   if (input.sources && typeof input.sources === 'object') {
     for (const k of Object.keys(s.sources)) {
       const v = input.sources[k];

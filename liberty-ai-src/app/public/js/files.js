@@ -63,6 +63,15 @@
         if (st.running) statusEl.appendChild(h('div', { class: 'banner info' }, h('span', { class: 'spinner' }), h('span', { text: 'Reading files… ' + st.scanned + ' checked, ' + st.indexed + ' new or changed' }), h('button', { class: 'btn small', type: 'button', onclick: () => api('POST', '/api/files/cancel', {}) }, 'Stop')));
         else {
           statusEl.appendChild(h('p', { class: 'muted small', text: r.stats.docs + ' files · ' + r.stats.chunks + ' passages searchable' + (st.finishedAt ? ' · last read ' + ago(st.finishedAt) : '') + (r.pdf ? ' · PDFs supported' : ' · PDFs not supported in this install') }));
+          if (r.folders.length && !r.stats.docs) {
+            const ex = Object.entries(st.ext || {}).sort((a, b) => b[1] - a[1]).slice(0, 6).map(([k, n]) => n + ' .' + k).join(', ');
+            let why = 'No readable documents were found in those folders.';
+            if (st.unreadable && st.firstError) why = 'I could not open part of the storage (' + st.firstError + '). The app may not have permission yet.';
+            else if (ex) why += ' I skipped files I can not read: ' + ex + '. Add a folder that holds documents (PDF, Word, text, ebooks).';
+            else if (!st.dirs) why = 'The storage looks empty or is not mounted. Folders here come from Umbrel Files.';
+            if (!r.pdf && /\.pdf/.test(ex)) why += ' PDFs need pdftotext, which is missing in this install.';
+            statusEl.appendChild(h('div', { class: 'banner warn' }, icon('alert'), h('span', { text: why })));
+          }
           if (st.full) statusEl.appendChild(h('div', { class: 'banner warn' }, icon('alert'), h('span', { text: 'The index is full. Remove a folder you do not need.' })));
           if (st.error) statusEl.appendChild(h('div', { class: 'banner warn' }, icon('alert'), h('span', { text: st.error })));
         }
@@ -106,8 +115,8 @@
       h('div', { class: 'card glass' }, h('h3', { text: 'Choose a folder' }), pickerEl),
       h('div', { class: 'card glass' }, h('h3', { text: 'Try a search' }), h('div', { class: 'row gap' }, q, h('button', { class: 'btn', type: 'button', onclick: () => doSearch(q.value) }, icon('send'), 'Search')), resultsEl));
     into.appendChild(h('section', { class: 'page' },
-      h('div', { class: 'page-head' }, h('h2', { text: 'Your files' }),
-        h('p', { class: 'muted', text: 'Pick folders and I can answer questions from what is inside: text, Word, PDF, ebooks and more. Your storage is mounted read-only, so I can look but never change a file.' })),
+      h('div', { class: 'page-head' }, h('h2', { text: 'Library' }),
+        h('p', { class: 'muted', text: 'Your offline library, like the Liberty Drive. Put manuals, guides, books and family papers in folders on your Umbrel (for example a folder called Liberty Library), then add them here. I search them with no internet, and read-only: I can never change a file. I read text, Word, PDF, ebooks, slides and spreadsheets, not photos, music or video.' })),
       host));
     browse = '';
     loadPicker();

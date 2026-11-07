@@ -31,7 +31,7 @@ function clip(s, n) {
 }
 
 function limits(cloud) {
-  return cloud ? { total: 60000, health: 6000, logs: 9000, apps: 8000, fileHit: 900, k: 8 } : { total: 16000, health: 4500, logs: 4500, apps: 3000, fileHit: 700, k: 6 };
+  return cloud ? { total: 60000, health: 6000, logs: 9000, apps: 8000, fileHit: 900, k: 8 } : { total: 5000, health: 1500, logs: 1500, apps: 1500, fileHit: 600, k: 3 };
 }
 
 function allowedFor(settings, kind, cloud) {

@@ -82,13 +82,10 @@
   }
 
   function suggestions() {
-    const out = [
-      { t: 'How is my server doing?', m: 'doctor' },
-      { t: 'Brief me on everything', m: 'chat' },
-      { t: "What's using the most memory?", m: 'doctor' },
-    ];
-    if (S.state && S.state.files && S.state.files.docs) out.push({ t: 'Search my files for insurance', m: 'chat' });
-    else out.push({ t: 'What can you do?', m: 'chat' });
+    const has = S.state && S.state.files && S.state.files.docs;
+    if (!has) return [{ t: 'How do I set up my library?', m: 'chat' }, { t: 'What can you do offline?', m: 'chat' }];
+    const out = [{ t: 'How do I purify water without a filter?', m: 'chat' }, { t: 'Find my insurance papers', m: 'chat' }, { t: 'Summarize what is in my library', m: 'chat' }];
+    if (S.state.settings.doctorOn) out.push({ t: 'How is my server doing?', m: 'doctor' });
     return out;
   }
 
@@ -99,7 +96,7 @@
       threadEl.appendChild(h('div', { class: 'empty' },
         h('img', { class: 'logo-big', src: '/icon.svg', alt: '' }),
         h('h2', { text: 'What can I help with?' }),
-        h('p', { class: 'muted', text: 'I can check on your server, read your apps, and search folders you choose. I only ever read. I never change anything.' }),
+        h('p', { class: 'muted', text: 'Ask me anything. I answer from the library and folders you choose, with no internet needed, and show you where each answer came from. I only ever read.' }),
         ready.ok ? null : h('div', { class: 'banner warn' }, icon('alert'), h('span', { text: ready.msg }), h('button', { class: 'btn small', type: 'button', onclick: () => LA.go('settings') }, 'Open Settings')),
         h('div', { class: 'sugg' }, suggestions().map((s) => h('button', { class: 'chip big', type: 'button', onclick: () => send(s.t, s.m) }, s.t)))));
       return;
@@ -113,7 +110,7 @@
   function setMode(m) {
     chat.mode = m;
     if (modeBtns) modeBtns.forEach((b) => b.classList.toggle('on', b.dataset.mode === m));
-    if (inputEl) inputEl.placeholder = m === 'doctor' ? 'Ask the Doctor about your server…' : 'Ask about your server, apps or files…';
+    if (inputEl) inputEl.placeholder = m === 'doctor' ? 'Ask the Doctor about your server…' : 'Ask your library anything…';
   }
 
   function setBusy(b) {
@@ -224,11 +221,11 @@
     root = h('section', { class: 'page ask' });
     listEl = h('div', { class: 'chat-list' });
     threadEl = h('div', { class: 'thread', 'aria-live': 'polite' });
-    inputEl = h('textarea', { class: 'input', rows: '1', placeholder: 'Ask about your server, apps or files…', maxlength: '4000',
+    inputEl = h('textarea', { class: 'input', rows: '1', placeholder: 'Ask your library anything…', maxlength: '4000',
       onkeydown: (e) => { if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) { e.preventDefault(); send(inputEl.value); } },
       oninput: autosize });
     sendBtn = h('button', { class: 'send', type: 'button', title: 'Send', onclick: () => { if (chat.busy && chat.abort) chat.abort.abort(); else send(inputEl.value); } }, icon('send'));
-    modeBtns = ['chat', 'doctor'].map((m) => h('button', { class: 'seg' + (chat.mode === m ? ' on' : ''), type: 'button', 'data-mode': m, onclick: () => setMode(m) }, icon(m === 'chat' ? 'chat' : 'pulse'), m === 'chat' ? 'Ask' : 'Doctor'));
+    modeBtns = (S.state && S.state.settings.doctorOn ? ['chat', 'doctor'] : []).map((m) => h('button', { class: 'seg' + (chat.mode === m ? ' on' : ''), type: 'button', 'data-mode': m, onclick: () => setMode(m) }, icon(m === 'chat' ? 'chat' : 'pulse'), m === 'chat' ? 'Ask' : 'Doctor'));
     root.appendChild(h('aside', { class: 'side glass' },
       h('button', { class: 'btn primary block', type: 'button', onclick: newChat }, icon('plus'), 'New chat'), listEl));
     root.appendChild(h('div', { class: 'main' },

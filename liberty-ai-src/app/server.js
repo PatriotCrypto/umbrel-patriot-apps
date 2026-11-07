@@ -58,6 +58,17 @@ function createApp(opts = {}) {
   // fill in any settings added by newer versions
   const d0 = cfg.defaults();
   for (const k of Object.keys(d0)) if (state.settings[k] === undefined) state.settings[k] = d0[k];
+  // 0.2: lighter defaults for people who installed 0.1 (Doctor off, small prompts).
+  if (!state.settings.light) {
+    state.settings.light = true;
+    state.settings.doctorOn = false;
+    state.settings.sources.health.enabled = false;
+    state.settings.sources.health.cloud = false;
+    const o = state.settings.ollama;
+    o.numCtx = Math.min(o.numCtx || 4096, 4096);
+    o.numPredict = o.numPredict || 400;
+    o.keepAlive = '2m';
+  }
   for (const k of Object.keys(d0.sources)) if (!state.settings.sources[k]) state.settings.sources[k] = d0.sources[k];
   store.attach(() => state);
   const secrets = new cfg.Secrets(dataDir);
@@ -142,6 +153,7 @@ function createApp(opts = {}) {
   function loopSample(firstMs) {
     clearTimeout(sampleTimer);
     if (stopped) return;
+    if (!state.settings.doctorOn) return;
     sampleTimer = setTimeout(async () => {
       await runSample();
       loopSample(state.settings.checkIntervalMin * 60 * 1000);
@@ -212,7 +224,7 @@ function createApp(opts = {}) {
   route('GET', '/healthz', () => ({ ok: true, version: VERSION }), { open: true });
 
   route('GET', '/api/state', async () => {
-    if (!health) refreshHealth(false).catch(() => {});
+    if (!health && state.settings.doctorOn) refreshHealth(false).catch(() => {});
     const provider = makeProvider();
     const guardState = await guard.status();
     return {
@@ -248,7 +260,7 @@ function createApp(opts = {}) {
   route('PUT', '/api/settings', (req, res, c) => {
     state.settings = cfg.validate(c.body, state.settings, knownIds());
     store.scheduleSave(500);
-    loopSample(state.settings.checkIntervalMin * 60 * 1000);
+    loopSample(state.settings.doctorOn ? 3000 : state.settings.checkIntervalMin * 60 * 1000);
     return { ok: true, settings: publicSettings() };
   });
 

@@ -54,10 +54,13 @@
     if (s.provider === 'ollama') {
       const url = h('input', { class: 'input', value: s.ollama.url, onchange: (e) => put({ ollama: { url: e.target.value } }) });
       const model = h('input', { class: 'input', value: s.ollama.model, list: 'models', placeholder: 'e.g. llama3.2:3b', onchange: (e) => put({ ollama: { model: e.target.value } }) });
-      const ctx = h('input', { class: 'input', type: 'number', min: '2048', step: '1024', value: s.ollama.numCtx, onchange: (e) => put({ ollama: { numCtx: Number(e.target.value) } }) });
+      const ctx = h('select', { class: 'input', onchange: (e) => put({ ollama: { numCtx: Number(e.target.value) } }) }, [[2048, 'Light (2048): fastest, least memory'], [4096, 'Balanced (4096)'], [8192, 'Roomy (8192): slow on a CPU']].map(([v, t]) => h('option', { value: String(v), text: t, selected: s.ollama.numCtx === v })));
+      const keep = h('select', { class: 'input', onchange: (e) => put({ ollama: { keepAlive: e.target.value } }) }, [['0', 'Unload right away (frees memory, slower next question)'], ['30s', '30 seconds'], ['2m', '2 minutes (recommended)'], ['10m', '10 minutes (uses memory longer)']].map(([v, t]) => h('option', { value: v, text: t, selected: s.ollama.keepAlive === v })));
+      const len = h('select', { class: 'input', onchange: (e) => put({ ollama: { numPredict: Number(e.target.value) } }) }, [[200, 'Short answers (fastest)'], [400, 'Normal'], [800, 'Long']].map(([v, t]) => h('option', { value: String(v), text: t, selected: s.ollama.numPredict === v })));
       sec.appendChild(h('div', { class: 'form' }, field('Ollama address', url, 'On Umbrel this is usually http://ollama_ollama_1:11434'),
-        field('Model', h('div', { class: 'row gap' }, model, modelBtn('Find models')), 'Small models (3B to 8B) are fine for the Doctor and for searching your files.'), dl,
-        field('Memory window (tokens)', ctx, 'Bigger lets me read more at once but uses more RAM. 8192 is a good start.')));
+        field('Model', h('div', { class: 'row gap' }, model, modelBtn('Find models')), 'On a CPU-only server pick a small model: 1B to 3B (for example llama3.2:3b or qwen2.5:1.5b). Bigger models are slow and use many GB of memory.'), dl,
+        field('How much I read at once', ctx, 'Smaller is faster and lighter. Your Ollama app, not Liberty AI, holds the model in memory.'),
+        field('Answer length', len), field('Keep the model loaded', keep, 'After this long idle Ollama frees the memory.')));
     } else if (s.provider === 'anthropic') {
       const model = h('input', { class: 'input', value: s.anthropic.model, list: 'models', onchange: (e) => put({ anthropic: { model: e.target.value } }) });
       sec.appendChild(h('div', { class: 'form' }, keyBox('anthropicKey', s.keys.anthropic, 'sk-ant-…'),
@@ -78,11 +81,10 @@
 
   function privacySection(s) {
     const rows = [
-      ['health', 'Server health', 'CPU, memory, disks, app states, findings'],
       ['logs', 'App logs', 'Recent log lines of apps that have problems (secrets scrubbed first)'],
       ['apps', 'App data', 'Summaries from the Patriot apps you switch on'],
-      ['files', 'Your files', 'Passages from folders you chose'],
-    ];
+      ['files', 'Your library and files', 'Passages from folders you chose'],
+    ].concat(S.state.settings.doctorOn ? [['health', 'Server health', 'CPU, memory, disks, app states, findings']] : []);
     const t = h('table', { class: 'tbl matrix' }, h('thead', null, h('tr', null, h('th', { text: 'Source' }), h('th', { class: 'c', text: 'Use it' }), h('th', { class: 'c', text: 'May go to a cloud AI' }))),
       h('tbody', null, rows.map(([k, name, desc]) => h('tr', null,
         h('td', null, h('b', { text: name }), h('small', { class: 'muted block', text: desc })),
@@ -162,7 +164,9 @@
     clear(host);
     host.appendChild(aiSection(s));
     host.appendChild(privacySection(s));
-    host.appendChild(alertsSection(s));
+    host.appendChild(h('section', { class: 'card glass' }, h('h3', { text: 'Server check (optional)' }),
+      sw('Show the Server page and watch my Umbrel', s.doctorOn, async (v) => { await put({ doctorOn: v }, true); await LA.refreshState(); paint(); }, 'Checks disk, memory, temperature and apps every few minutes. Off by default because it uses a little CPU and most people do not need it.')));
+    if (s.doctorOn) host.appendChild(alertsSection(s));
     host.appendChild(lookSection());
     host.appendChild(audit);
     host.appendChild(aboutSection(s));

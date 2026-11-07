@@ -3,7 +3,7 @@
   'use strict';
   const { h, clear, icon, api, S } = LA;
   const TABS = [
-    ['ask', 'Ask', 'chat'], ['doctor', 'Doctor', 'pulse'], ['apps', 'Apps', 'grid'], ['files', 'Files', 'folder'], ['settings', 'Settings', 'gear'],
+    ['ask', 'Ask', 'chat'], ['files', 'Library', 'folder'], ['apps', 'Apps', 'grid'], ['doctor', 'Server', 'pulse'], ['settings', 'Settings', 'gear'],
   ];
   let view = null;
   let current = null;
@@ -33,6 +33,8 @@
     providerChip.appendChild(icon(p.cloud ? 'cloud' : 'home'));
     providerChip.appendChild(h('span', { text: (st.demo ? 'Demo' : p.kind === 'anthropic' ? 'Claude' : p.kind === 'ollama' ? 'Ollama' : 'Server') + ' · ' + (p.cloud ? 'cloud' : 'local') }));
     providerChip.title = st.settings.localOnly ? 'Local-only mode is on' : 'Click to change the AI';
+    if (tabEls.doctor) tabEls.doctor.hidden = !st.settings.doctorOn;
+    healthChip.hidden = !st.settings.doctorOn;
     clear(healthChip);
     if (st.health) {
       const t = st.health.crit ? 'crit' : st.health.warn ? 'warn' : 'ok';

@@ -2,26 +2,27 @@ manifestVersion: 1
 id: patriot-liberty-ai
 category: ai
 name: Liberty AI
-version: "0.1.0"
-tagline: Your home server doctor and ask-anything assistant
+version: "0.2.0"
+tagline: The Liberty Drive for your Umbrel: offline AI and library
 description: >-
-  Liberty AI is one place to look after your Umbrel and ask it questions. The Home Server Doctor checks
-  disk, memory, temperature and your apps every few minutes, explains problems in plain English, and can
-  send you an ntfy alert when something needs attention. Ask anything, and it answers from your own
-  files and apps, with the sources shown so you can check every claim.
+  Liberty AI is the Liberty Drive for your Umbrel: an offline AI assistant plus your own reference library.
+  Put survival guides, manuals, books, medical references and family papers in folders on your Umbrel, add them
+  to the Library, and ask questions in plain English. Answers cite the exact passages they came from, so you can
+  check every claim. Instant search works even without the AI.
 
 
   It is read-only and permission-first. It can only read folders you add and apps you switch on, all off by
-  default. It never changes anything on your server. Use a local model such as Ollama and nothing leaves
-  your Umbrel, or bring your own Claude key for harder questions. Each kind of data has its own
-  "may this go to a cloud AI" switch, and Local-only mode blocks the cloud entirely.
+  default, and it never changes anything. Use a small local model through Ollama and nothing leaves your Umbrel,
+  or bring your own Claude key for harder questions, with a separate "may go to the cloud" switch for each kind of
+  data and a Local-only mode that blocks the cloud entirely. An optional Server page can watch disk, memory and
+  apps for you.
 
 
-  Works with the Patriot Apps (Rally Point, ZeroDollar, Cold Front and more as they join in). Born from
-  the Liberty Drive offline-AI USB. Freedom doesn't need Wi-Fi.
+  Works with the Patriot Apps (Rally Point, ZeroDollar, Cold Front and more as they join in). Freedom doesn't
+  need Wi-Fi.
 
 
-  Needs read access to Docker to see your containers, and to your Umbrel storage for the folders you pick.
+  Needs read access to your Umbrel storage for the folders you pick (and to Docker for the optional Server page).
   Independent project. Not affiliated with or endorsed by Anthropic, Ollama or Umbrel.
 developer: PatriotCrypto
 website: https://github.com/PatriotCrypto/umbrel-patriot-apps
@@ -34,7 +35,8 @@ path: ""
 defaultUsername: ""
 defaultPassword: ""
 releaseNotes: >-
-  First release. Home Server Doctor, ask-anything chat with sources, file search, and per-app permissions.
+  Now centered on the offline library and ask-anything. Much lighter on CPU and memory: smaller prompts, short model
+  keep-alive, speed settings. New icon. The Server (Doctor) page is optional and off by default. Clearer folder scan reports.
 icon: https://raw.githubusercontent.com/PatriotCrypto/umbrel-patriot-apps/main/patriot-liberty-ai/icon.svg
 submitter: PatriotCrypto
 submission: https://github.com/PatriotCrypto/umbrel-patriot-apps
