@@ -24,6 +24,7 @@ const DEVICES = [
   { mac: '5c:92:5e:0a:41:c2', ip: '192.168.1.22', name: 'Bitcoin Node', pat: 'always', hostname: 'bitcoin-node' },
   { mac: '9c:6b:00:2d:77:e1', ip: '192.168.1.23', name: 'Spare Box', pat: 'always', hostname: 'minipc', btc: true },
   { mac: '10:52:1c:5e:aa:07', ip: '192.168.1.24', name: 'Wingbits Antenna', pat: 'always', hostname: 'wingbits' },
+  { mac: '4c:fc:aa:19:60:3d', ip: '192.168.1.25', name: 'Tesla (Garage)', pat: 'home', hostname: 'tesla-garage' },
   { mac: '00:07:ab:66:31:90', ip: '192.168.1.43', name: 'Kitchen Tablet', pat: 'home', hostname: 'galaxy-tab', type: 'tablet' },
   { mac: '00:0d:4b:12:ee:07', ip: '192.168.1.50', name: 'Living Room TV', pat: 'evening', hostname: 'roku-livingroom' },
   { mac: '00:04:1f:c4:08:3a', ip: '192.168.1.51', name: 'Game Console', pat: 'weekend', hostname: 'PS5-1234' },
