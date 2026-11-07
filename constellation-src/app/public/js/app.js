@@ -325,6 +325,9 @@
     try {
       sc = mod && mod.create(stage, {
         options: S.sceneOpts,
+        umbrelLogo: '/img/umbrel-logo.png',
+        bitcoinLogo: '/img/bitcoin-logo.png',
+        onShow: showBanner,
         onSelect: (mac) => { if (mac) openDrawer(mac); else closeDrawer(); },
         onReorder: async (list, tags) => {
           try { await api('PUT', '/api/order', { order: list, tags: tags || undefined }); } catch (e) { toast(e.message); }
@@ -876,6 +879,17 @@
     row('Last scan', sc.lastScanAt ? ago(sc.lastScanAt, now) + (sc.lastScanMs ? ' / took ' + (sc.lastScanMs / 1000).toFixed(1) + ' s' : '') : 'pending');
     row('Status', sc.scanning ? 'Scanning now' : sc.lastError ? sc.lastError : 'Healthy');
     row('Devices', st.summary.online + ' online / ' + st.summary.total + ' total');
+  }
+
+  // ---------- launch show banner (seven taps on the gateway) ----------
+  function showBanner() {
+    if (document.querySelector('.show-banner')) return;
+    const msgs = ['Starlink train overhead', 'Launch sequence: go', 'Liftoff', 'All systems nominal'];
+    const b = el('div', { class: 'show-banner', 'aria-hidden': 'true', text: msgs[0] });
+    document.body.appendChild(b);
+    let i = 0;
+    const t = setInterval(() => { i++; if (i < msgs.length) b.textContent = msgs[i]; }, 3600);
+    setTimeout(() => { clearInterval(t); b.remove(); }, 15200);
   }
 
   // ---------- easter egg ----------

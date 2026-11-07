@@ -5,7 +5,7 @@ import {
   WebGLRenderer, Scene, PerspectiveCamera, Color, Fog, Group, Mesh, SphereGeometry, MeshBasicMaterial,
   Sprite, SpriteMaterial, CanvasTexture, AdditiveBlending, NormalBlending, BufferGeometry, Float32BufferAttribute,
   Line, LineBasicMaterial, LineSegments, Points, PointsMaterial, Vector3, QuadraticBezierCurve3,
-  TorusGeometry, CylinderGeometry, ShaderMaterial, Raycaster, Vector2, MathUtils, Plane,
+  TorusGeometry, CylinderGeometry, ConeGeometry, ShaderMaterial, Raycaster, Vector2, MathUtils, Plane, Quaternion, Texture, BufferAttribute,
 } from 'three';
 
 const TWO_PI = Math.PI * 2;
@@ -27,6 +27,18 @@ function tierOf(d) {
   if (d.type === 'computer' || d.type === 'phone' || d.type === 'tablet') return 2;
   return 3;
 }
+
+const UMBREL = new Color('#5351f3');
+// A device counts as an Umbrel when its discovered hostname or the name you gave it says so.
+const BTC = new Color('#f7931a');
+// 'btc' (named bitcoin/btc, or found listening on the Bitcoin port), 'umbrel' (named umbrel), or null.
+function kindOf(d) {
+  const nm = [d.hostname, d.name].filter(Boolean).join(' ');
+  if (/bitcoin|btc/i.test(nm)) return 'btc';
+  if (/umbrel/i.test(nm)) return 'umbrel';
+  return d.btc ? 'btc' : null;
+}
+
 
 function readTheme() {
   const cs = getComputedStyle(document.documentElement);
@@ -101,6 +113,18 @@ function create(container, opts = {}) {
   const glowTex = glowTexture();
   const ringTex = ringTexture();
   const disposables = [glowTex, ringTex];
+  let logoTex = null;
+  let btcTex = null;
+  if (opts.bitcoinLogo) {
+    const bi = new Image();
+    bi.onload = () => { btcTex = new Texture(bi); btcTex.needsUpdate = true; disposables.push(btcTex); for (const n of nodes.values()) restyle(n); };
+    bi.src = opts.bitcoinLogo;
+  }
+  if (opts.umbrelLogo) {
+    const im = new Image();
+    im.onload = () => { logoTex = new Texture(im); logoTex.needsUpdate = true; disposables.push(logoTex); for (const n of nodes.values()) restyle(n); };
+    im.src = opts.umbrelLogo;
+  }
 
   // ---------- backdrop: stars, planet limb ----------
   const starGeo = new BufferGeometry();
@@ -315,6 +339,7 @@ function create(container, opts = {}) {
     scene.remove(n.group, n.link, n.stem);
     n.link.geometry.dispose(); n.stem.geometry.dispose();
     n.mesh.material.dispose(); n.halo.material.dispose(); n.ring.material.dispose(); n.link.material.dispose(); n.stem.material.dispose();
+    if (n.logo) n.logo.material.dispose();
     n.el.remove();
     hitList.splice(hitList.indexOf(n.hit), 1);
     nodes.delete(n.mac);
@@ -323,6 +348,7 @@ function create(container, opts = {}) {
   function layout() { layoutRing(); }
 
   function nodeRadius(d) {
+    if (kindOf(d)) return d.online ? 0.38 : 0.2;
     if (!d.online) return 0.13;
     return d.role === 'self' ? 0.3 : d.type === 'server' ? 0.26 : 0.2;
   }
@@ -334,12 +360,23 @@ function create(container, opts = {}) {
     const visible = d.online || options.showOffline;
     n.group.visible = visible; n.link.visible = visible && d.online; n.stem.visible = false;
     const isNew = !d.known && d.online;
-    const col = !d.online ? T.off : isNew ? T.warn : T.node;
+    const kind = kindOf(d);
+    const um = !!kind;
+    const kcol = kind === 'btc' ? BTC : UMBREL;
+    const col = um ? (d.online ? kcol : kcol.clone().lerp(T.off, 0.65)) : !d.online ? T.off : isNew ? T.warn : T.node;
+    const kmap = kind === 'btc' ? btcTex : logoTex;
+    if (kind && kmap && (!n.logo || n.logoKind !== kind)) {
+      if (n.logo) { n.group.remove(n.logo); n.logo.material.dispose(); }
+      n.logo = new Sprite(new SpriteMaterial({ map: kmap, transparent: true, depthWrite: false }));
+      n.logoKind = kind;
+      n.group.add(n.logo);
+    }
+    if (n.logo) { n.logo.visible = um; n.logo.material.opacity = (d.online ? 1 : 0.5) * dim; }
     n.mesh.material.color.copy(col);
     n.mesh.material.opacity = (d.online ? 1 : 0.8) * dim;
     n.mesh.scale.setScalar(nodeRadius(d));
     n.halo.visible = d.online;
-    n.halo.material.color.copy(n.dev.group && d.online && !isNew ? tagColor(n.dev.group) : col);
+    n.halo.material.color.copy(n.dev.group && d.online && !isNew && !um ? tagColor(n.dev.group) : col);
     n.halo.material.opacity = (T.light ? 0.28 : 0.7) * dim;
     n.halo.material.blending = blendNow();
     n.halo.scale.setScalar(nodeRadius(d) * 7);
@@ -497,6 +534,13 @@ function create(container, opts = {}) {
       if (e.type === 'pointerup') opts.onSelect && opts.onSelect(d.id);
       return;
     }
+    // a plain tap (not an orbit drag): open a device, count gateway taps, or close the popup
+    if (was && e.type === 'pointerup' && moved < 6) {
+      const h = pick(e.clientX, e.clientY);
+      if (h === gwHit) { gatewayTap(); return; }
+      if (h && h.userData.mac && nodes.has(h.userData.mac)) { opts.onSelect && opts.onSelect(h.userData.mac); return; }
+      if (selected && opts.onSelect) opts.onSelect(null);
+    }
   };
   canvas.addEventListener('pointerup', endPtr);
   canvas.addEventListener('pointercancel', endPtr);
@@ -551,7 +595,7 @@ function create(container, opts = {}) {
     frame++;
 
     // camera easing and idle drift
-    if (!reduced && !selected && nowMs - lastInteract > 5000 && ptrs.size === 0 && hovered === null) view.yaw += dt * 0.045;
+    if (!reduced && !selected && !showT0 && nowMs - lastInteract > 5000 && ptrs.size === 0 && hovered === null) view.yaw += dt * 0.045;
     view.dist += (goal.dist - view.dist) * Math.min(1, dt * 5);
     target.lerp(goal.target, Math.min(1, dt * 4));
 
@@ -565,14 +609,19 @@ function create(container, opts = {}) {
       view.pitch = MathUtils.clamp(view.pitch, 0.14, 1.4);
     }
 
+    const showE = showT0 ? (nowMs - showT0) / 1000 : -1;
+    if (showT0) updateShow(nowMs, dt);
+
     // node motion
     let moving = false;
     for (const n of nodes.values()) {
       const k = Math.min(1, dt * 4);
       const before = n.pos.y;
       n.pos.lerp(n.target, k);
-      const ly = lift ? lift * (0.6 + n.phase * 0.8) : 0;
-      if (n.pos.distanceToSquared(n.target) > 1e-5 || n.dirty || lift || before !== n.pos.y) {
+      const rip = showE >= 0 ? rippleAt(Math.hypot(n.pos.x, n.pos.z), showE) : 0;
+      const ly = (lift ? lift * (0.6 + n.phase * 0.8) : 0) + rip;
+      if (n.pos.distanceToSquared(n.target) > 1e-5 || n.dirty || lift || rip || n.rippled || before !== n.pos.y) {
+        n.rippled = rip > 0;
         n.dirty = false;
         moving = true;
         const real = n.pos.clone();
@@ -586,7 +635,20 @@ function create(container, opts = {}) {
       }
     }
 
+    // umbrel logos always face the camera, sitting on the front of the globe
+    for (const n of nodes.values()) {
+      if (!n.logo || !n.logo.visible) continue;
+      const r = nodeRadius(n.dev);
+      n.logo.position.copy(camera.position).sub(n.group.position).normalize().multiplyScalar(r * 1.04);
+      n.logo.scale.setScalar(r * 1.4);
+    }
+
     // gateway and dish
+    if (!showT0) {
+      const pk = Math.max(0, 1 - (nowMs - gwPulse) / 420);
+      gwHalo.scale.setScalar(3 + pk * (0.8 + gwTaps * 0.45));
+      gwHalo.material.color.copy(T.node);
+    }
     gwRing1.rotation.z = t * 0.5;
     gwRing2.rotation.y = t * 0.35;
     const iColor = internet.state === 'down' ? T.bad : internet.state === 'degraded' ? T.warn : T.node;
@@ -631,6 +693,7 @@ function create(container, opts = {}) {
 
     placeCamera();
     if (liftT0) camera.position.x += Math.sin(t * 60) * 0.03;
+    if (showShake) { camera.position.x += Math.sin(t * 70) * 0.09 * showShake; camera.position.y += Math.cos(t * 83) * 0.07 * showShake; }
 
     // hover picking (every other frame)
     if (inside && ptrs.size === 0 && pointer && frame % 2 === 0) {
@@ -663,6 +726,270 @@ function create(container, opts = {}) {
       tmp.copy(n.pos); tmp.y += lift ? lift * (0.6 + n.phase * 0.8) : 0; tmp.y -= 0.35;
       place(n.el, tmp, showLabel, 'cs-label' + (d.online ? '' : ' off') + (isSel || isHov ? ' hot' : '') + (!d.known && d.online ? ' new' : ''));
     }
+  }
+
+  // ---------- launch show (easter egg): Starlink trains cross the sky, ships lift off the gateway ----------
+  const SHOW_LEN = 15;
+  const WAVES = [{ at: 0.2, n: 3, gap: 0.3 }, { at: 3.4, n: 4, gap: 0.22 }, { at: 6.6, n: 6, gap: 0.16 }];
+  const TRAIN_SPECS = [
+    { t0: 0.6, y: 11, dy: -3, d: 56, dir: 1, dur: 8.5 },
+    { t0: 2.6, y: 17, dy: 2, d: 72, dir: -1, dur: 9.5 },
+    { t0: 5.0, y: 6, dy: -5, d: 48, dir: 1, dur: 8.5 },
+    { t0: 7.4, y: 19, dy: -2, d: 76, dir: -1, dur: 9 },
+  ];
+  const TR_N = 24;
+  let showT0 = 0;
+  let gwPulse = 0;
+  let gwTaps = 0;
+  let gwTimer = 0;
+  let showShake = 0;
+  const showGroup = new Group();
+  showGroup.visible = false;
+  scene.add(showGroup);
+
+  // satellite trains
+  const trGeo = new BufferGeometry();
+  const trPos = new Float32Array(TRAIN_SPECS.length * TR_N * 3);
+  const trCol = new Float32Array(TRAIN_SPECS.length * TR_N * 3);
+  trGeo.setAttribute('position', new BufferAttribute(trPos, 3));
+  trGeo.setAttribute('color', new BufferAttribute(trCol, 3));
+  const trCore = new Points(trGeo, new PointsMaterial({ size: 1.1, map: glowTex, vertexColors: true, transparent: true, depthWrite: false, blending: blendNow() }));
+  const trGlow = new Points(trGeo, new PointsMaterial({ size: 4.6, map: glowTex, vertexColors: true, transparent: true, opacity: 0.55, depthWrite: false, blending: blendNow() }));
+  trCore.frustumCulled = false; trGlow.frustumCulled = false;
+  showGroup.add(trGlow, trCore);
+  let trains = [];
+
+  // exhaust, smoke and sparks share one particle pool
+  const PN = 2600;
+  const pPos = new Float32Array(PN * 3);
+  const pCol = new Float32Array(PN * 3);
+  const pVel = new Float32Array(PN * 3);
+  const pLife = new Float32Array(PN);
+  const pMax = new Float32Array(PN).fill(1);
+  const pKind = new Uint8Array(PN);
+  let pHead = 0;
+  const pGeo = new BufferGeometry();
+  pGeo.setAttribute('position', new BufferAttribute(pPos, 3));
+  pGeo.setAttribute('color', new BufferAttribute(pCol, 3));
+  const pMat = new PointsMaterial({ size: 0.42, map: glowTex, vertexColors: true, transparent: true, depthWrite: false, blending: blendNow() });
+  const pPts = new Points(pGeo, pMat);
+  pPts.frustumCulled = false;
+  showGroup.add(pPts);
+  for (let i = 0; i < PN; i++) pPos[i * 3 + 1] = -999;
+  function emit(x, y, z, vx, vy, vz, life, kind) {
+    const i = pHead; pHead = (pHead + 1) % PN;
+    pPos[i * 3] = x; pPos[i * 3 + 1] = y; pPos[i * 3 + 2] = z;
+    pVel[i * 3] = vx; pVel[i * 3 + 1] = vy; pVel[i * 3 + 2] = vz;
+    pLife[i] = life; pMax[i] = life; pKind[i] = kind;
+  }
+  const PAL = [[1.0, 0.72, 0.28], [0.62, 0.64, 0.7], [1, 1, 0.85]]; // flame, smoke, spark
+  function paint(arr, i, c, f) {
+    if (T.light) {
+      arr[i * 3] = T.bg.r + (c[0] * 0.8 - T.bg.r) * f; arr[i * 3 + 1] = T.bg.g + (c[1] * 0.5 - T.bg.g) * f; arr[i * 3 + 2] = T.bg.b + (c[2] * 0.4 - T.bg.b) * f;
+    } else { arr[i * 3] = c[0] * f; arr[i * 3 + 1] = c[1] * f; arr[i * 3 + 2] = c[2] * f; }
+  }
+
+  // ships
+  const ships = [];
+  const shipSilver = () => new MeshBasicMaterial({ color: T.light ? 0x39404d : 0xdfe5ee });
+  function makeShip() {
+    const grp = new Group();
+    const body = new Mesh(new CylinderGeometry(0.1, 0.1, 0.62, 16), shipSilver());
+    const nose = new Mesh(new ConeGeometry(0.1, 0.3, 16), shipSilver());
+    nose.position.y = 0.46;
+    const band = new Mesh(new CylinderGeometry(0.103, 0.103, 0.14, 16), new MeshBasicMaterial({ color: T.light ? 0x111419 : 0x20252d }));
+    band.position.y = -0.18;
+    const finL = new Mesh(new ConeGeometry(0.05, 0.22, 4), shipSilver()); finL.position.set(-0.13, -0.24, 0); finL.rotation.z = 0.28;
+    const finR = new Mesh(new ConeGeometry(0.05, 0.22, 4), shipSilver()); finR.position.set(0.13, -0.24, 0); finR.rotation.z = -0.28;
+    const flame = new Mesh(new ConeGeometry(0.09, 1, 14), new MeshBasicMaterial({ color: 0xff8a2a, transparent: true, opacity: 0.9, blending: blendNow(), depthWrite: false }));
+    flame.rotation.x = Math.PI; flame.position.y = -0.34 - 0.5;
+    const core = new Mesh(new ConeGeometry(0.05, 0.6, 12), new MeshBasicMaterial({ color: 0xfff3c8, transparent: true, opacity: 0.95, blending: blendNow(), depthWrite: false }));
+    core.rotation.x = Math.PI; core.position.y = -0.34 - 0.3;
+    const glow = new Sprite(new SpriteMaterial({ map: glowTex, color: 0xffa040, transparent: true, opacity: 0.8, blending: blendNow(), depthWrite: false }));
+    glow.scale.setScalar(1.3); glow.position.y = -0.4;
+    grp.add(body, nose, band, finL, finR, flame, core, glow);
+    grp.scale.setScalar(1.5);
+    grp.visible = false;
+    showGroup.add(grp);
+    return { grp, flame, core, glow, parts: [body, nose, band, finL, finR] };
+  }
+  const shockGeo = circleLine(1, 120);
+  const shocks = [0, 1, 2].map(() => {
+    const m = new Group();
+    for (const k of [1, 1.025, 1.05]) {
+      const ln = new Line(shockGeo, new LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0, blending: blendNow(), depthWrite: false }));
+      ln.scale.setScalar(k); m.add(ln);
+    }
+    m.visible = false; showGroup.add(m); return m;
+  });
+
+  const sV = new Vector3(); const sUp = new Vector3(0, 1, 0); const sQ = new Quaternion(); const sH = new Vector3(); const sDir = new Vector3();
+
+  function startShow() {
+    if (showT0) return;
+    showT0 = performance.now();
+    showGroup.visible = true;
+    // satellite trains are laid out across the screen as the camera sees it right now
+    camera.updateMatrixWorld();
+    const right = new Vector3().setFromMatrixColumn(camera.matrixWorld, 0).normalize();
+    const camUp = new Vector3().setFromMatrixColumn(camera.matrixWorld, 1).normalize();
+    const fwd = camera.getWorldDirection(new Vector3());
+    trains = TRAIN_SPECS.map((sp) => {
+      const half = sp.d * 0.78;
+      const start = camera.position.clone().addScaledVector(fwd, sp.d).addScaledVector(right, -sp.dir * half).addScaledVector(camUp, sp.y);
+      return { sp, start, dir: right.clone().multiplyScalar(sp.dir), up: camUp.clone(), len: half * 2, gap: sp.d * 0.017 };
+    });
+    // ships
+    const rnd = (a, b) => a + Math.random() * (b - a);
+    let k = 0;
+    WAVES.forEach((w, wi) => {
+      for (let i = 0; i < w.n; i++) {
+        let sh = ships[k]; if (!sh) { sh = makeShip(); ships[k] = sh; }
+        k++;
+        sh.t0 = w.at + i * w.gap;
+        sh.az = (k * 2.399963 + wi) % TWO_PI;
+        sh.v0 = rnd(1.2, 2.2); sh.a = rnd(1.0, 1.7); sh.k = rnd(0.05, 0.16);
+        sh.big = wi === 2 && i === w.n - 1;
+        sh.grp.scale.setScalar(sh.big ? 2.3 : 1.35 + wi * 0.12);
+        sh.flicker = Math.random() * 10;
+        sh.blasted = false;
+        sh.grp.visible = false;
+      }
+    });
+    for (let i = 0; i < shocks.length; i++) { shocks[i].visible = false; shocks[i].userData.t0 = WAVES[i].at; }
+    if (!selected) { goal.target.set(0, 5.5, 0); goal.dist = 27; }
+    lastInteract = performance.now();
+  }
+
+  function endShow() {
+    showT0 = 0;
+    showGroup.visible = false;
+    for (const sh of ships) sh.grp.visible = false;
+    pLife.fill(0); for (let i = 0; i < PN; i++) pPos[i * 3 + 1] = -999;
+    pGeo.attributes.position.needsUpdate = true;
+    if (!selected) { goal.target.copy(HOME_TARGET); goal.dist = DEFAULT_VIEW.dist; }
+    showShake = 0;
+  }
+
+  function gatewayTap() {
+    gwTaps++;
+    gwPulse = performance.now();
+    clearTimeout(gwTimer);
+    if (gwTaps >= 7) { gwTaps = 0; startShow(); if (opts.onShow) opts.onShow(); return; }
+    gwTimer = setTimeout(() => {
+      const n = gwTaps; gwTaps = 0;
+      if (n > 0 && n < 7 && gwHit.userData.mac && opts.onSelect) opts.onSelect(gwHit.userData.mac);
+    }, 850);
+  }
+
+  function rippleAt(dist, e) {
+    let r = 0;
+    for (const w of WAVES) {
+      const te = e - w.at;
+      if (te < 0 || te > 3.2) continue;
+      const front = te * 6.5;
+      const x = Math.abs(dist - front);
+      if (x < 2.2) r += (1 - x / 2.2) * 0.55 * (1 - te / 3.2);
+    }
+    return r;
+  }
+
+  function updateShow(nowMs, dt) {
+    const e = (nowMs - showT0) / 1000;
+    if (e > SHOW_LEN) { endShow(); return; }
+    const tr = trGeo.attributes.position;
+    // satellite trains
+    trains.forEach((tn, ti) => {
+      const u = (e - tn.sp.t0) / tn.sp.dur;
+      const total = tn.len + TR_N * tn.gap;
+      for (let k = 0; k < TR_N; k++) {
+        const idx = ti * TR_N + k;
+        const s = u * total - k * tn.gap;
+        if (u < 0 || u > 1 || s < 0 || s > tn.len) { trPos[idx * 3 + 1] = -999; trCol[idx * 3] = trCol[idx * 3 + 1] = trCol[idx * 3 + 2] = 0; continue; }
+        const f = s / tn.len;
+        const arc = Math.sin(Math.PI * f) * tn.sp.dy * 1.6;
+        trPos[idx * 3] = tn.start.x + tn.dir.x * s + tn.up.x * arc;
+        trPos[idx * 3 + 1] = tn.start.y + tn.dir.y * s + tn.up.y * arc;
+        trPos[idx * 3 + 2] = tn.start.z + tn.dir.z * s + tn.up.z * arc;
+        const edge = Math.min(1, f * 7, (1 - f) * 7);
+        const tw = (0.8 + 0.2 * Math.sin(e * 9 + k * 1.7)) * edge;
+        if (T.light) { trCol[idx * 3] = T.bg.r + (0.08 - T.bg.r) * tw; trCol[idx * 3 + 1] = T.bg.g + (0.12 - T.bg.g) * tw; trCol[idx * 3 + 2] = T.bg.b + (0.32 - T.bg.b) * tw; }
+        else { trCol[idx * 3] = 0.82 * tw; trCol[idx * 3 + 1] = 0.9 * tw; trCol[idx * 3 + 2] = 1.0 * tw; }
+      }
+    });
+    tr.needsUpdate = true; trGeo.attributes.color.needsUpdate = true;
+
+    // ships and their exhaust
+    let boom = 0;
+    for (const sh of ships) {
+      const t = e - sh.t0;
+      if (t < 0 || t > 7.5) { sh.grp.visible = false; continue; }
+      sh.grp.visible = true;
+      sH.set(Math.cos(sh.az), 0, Math.sin(sh.az));
+      const lift = sh.v0 * t + 0.5 * sh.a * t * t;
+      const side = (sh.k * t * t * t) / 3;
+      sh.grp.position.set(gatewayPos.x + sH.x * side, gatewayPos.y + 0.3 + lift, gatewayPos.z + sH.z * side);
+      sDir.set(sH.x * sh.k * t * t, sh.v0 + sh.a * t, sH.z * sh.k * t * t).normalize();
+      sQ.setFromUnitVectors(sUp, sDir);
+      sh.grp.quaternion.copy(sQ);
+      const fl = 0.85 + 0.35 * Math.sin(nowMs * 0.05 + sh.flicker) + Math.random() * 0.15;
+      sh.flame.scale.y = fl * (t < 0.6 ? t / 0.6 + 0.2 : 1) * 1.3;
+      sh.flame.position.y = -0.34 - 0.5 * sh.flame.scale.y;
+      sh.core.scale.y = fl; sh.core.position.y = -0.34 - 0.3 * fl;
+      sh.glow.material.opacity = 0.65 + 0.2 * Math.sin(nowMs * 0.04 + sh.flicker);
+      if (t < 1.1 && !sh.blasted) {
+        sh.blasted = true;
+        for (let i = 0; i < 26; i++) {
+          const a = Math.random() * TWO_PI, sp = 1.4 + Math.random() * 3.2;
+          emit(gatewayPos.x, 0.1, gatewayPos.z, Math.cos(a) * sp, 0.25 + Math.random() * 0.9, Math.sin(a) * sp, 1.2 + Math.random() * 1.2, 1);
+        }
+      }
+      const tail = sh.grp.position.clone().addScaledVector(sDir, -0.5 * sh.grp.scale.x);
+      const nEm = sh.big ? 6 : 3;
+      for (let i = 0; i < nEm; i++) {
+        const j = 0.25;
+        emit(tail.x, tail.y, tail.z, -sDir.x * 3 + (Math.random() - 0.5) * j * 6, -sDir.y * 3 + (Math.random() - 0.5) * j * 6, -sDir.z * 3 + (Math.random() - 0.5) * j * 6, 0.35 + Math.random() * 0.5, 0);
+      }
+      emit(tail.x, tail.y, tail.z, (Math.random() - 0.5) * 0.8, (Math.random() - 0.5) * 0.8, (Math.random() - 0.5) * 0.8, 1.2 + Math.random() * 0.9, 1);
+      if (Math.random() < 0.35) emit(tail.x, tail.y, tail.z, (Math.random() - 0.5) * 5, (Math.random() - 0.5) * 5 - 2, (Math.random() - 0.5) * 5, 0.5 + Math.random() * 0.5, 2);
+      if (t < 1.6) boom = Math.max(boom, 1 - t / 1.6);
+    }
+
+    // particles
+    for (let i = 0; i < PN; i++) {
+      if (pLife[i] <= 0) continue;
+      pLife[i] -= dt;
+      const f = Math.max(0, pLife[i] / pMax[i]);
+      pPos[i * 3] += pVel[i * 3] * dt; pPos[i * 3 + 1] += pVel[i * 3 + 1] * dt; pPos[i * 3 + 2] += pVel[i * 3 + 2] * dt;
+      if (pKind[i] === 1) { pVel[i * 3] *= 0.985; pVel[i * 3 + 2] *= 0.985; pVel[i * 3 + 1] *= 0.99; }
+      if (pKind[i] === 2) pVel[i * 3 + 1] -= 4 * dt;
+      if (pLife[i] <= 0) { pPos[i * 3 + 1] = -999; continue; }
+      const c = PAL[pKind[i]].slice();
+      if (pKind[i] === 0) { c[1] = 0.25 + 0.5 * f; c[2] = 0.05 + 0.25 * f; }
+      paint(pCol, i, c, pKind[i] === 1 ? f * 0.55 : f);
+    }
+    pGeo.attributes.position.needsUpdate = true; pGeo.attributes.color.needsUpdate = true;
+
+    // shock rings along the ground at each launch wave
+    shocks.forEach((m) => {
+      const te = e - m.userData.t0;
+      if (te < 0 || te > 2.2) { m.visible = false; return; }
+      m.visible = true;
+      const r = 0.6 + te * 6.5;
+      m.scale.setScalar(r); m.position.set(gatewayPos.x, 0.1, gatewayPos.z);
+      m.children.forEach((ln, i) => {
+        ln.material.opacity = (0.9 - i * 0.25) * (1 - te / 2.2);
+        ln.material.color.set(T.light ? 0x5a6270 : 0xcfe0ff);
+      });
+    });
+
+    // camera and gateway reaction
+    showShake = boom;
+    let g = 0;
+    for (const w of WAVES) { const te = e - w.at; if (te >= 0 && te < 1.4) g = Math.max(g, 1 - te / 1.4); }
+    gwHalo.scale.setScalar(3 + g * 4);
+    gwHalo.material.color.copy(g > 0.05 ? new Color(0xffc27a) : T.node);
+    return e;
   }
 
   // gateway label and dish label are drawn by the page HUD through anchors
@@ -777,7 +1104,7 @@ function create(container, opts = {}) {
   }
 
   placeCamera();
-  return { supported: true, update, select, applyTheme, setEditMode, setOptions, resetView, liftoff, destroy, canvas };
+  return { supported: true, update, select, applyTheme, setEditMode, setOptions, resetView, liftoff, show: startShow, destroy, canvas };
 }
 
 export { create };

@@ -209,6 +209,18 @@ class Engine {
     }
   }
 
+  setBtc(mac, on, now) {
+    const d = this.s.devices[mac];
+    if (!d) return;
+    d.btcAt = now;
+    if (!!d.btc !== !!on) { d.btc = !!on; this.touch(); }
+  }
+
+  // Online devices whose Bitcoin-port check is due (daily if it answered, every 12 h if not).
+  needsBtc(now) {
+    return Object.values(this.s.devices).filter((d) => d.online && d.role !== 'gateway' && now - (d.btcAt || 0) > (d.btc ? 24 : 12) * 3600e3);
+  }
+
   // Devices whose name should be (re)looked up now.
   needsName(now, retryMs = 6 * 3600e3) {
     const out = [];
@@ -336,7 +348,7 @@ class Engine {
       mac: d.mac, ip: d.ip, name: d.name, hostname: d.hostname, vendor: d.vendor,
       type: d.type || d.typeAuto, typeAuto: d.typeAuto, typeSet: d.type,
       notes: d.notes, known: d.known, hidden: d.hidden, role: d.role, random: d.random,
-      firstSeen: d.firstSeen, lastSeen: d.lastSeen, online: d.online, group: d.group || '',
+      firstSeen: d.firstSeen, lastSeen: d.lastSeen, online: d.online, group: d.group || '', btc: !!d.btc,
       since: open ? open[0] : null,
       up24: this.uptime(d, now, DAY),
       up7: this.uptime(d, now, 7 * DAY),
@@ -453,6 +465,7 @@ class Engine {
         firstSeen: num(d.firstSeen) || now, lastSeen: num(d.lastSeen) || now, online: false, sessions: [],
       };
       if (typeof d.group === 'string') nd.group = U.cleanText(d.group, 24);
+      nd.btc = d.btc === true; nd.btcAt = num(d.btcAt) || 0;
       for (const iv of Array.isArray(d.sessions) ? d.sessions.slice(-4000) : []) {
         if (Array.isArray(iv) && num(iv[0]) !== null && (iv[1] === null || num(iv[1]) !== null)) nd.sessions.push([iv[0], iv[1]]);
       }

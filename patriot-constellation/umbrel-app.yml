@@ -2,7 +2,7 @@ manifestVersion: 1
 id: patriot-constellation
 category: networking
 name: Constellation
-version: "0.1.0"
+version: "0.2.0"
 tagline: See every device on your network, in 3D
 description: >-
   Constellation is a quiet observatory for your home network. It discovers every device on your
@@ -32,8 +32,8 @@ path: ""
 defaultUsername: ""
 defaultPassword: ""
 releaseNotes: >-
-  First release: live 3D network map, device list with naming, a ring you arrange by dragging, with room and owner tags, uptime
-  and internet charts, speed test, new-device alerts, six looks including Glass and Daylight.
+  Click any device on the map for a liquid glass details card. Umbrels get a purple globe with the Umbrel logo, and Bitcoin nodes
+  (named bitcoin, or found listening on the Bitcoin port) get an orange globe with the Bitcoin logo. Plus a hidden surprise on the gateway.
 icon: https://raw.githubusercontent.com/PatriotCrypto/umbrel-patriot-apps/main/patriot-constellation/icon.svg
 submitter: PatriotCrypto
 submission: https://github.com/PatriotCrypto/umbrel-patriot-apps

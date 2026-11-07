@@ -193,3 +193,15 @@ test('speed test: measures with a fake network and stores results', async () => 
   assert.equal(validateSettings({ speedEveryHours: 5 }, DEFAULT_SETTINGS).ok, false);
   assert.equal(validateSettings({ speedEveryHours: 6 }, DEFAULT_SETTINGS).ok, true);
 });
+
+test('bitcoin node detection: due checks, daily recheck once found', () => {
+  const e = fresh();
+  const mac = PHONE.mac;
+  e.applyScan([GW, ME, PHONE], T0 + 60e3, CTX);
+  assert.ok(e.needsBtc(T0 + 61e3).some((d) => d.mac === mac), 'new device is due');
+  assert.ok(!e.needsBtc(T0 + 61e3).some((d) => d.mac === GW.mac), 'gateway is never probed');
+  e.setBtc(mac, true, T0 + 61e3);
+  assert.equal(e.view(e.s.devices[mac], T0).btc, true);
+  assert.ok(!e.needsBtc(T0 + 61e3 + 23 * 3600e3).some((d) => d.mac === mac), 'found nodes recheck only daily');
+  assert.ok(e.needsBtc(T0 + 61e3 + 25 * 3600e3).some((d) => d.mac === mac));
+});
