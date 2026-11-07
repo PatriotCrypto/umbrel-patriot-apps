@@ -1,0 +1,39 @@
+manifestVersion: 1
+id: patriot-constellation
+category: networking
+name: Constellation
+version: "0.1.0"
+tagline: See every device on your network, in 3D
+description: >-
+  Constellation is a quiet observatory for your home network. It discovers every device on your
+  Wi-Fi, lets you name them, and shows who is online right now as a live 3D map, with charts of
+  device presence, time online and internet latency. Arrange the ring by dragging, and tag devices by room or person, and run a speed test any time.
+
+
+  It is monitoring only. It cannot block devices, set schedules, or measure per-device data usage,
+  because routers like the stock Starlink one do not expose that. Usage means time online and session
+  history.
+
+
+  Runs on the host network so it can see your LAN, and protects itself with its own password
+  (set on first visit, with a one-time recovery code). Four looks, all local, nothing leaves your Umbrel
+  except optional ntfy alerts you configure.
+
+
+  Independent project. Not affiliated with or endorsed by Starlink, SpaceX or Umbrel.
+developer: PatriotCrypto
+website: https://github.com/PatriotCrypto/umbrel-patriot-apps
+dependencies: []
+repo: https://github.com/PatriotCrypto/umbrel-patriot-apps
+support: https://github.com/PatriotCrypto/umbrel-patriot-apps/issues
+port: 3977
+gallery: []
+path: ""
+defaultUsername: ""
+defaultPassword: ""
+releaseNotes: >-
+  First release: live 3D network map, device list with naming, a ring you arrange by dragging, with room and owner tags, uptime
+  and internet charts, speed test, new-device alerts, six looks including Glass and Daylight.
+icon: https://raw.githubusercontent.com/PatriotCrypto/umbrel-patriot-apps/main/patriot-constellation/icon.svg
+submitter: PatriotCrypto
+submission: https://github.com/PatriotCrypto/umbrel-patriot-apps

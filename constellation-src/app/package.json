@@ -1,0 +1,16 @@
+{
+  "name": "constellation",
+  "version": "0.1.0",
+  "description": "A read-only network observatory for your home LAN: devices, uptime, internet health, and a 3D map.",
+  "license": "MIT",
+  "private": true,
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "demo": "CONSTELLATION_DEMO=1 CONSTELLATION_NO_AUTH=1 DATA_DIR=./.demo-data PORT=3971 node server.js",
+    "test": "node --test"
+  },
+  "engines": {
+    "node": ">=22"
+  }
+}
