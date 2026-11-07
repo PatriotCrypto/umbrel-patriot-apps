@@ -21,6 +21,8 @@ const DEVICES = [
   { mac: '00:0d:3a:20:99:08', ip: '192.168.1.33', name: 'Family Laptop', pat: 'evening', hostname: 'family-laptop' },
   { mac: 'da:4f:21:90:6b:17', ip: '192.168.1.41', name: "Alex's Phone", pat: 'home', hostname: 'Alexs-iPhone', type: 'phone' },
   { mac: 'ea:19:7c:42:d3:5e', ip: '192.168.1.42', name: "Sam's Phone", pat: 'home', hostname: 'Sams-Pixel', type: 'phone' },
+  { mac: '5c:92:5e:0a:41:c2', ip: '192.168.1.22', name: 'Bitcoin Node', pat: 'always', hostname: 'bitcoin-node' },
+  { mac: '9c:6b:00:2d:77:e1', ip: '192.168.1.23', name: 'Spare Box', pat: 'always', hostname: 'minipc', btc: true },
   { mac: '00:07:ab:66:31:90', ip: '192.168.1.43', name: 'Kitchen Tablet', pat: 'home', hostname: 'galaxy-tab', type: 'tablet' },
   { mac: '00:0d:4b:12:ee:07', ip: '192.168.1.50', name: 'Living Room TV', pat: 'evening', hostname: 'roku-livingroom' },
   { mac: '00:04:1f:c4:08:3a', ip: '192.168.1.51', name: 'Game Console', pat: 'weekend', hostname: 'PS5-1234' },
@@ -119,6 +121,7 @@ function seed(engine, now) {
   }
   for (const d of DEVICES) {
     if (d.hostname) engine.setHostname(d.mac, d.hostname, now);
+    if (d.btc) engine.setBtc(d.mac, true, now);
     if (d.name) engine.updateDevice(d.mac, { name: d.name }, now);
     if (d.type) engine.updateDevice(d.mac, { type: d.type }, now);
     if (d.keepKnown) engine.updateDevice(d.mac, { known: true }, now);

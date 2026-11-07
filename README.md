@@ -197,6 +197,7 @@ You need a Wingbits API key (station operators get a free Starter plan). Until y
 
 - A live 3D map with your gateway in the middle and every device on one ring you can rearrange by dragging. Tag devices by room or person.
 - Name devices, and track when each one is online, for how long, and how your internet is holding up. Includes a speed test.
+- Click a device for a glass details card. Umbrels and Bitcoin nodes get their own globes with the Umbrel and Bitcoin logos.
 - Six looks, including Glass and Daylight. Monitoring only: it cannot block devices or show per-device data use. It has its own password because it runs on your host network.
 
 *An independent hobby project, not affiliated with Starlink, SpaceX or Umbrel.* · [Details](constellation-src/README.md)

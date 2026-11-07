@@ -12,6 +12,7 @@ const { Engine, validateSettings } = require('./lib/engine');
 const { detectNetwork, scanOnce } = require('./lib/scanner');
 const { resolveName } = require('./lib/names');
 const { probeAll } = require('./lib/probe');
+const { probePort } = require('./lib/btcprobe');
 const { runSpeedTest } = require('./lib/speedtest');
 const U = require('./lib/util');
 const demoLib = require('./lib/demo');
@@ -115,6 +116,7 @@ function createApp(opts = {}) {
       flushNotifications();
       if (store) store.scheduleSave();
       resolveNames().catch(() => {});
+      detectBitcoin().catch(() => {});
     } catch (e) {
       status.lastError = String((e && e.message) || e);
     } finally {
@@ -169,6 +171,26 @@ function createApp(opts = {}) {
       }
     } finally {
       nameBusy = false;
+      if (store) store.scheduleSave();
+      broadcast();
+    }
+  }
+
+  // Quietly notice Bitcoin nodes: anything on the LAN answering on port 8333.
+  let btcBusy = false;
+  async function detectBitcoin() {
+    if (btcBusy || demo || !net || !net.ok) return;
+    btcBusy = true;
+    try {
+      const list = engine.needsBtc(Date.now());
+      for (let i = 0; i < list.length; i += 8) {
+        await Promise.all(list.slice(i, i + 8).map(async (d) => {
+          const ok = await (opts.btcFn || probePort)(d.ip, 8333).catch(() => false);
+          engine.setBtc(d.mac, ok, Date.now());
+        }));
+      }
+    } finally {
+      btcBusy = false;
       if (store) store.scheduleSave();
       broadcast();
     }
