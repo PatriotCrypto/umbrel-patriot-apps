@@ -2,7 +2,7 @@
 
 # Patriot Apps
 
-**Thirteen self-hosted apps for your Umbrel. One store, no accounts, no cloud.**
+**Fourteen self-hosted apps for your Umbrel. One store, no accounts, no cloud.**
 
 Everything you put in these apps stays on your own server.
 

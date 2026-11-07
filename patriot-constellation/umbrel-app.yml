@@ -26,7 +26,7 @@ website: https://github.com/PatriotCrypto/umbrel-patriot-apps
 dependencies: []
 repo: https://github.com/PatriotCrypto/umbrel-patriot-apps
 support: https://github.com/PatriotCrypto/umbrel-patriot-apps/issues
-port: 3971
+port: 3977
 gallery: []
 path: ""
 defaultUsername: ""
@@ -34,6 +34,6 @@ defaultPassword: ""
 releaseNotes: >-
   First release: live 3D network map, device list with naming, a ring you arrange by dragging, with room and owner tags, uptime
   and internet charts, speed test, new-device alerts, six looks including Glass and Daylight.
-icon: https://raw.githubusercontent.com/PatriotCrypto/umbrel-patriot-apps/main/constellation-src/app/public/icon.svg
+icon: https://raw.githubusercontent.com/PatriotCrypto/umbrel-patriot-apps/main/patriot-constellation/icon.svg
 submitter: PatriotCrypto
 submission: https://github.com/PatriotCrypto/umbrel-patriot-apps
