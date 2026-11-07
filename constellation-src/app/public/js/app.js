@@ -327,6 +327,7 @@
         options: S.sceneOpts,
         umbrelLogo: '/img/umbrel-logo.png',
         bitcoinLogo: '/img/bitcoin-logo.png',
+        wingbitsLogo: '/img/wingbits-logo.png',
         onShow: showBanner,
         onSelect: (mac) => { if (mac) openDrawer(mac); else closeDrawer(); },
         onReorder: async (list, tags) => {

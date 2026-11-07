@@ -31,11 +31,13 @@ function tierOf(d) {
 const UMBREL = new Color('#5351f3');
 // A device counts as an Umbrel when its discovered hostname or the name you gave it says so.
 const BTC = new Color('#f7931a');
-// 'btc' (named bitcoin/btc, or found listening on the Bitcoin port), 'umbrel' (named umbrel), or null.
+const WINGBITS = new Color('#1496aa');
+// 'btc' (named bitcoin/btc, or found listening on the Bitcoin port), 'umbrel' (named umbrel), 'wingbits' (named wingbits), or null.
 function kindOf(d) {
   const nm = [d.hostname, d.name].filter(Boolean).join(' ');
   if (/bitcoin|btc/i.test(nm)) return 'btc';
   if (/umbrel/i.test(nm)) return 'umbrel';
+  if (/wingbits/i.test(nm)) return 'wingbits';
   return d.btc ? 'btc' : null;
 }
 
@@ -115,6 +117,12 @@ function create(container, opts = {}) {
   const disposables = [glowTex, ringTex];
   let logoTex = null;
   let btcTex = null;
+  let wbTex = null;
+  if (opts.wingbitsLogo) {
+    const wi = new Image();
+    wi.onload = () => { wbTex = new Texture(wi); wbTex.needsUpdate = true; disposables.push(wbTex); for (const n of nodes.values()) restyle(n); };
+    wi.src = opts.wingbitsLogo;
+  }
   if (opts.bitcoinLogo) {
     const bi = new Image();
     bi.onload = () => { btcTex = new Texture(bi); btcTex.needsUpdate = true; disposables.push(btcTex); for (const n of nodes.values()) restyle(n); };
@@ -362,9 +370,9 @@ function create(container, opts = {}) {
     const isNew = !d.known && d.online;
     const kind = kindOf(d);
     const um = !!kind;
-    const kcol = kind === 'btc' ? BTC : UMBREL;
+    const kcol = kind === 'btc' ? BTC : kind === 'wingbits' ? WINGBITS : UMBREL;
     const col = um ? (d.online ? kcol : kcol.clone().lerp(T.off, 0.65)) : !d.online ? T.off : isNew ? T.warn : T.node;
-    const kmap = kind === 'btc' ? btcTex : logoTex;
+    const kmap = kind === 'btc' ? btcTex : kind === 'wingbits' ? wbTex : logoTex;
     if (kind && kmap && (!n.logo || n.logoKind !== kind)) {
       if (n.logo) { n.group.remove(n.logo); n.logo.material.dispose(); }
       n.logo = new Sprite(new SpriteMaterial({ map: kmap, transparent: true, depthWrite: false, depthTest: false }));
