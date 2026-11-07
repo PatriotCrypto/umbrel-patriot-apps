@@ -7,7 +7,7 @@ services:
       APP_PORT: 3979
 
   web:
-    image: ghcr.io/patriotcrypto/liberty-ai:0.1.0
+    image: ghcr.io/patriotcrypto/liberty-ai:0.1.0@sha256:b5cd3ba9e0d45a273952e3debf55f56f83f3d041376dd4229b68eb73cb727afd
     restart: on-failure
     stop_grace_period: 15s
     read_only: true
