@@ -2,7 +2,7 @@ manifestVersion: 1
 id: patriot-advent
 category: media
 name: Advent Calendar
-version: "1.0.0"
+version: "1.1.0"
 tagline: "A Christmas countdown with daily surprises, North Pole cams and a Santa tracker"
 description: >-
   A Christian Christmas Advent calendar for the whole family. Every day from December 1 to 25 a
@@ -35,8 +35,10 @@ path: ""
 defaultUsername: ""
 defaultPassword: ""
 releaseNotes: >-
-  First release. 25 animated doors with daily verses, North Pole cams, Christmas Eve launch and
-  Santa tracker, Santa's letter desk, Nice List Scanner, games, badges and secrets.
+  A whole new look. Every door now opens on a rich, painterly picture that comes alive with light,
+  sparkle and snow. The North Pole cams look like real security footage: night-vision green, grain,
+  static and the odd signal drop. Five bright new themes for kids, a hand-lettered cursive heading
+  font, and a plain light/dark Grown-ups page.
 icon: https://raw.githubusercontent.com/PatriotCrypto/umbrel-patriot-apps/main/patriot-advent/icon.svg
 submitter: PatriotCrypto
 submission: https://github.com/PatriotCrypto/umbrel-patriot-apps

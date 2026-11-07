@@ -89,7 +89,7 @@
     const app = document.getElementById('app');
     if (!S.state) await AD.refreshState();
     if (!S.state) { clear(app); app.appendChild(h('p', { class: 'center muted', text: 'Cannot reach the calendar. Is the app running?' })); return; }
-    if (!S.state.setup) { clear(app); document.documentElement.setAttribute('data-theme', 'bethlehem'); AD.setup(app); return; }
+    if (!S.state.setup) { clear(app); document.documentElement.setAttribute('data-theme', 'joy'); AD.setup(app); return; }
     try { S.child = localStorage.getItem('advent.child') || S.child; } catch (e) { /* ignore */ }
     if (!S.state.children.find((c) => c.id === S.child)) S.child = S.state.children[0].id;
     shell();

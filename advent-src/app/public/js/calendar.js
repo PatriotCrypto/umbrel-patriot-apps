@@ -16,19 +16,22 @@
   function unlocked(n) { return S.state.day >= n; }
 
   // ---------- the night-sky background ----------
+  // A snowy Christmas village photo that slowly drifts, with twinkling stars, falling snow,
+  // a shooting star now and then, and a tint from the current theme.
   function background(canvas) {
-    const D = window.Draw;
-    const snow = new D.Snow(S.state.settings.snow ? 70 : 0);
+    const D = window.Draw, SC = window.Scenes;
+    const snow = new D.Snow(S.state.settings.snow ? 90 : 0);
+    const img = SC.picture('bg-village');
+    const sparkle = new SC.Floaters({ rate: 3, vy: -8, vx: 6, size: 1.6, colors: ['#fff', '#ffe9a8'], glow: 6, life: 5, shape: 'star', area: [0, 0, 1, 0.7] });
     let shoot = null;
     const sc = new D.Scene(canvas, (ctx, W, H, t, dt) => {
-      D.sky(ctx, W, H, '#040a26', '#17275e');
-      D.starField(ctx, W, H, t, 110, 3);
+      SC.drawPicture(ctx, img, W, H, t, { zoom: 1.1, panX: 20, panY: 10, speed: 0.04, breathe: 0.01 });
+      const tint = getComputedStyle(document.documentElement).getPropertyValue('--bg-tint').trim();
+      if (tint) { ctx.save(); ctx.fillStyle = tint; ctx.fillRect(0, 0, W, H); ctx.restore(); }
+      SC.twinkles(ctx, W, H, t, 60, 3, 0.45);
       if (!shoot && Math.random() < 0.004) shoot = { x: D.rnd(W * 0.2, W), y: D.rnd(0, H * 0.3), life: 1 };
       if (shoot) { shoot.life -= dt; shoot.x -= 600 * dt; shoot.y += 200 * dt; ctx.save(); ctx.globalAlpha = shoot.life; ctx.strokeStyle = '#fff'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(shoot.x, shoot.y); ctx.lineTo(shoot.x + 90, shoot.y - 30); ctx.stroke(); ctx.restore(); if (shoot.life <= 0) shoot = null; }
-      D.bethlehemStar(ctx, W * 0.5, H * 0.07, Math.min(W, H) * 0.02, t);
-      D.hills(ctx, W, H, '#0e1a44', 0.84, 0.03, 2); D.skyline(ctx, W, H, 0.9, '#0a1030', 6); D.windows(ctx, W, H, 0.88, t, 8);
-      D.hills(ctx, W, H, '#060b22', 0.96, 0.02, 9);
-      const s = Math.min(W, H) * 0.06; D.stable(ctx, W * 0.5, H * 0.995, s, true); D.manger(ctx, W * 0.5, H * 0.99, s * 0.4, true, true);
+      sparkle.draw(ctx, W, H, dt, t);
       snow.draw(ctx, W, H, dt);
     });
     return sc.start();
@@ -60,7 +63,7 @@
   // ---------- doors ----------
   function door(n) {
     const open = isOpen(n), ok = unlocked(n), today = S.state.day === n;
-    const el = h('button', { class: 'door' + (open ? ' open' : '') + (ok ? '' : ' locked') + (today ? ' today' : ''), type: 'button', 'aria-label': 'Door ' + n + (ok ? '' : ', locked'), 'data-n': n,
+    const el = h('button', { class: 'door' + (open ? ' open' : '') + (ok ? '' : ' locked') + (today ? ' today' : '') + ' c' + (n % 5), type: 'button', 'aria-label': 'Door ' + n + (ok ? '' : ', locked'), 'data-n': n,
       onclick: () => openDoor(n, el) });
     el.appendChild(h('span', { class: 'door-front' }, h('b', { text: String(n) }), ok ? null : icon('lock', 'small')));
     el.appendChild(h('span', { class: 'door-back' }, h('span', { class: 'emo', text: EMOJI[n - 1] })));

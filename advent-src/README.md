@@ -25,6 +25,10 @@ A Christian Christmas Advent calendar for Umbrel, made for kids. A door a day fr
 - The app has no Umbrel login in front of it so children can open it from any phone or tablet on your home network. Only the Grown-ups page is protected, by the PIN. Do not expose the port to the internet.
 - Dates follow the device's clock. The calendar starts on December 1 and stays open through Christmas; after that it rests until next Advent.
 
+## Artwork and fonts
+
+The door pictures, the calendar backdrop and the camera "footage" are still images generated with Canva's AI image tool and animated in the browser with canvas layers (light, sparkle, snow, grain, night-vision tint, camera drift). Headings use [Dancing Script](https://fonts.google.com/specimen/Dancing+Script) and body text uses [Baloo 2](https://fonts.google.com/specimen/Baloo+2), both under the SIL Open Font License and bundled in `app/public/fonts/`.
+
 ## Privacy
 
 Everything stays on your Umbrel. No accounts, no telemetry, no outside requests at all. Letters and wish lists are stored in the app's own data folder.

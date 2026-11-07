@@ -29,10 +29,10 @@ test('setup, pin, children and the nice list', async () => {
   const { app, call } = await boot();
   let r = await call('GET', '/api/state?d=2026-12-05');
   assert.equal(r.body.setup, false);
-  r = await call('POST', '/api/setup', { children: ['Ava', 'Ben'], pin: '1234', hometown: 'Sunman', bedtime: '20:30', theme: 'cabin' });
+  r = await call('POST', '/api/setup', { children: ['Ava', 'Ben'], pin: '1234', hometown: 'Sunman', bedtime: '20:30', theme: 'candy' });
   assert.equal(r.status, 200);
   r = await call('GET', '/api/state?d=2026-12-05');
-  assert.equal(r.body.setup, true); assert.equal(r.body.day, 5); assert.equal(r.body.children.length, 2); assert.equal(r.body.settings.theme, 'cabin');
+  assert.equal(r.body.setup, true); assert.equal(r.body.day, 5); assert.equal(r.body.children.length, 2); assert.equal(r.body.settings.theme, 'candy');
   const ava = r.body.children[0];
   // pin
   r = await call('POST', '/api/pin', { pin: '0000' }); assert.equal(r.status, 401);

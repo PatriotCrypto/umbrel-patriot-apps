@@ -11,8 +11,9 @@ const { DAYS } = require('./lib/days');
 const santa = require('./lib/santa');
 
 const VERSION = require('./package.json').version;
-const THEMES = ['bethlehem', 'cabin', 'candy', 'frost', 'command'];
-const MIME = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.svg': 'image/svg+xml', '.png': 'image/png', '.json': 'application/json', '.webmanifest': 'application/manifest+json' };
+const THEMES = ['joy', 'candy', 'wonderland', 'gingerbread', 'aurora'];
+const OLD_THEMES = { bethlehem: 'joy', cabin: 'gingerbread', frost: 'wonderland', command: 'aurora' };
+const MIME = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.svg': 'image/svg+xml', '.png': 'image/png', '.json': 'application/json', '.webmanifest': 'application/manifest+json', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.webp': 'image/webp', '.woff2': 'font/woff2', '.woff': 'font/woff', '.txt': 'text/plain; charset=utf-8' };
 
 class HttpError extends Error { constructor(status, msg) { super(msg); this.status = status; } }
 const clean = (v, n) => String(v == null ? '' : v).replace(/[\u0000-\u001f\u007f]/g, '').trim().slice(0, n);
@@ -22,7 +23,7 @@ function defaults() {
   return {
     setup: false,
     pin: null, // { salt, hash }
-    theme: 'bethlehem',
+    theme: 'joy',
     hometown: '',
     bedtime: '21:00',
     volume: 0.8,
@@ -89,6 +90,8 @@ function createApp(opts = {}) {
   route('GET', '/api/state', (req, res, c) => {
     const today = todayFor(c.query);
     const s = state.settings;
+    if (OLD_THEMES[s.theme]) s.theme = OLD_THEMES[s.theme];
+    if (!THEMES.includes(s.theme)) s.theme = 'joy';
     return {
       version: VERSION,
       setup: s.setup,
@@ -320,7 +323,7 @@ function createApp(opts = {}) {
       const ext = path.extname(file).toLowerCase();
       res.writeHead(200, {
         'Content-Type': MIME[ext] || 'application/octet-stream',
-        'Cache-Control': ext === '.html' ? 'no-cache' : 'public, max-age=3600',
+        'Cache-Control': ext === '.html' ? 'no-cache' : (ext === '.jpg' || ext === '.woff2') ? 'public, max-age=604800, immutable' : 'public, max-age=3600',
         'Content-Security-Policy': "default-src 'self'; img-src 'self' data:; media-src 'self' blob:; script-src 'self'; style-src 'self'; connect-src 'self'; frame-ancestors 'self'; base-uri 'none'; form-action 'self'",
         'X-Content-Type-Options': 'nosniff',
         'Referrer-Policy': 'no-referrer',

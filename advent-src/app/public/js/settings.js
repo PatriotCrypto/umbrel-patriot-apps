@@ -3,13 +3,13 @@
   'use strict';
   const { h, clear, icon, api, toast, modal, S } = AD;
   const A = () => window.Audio2;
-  const THEMES = [['bethlehem', 'Bethlehem Night', 'Deep blue and gold'], ['cabin', 'Cozy Cabin', 'Warm red, green and wood'], ['candy', 'Candy Cane', 'Bright red and white'], ['frost', 'Winter Frost', 'Icy blue and silver'], ['command', 'North Pole Command', 'Green terminal glow']];
+  const THEMES = [['joy', 'Christmas Joy', 'Bright blue, red and gold'], ['candy', 'Candy Cane', 'Peppermint red and pink'], ['wonderland', 'Winter Wonderland', 'Icy blue, purple and silver'], ['gingerbread', 'Gingerbread', 'Warm brown, cream and candy'], ['aurora', 'Northern Lights', 'Green, teal and violet']];
 
   // ---------- setup wizard ----------
   function setup(into) {
     const kids = [''];
     let step = 0;
-    const data = { pin: '', hometown: '', bedtime: '21:00', theme: 'bethlehem' };
+    const data = { pin: '', hometown: '', bedtime: '21:00', theme: 'joy' };
     const card = h('div', { class: 'wizard glass' });
     const paint = () => {
       clear(card);
