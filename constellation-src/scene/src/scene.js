@@ -33,12 +33,37 @@ const UMBREL = new Color('#5351f3');
 const BTC = new Color('#f7931a');
 const WINGBITS = new Color('#0b0c0f');
 const WINGBITS_HALO = new Color('#9aa3b8');
+const CAR = new Color('#cf2a2f');
+
+// A plain white car silhouette (side view, generic sedan) for devices named Tesla.
+function carTexture() {
+  const c = document.createElement('canvas');
+  c.width = c.height = 256;
+  const x = c.getContext('2d');
+  x.fillStyle = '#fff';
+  x.beginPath();
+  x.moveTo(26, 150); x.bezierCurveTo(26, 136, 38, 130, 60, 126); x.lineTo(98, 114);
+  x.bezierCurveTo(120, 90, 152, 84, 180, 88); x.bezierCurveTo(202, 92, 216, 112, 226, 126);
+  x.lineTo(236, 134); x.bezierCurveTo(246, 138, 248, 146, 248, 156); x.lineTo(248, 166); x.lineTo(26, 166); x.closePath(); x.fill();
+  x.globalCompositeOperation = 'destination-out';
+  x.beginPath(); x.moveTo(108, 113); x.lineTo(128, 96); x.lineTo(172, 95); x.lineTo(206, 114); x.closePath(); x.fill();
+  x.fillRect(150, 94, 5, 22);
+  for (const cx of [80, 200]) { x.beginPath(); x.arc(cx, 168, 28, 0, TWO_PI); x.fill(); }
+  x.globalCompositeOperation = 'source-over';
+  for (const cx of [80, 200]) {
+    x.beginPath(); x.arc(cx, 168, 21, 0, TWO_PI); x.fill();
+    x.globalCompositeOperation = 'destination-out'; x.beginPath(); x.arc(cx, 168, 13, 0, TWO_PI); x.fill();
+    x.globalCompositeOperation = 'source-over'; x.beginPath(); x.arc(cx, 168, 6, 0, TWO_PI); x.fill();
+  }
+  const t = new Texture(c); t.needsUpdate = true; return t;
+}
 // 'btc' (named bitcoin/btc, or found listening on the Bitcoin port), 'umbrel' (named umbrel), 'wingbits' (named wingbits), or null.
 function kindOf(d) {
   const nm = [d.hostname, d.name].filter(Boolean).join(' ');
   if (/bitcoin|btc/i.test(nm)) return 'btc';
   if (/umbrel/i.test(nm)) return 'umbrel';
   if (/wingbits/i.test(nm)) return 'wingbits';
+  if (/tesla/i.test(nm)) return 'car';
   return d.btc ? 'btc' : null;
 }
 
@@ -119,6 +144,8 @@ function create(container, opts = {}) {
   let logoTex = null;
   let btcTex = null;
   let wbTex = null;
+  const carTex = carTexture();
+  disposables.push(carTex);
   if (opts.wingbitsLogo) {
     const wi = new Image();
     wi.onload = () => { wbTex = new Texture(wi); wbTex.needsUpdate = true; disposables.push(wbTex); for (const n of nodes.values()) restyle(n); };
@@ -371,9 +398,9 @@ function create(container, opts = {}) {
     const isNew = !d.known && d.online;
     const kind = kindOf(d);
     const um = !!kind;
-    const kcol = kind === 'btc' ? BTC : kind === 'wingbits' ? WINGBITS : UMBREL;
+    const kcol = kind === 'btc' ? BTC : kind === 'wingbits' ? WINGBITS : kind === 'car' ? CAR : UMBREL;
     const col = um ? (d.online ? kcol : kcol.clone().lerp(T.off, 0.65)) : !d.online ? T.off : isNew ? T.warn : T.node;
-    const kmap = kind === 'btc' ? btcTex : kind === 'wingbits' ? wbTex : logoTex;
+    const kmap = kind === 'btc' ? btcTex : kind === 'wingbits' ? wbTex : kind === 'car' ? carTex : logoTex;
     if (kind && kmap && (!n.logo || n.logoKind !== kind)) {
       if (n.logo) { n.group.remove(n.logo); n.logo.material.dispose(); }
       n.logo = new Sprite(new SpriteMaterial({ map: kmap, transparent: true, depthWrite: false, depthTest: false }));

@@ -1,6 +1,6 @@
 {
   "name": "constellation",
-  "version": "0.2.2",
+  "version": "0.2.3",
   "description": "A read-only network observatory for your home LAN: devices, uptime, internet health, and a 3D map.",
   "license": "MIT",
   "private": true,
