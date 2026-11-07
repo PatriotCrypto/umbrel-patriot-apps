@@ -32,7 +32,7 @@ path: ""
 defaultUsername: ""
 defaultPassword: ""
 releaseNotes: >-
-  Devices you name Wingbits (for example Wingbits Antenna) now get a teal globe with the Wingbits logo.
+  Devices you name Wingbits (for example Wingbits Antenna) now get a black globe with the Wingbits logo.
 icon: https://raw.githubusercontent.com/PatriotCrypto/umbrel-patriot-apps/main/patriot-constellation/icon.svg
 submitter: PatriotCrypto
 submission: https://github.com/PatriotCrypto/umbrel-patriot-apps

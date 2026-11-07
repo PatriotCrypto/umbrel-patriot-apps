@@ -31,7 +31,8 @@ function tierOf(d) {
 const UMBREL = new Color('#5351f3');
 // A device counts as an Umbrel when its discovered hostname or the name you gave it says so.
 const BTC = new Color('#f7931a');
-const WINGBITS = new Color('#1496aa');
+const WINGBITS = new Color('#0b0c0f');
+const WINGBITS_HALO = new Color('#9aa3b8');
 // 'btc' (named bitcoin/btc, or found listening on the Bitcoin port), 'umbrel' (named umbrel), 'wingbits' (named wingbits), or null.
 function kindOf(d) {
   const nm = [d.hostname, d.name].filter(Boolean).join(' ');
@@ -385,7 +386,7 @@ function create(container, opts = {}) {
     n.mesh.material.opacity = (d.online ? 1 : 0.8) * dim;
     n.mesh.scale.setScalar(nodeRadius(d));
     n.halo.visible = d.online;
-    n.halo.material.color.copy(n.dev.group && d.online && !isNew && !um ? tagColor(n.dev.group) : col);
+    n.halo.material.color.copy(kind === 'wingbits' && d.online ? WINGBITS_HALO : n.dev.group && d.online && !isNew && !um ? tagColor(n.dev.group) : col);
     n.halo.material.opacity = (T.light ? 0.28 : 0.7) * dim;
     n.halo.material.blending = blendNow();
     n.halo.scale.setScalar(nodeRadius(d) * 7);
