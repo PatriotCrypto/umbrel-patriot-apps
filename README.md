@@ -49,6 +49,7 @@ Umbrel re-checks community stores every so often, so a new app or update can tak
   </tr>
   <tr>
     <td align="center"><a href="#cold-front"><img src="patriot-coldfront/icon.svg" width="84" alt="Cold Front"><br><b>Cold Front</b></a><br><sub>Local thermostat control</sub></td>
+    <td align="center"><a href="#constellation"><img src="constellation-src/app/public/icon.svg" width="84" alt="Constellation"><br><b>Constellation</b></a><br><sub>Your network in 3D</sub></td>
   </tr>
 </table>
 
@@ -188,6 +189,17 @@ You need a Wingbits API key (station operators get a free Starter plan). Until y
 - Four looks, and a hidden surprise.
 
 *An independent hobby project, not affiliated with Meshtastic, Baofeng, CHIRP or Umbrel.* · [Details](skynet-src/README.md)
+
+### Constellation
+<img src="constellation-src/app/public/icon.svg" width="96" align="right" alt="Constellation icon">
+
+**See every device on your network, in 3D.** A quiet observatory for your home Wi-Fi.
+
+- A live 3D map with your gateway in the middle and every device on one ring you can rearrange by dragging. Tag devices by room or person.
+- Name devices, and track when each one is online, for how long, and how your internet is holding up. Includes a speed test.
+- Six looks, including Glass and Daylight. Monitoring only: it cannot block devices or show per-device data use. It has its own password because it runs on your host network.
+
+*An independent hobby project, not affiliated with Starlink, SpaceX or Umbrel.* · [Details](constellation-src/README.md)
 
 ### Uplink
 <img src="patriot-uplink/icon.svg" width="96" align="right" alt="Uplink icon">

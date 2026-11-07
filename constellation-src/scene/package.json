@@ -1,0 +1,13 @@
+{
+  "name": "constellation-scene",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Build tooling for the 3D network scene. The bundle is committed to app/public/js, so this is only needed when changing the scene.",
+  "scripts": {
+    "build": "esbuild src/scene.js --bundle --minify --format=iife --global-name=CSSceneModule --target=es2020 --legal-comments=none --outfile=../app/public/js/scene.bundle.js"
+  },
+  "devDependencies": {
+    "esbuild": "^0.25.0",
+    "three": "^0.187.0"
+  }
+}
