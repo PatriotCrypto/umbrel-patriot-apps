@@ -18,6 +18,9 @@ class Engine {
     this.demoHist = { samples: [], runs: [] };
     this.expected = null; // setpoints we last wrote or last saw
     this.lastWriteAt = 0;
+    this.quietUntil = 0;
+    this._busy = false;
+    this._again = false;
     this.lastSampleAt = 0;
     this.openRun = null;
     this.last = { desired: null, snap: null, status: 'starting', note: null };
@@ -72,7 +75,18 @@ class Engine {
     return { ...d, heat: c.heat, cool: c.cool, adjust: c.heat - d.heat };
   }
 
+  /** Run a tick; if one is already running (a slow Z-Wave write), run once more right after instead of overlapping. */
   async tick() {
+    if (this._busy) { this._again = true; return; }
+    this._busy = true;
+    try { await this._tick(); } finally { this._busy = false; }
+    if (this._again) { this._again = false; return this.tick(); }
+  }
+
+  /** The user (or the schedule editor) just changed something: allow a fresh write, and don't read the thermostat's old values as a wall change. */
+  _userChanged() { this.lastWriteAt = 0; this.quietUntil = this.now() + 120000; }
+
+  async _tick() {
     if (!this.adapter) return;
     const nowMs = this.now();
     const snap = this.adapter.snapshot();
@@ -90,8 +104,13 @@ class Engine {
     const obs = { heat: t.heat, cool: t.cool };
 
     const differs = this.expected && (Math.abs(obs.heat - this.expected.heat) >= 0.5 || Math.abs(obs.cool - this.expected.cool) >= 0.5);
-    const writeLag = nowMs - this.lastWriteAt < 90000; // the thermostat takes a moment to report our own write back
-    if (differs && !writeLag) {
+    const writeLag = nowMs - this.lastWriteAt < 90000 || nowMs < this.quietUntil; // the thermostat takes a moment to report our own write back
+    const reverted = differs && this.preWrite && Math.abs(obs.heat - this.preWrite.heat) < 0.5 && Math.abs(obs.cool - this.preWrite.cool) < 0.5;
+    if (differs && !writeLag && reverted) {
+      // the thermostat went back to what it had before our write: it refused or dropped it. That is not someone at the wall.
+      this.log('error', `The thermostat did not keep our setting (still ${obs.heat}/${obs.cool}). Check its mode: it may ignore this setpoint in Off or the other mode.`);
+      this.expected = obs; this.preWrite = null;
+    } else if (differs && !writeLag) {
       if (this._nearBoundary(nowMs)) {
         this.expected = obs; // the thermostat's own schedule moved at the same time ours did
       } else {
@@ -114,6 +133,7 @@ class Engine {
     if (!this.settings.enforce) { this.last.status = off ? 'observing' : 'ok'; return; }
     if (off && nowMs - this.lastWriteAt >= WRITE_GAP_MS) {
       this.lastWriteAt = nowMs;
+      this.preWrite = { heat: obs.heat, cool: obs.cool };
       try {
         await this.adapter.setSetpoints({ heat: Math.abs(obs.heat - d.heat) >= 0.5 ? d.heat : null, cool: Math.abs(obs.cool - d.cool) >= 0.5 ? d.cool : null });
         this.expected = { heat: d.heat, cool: d.cool };
@@ -233,7 +253,7 @@ class Engine {
     s.hold = { heat: c.heat, cool: c.cool, until: at, source: 'app', since: this.now() };
     this.store.touch();
     this.log('hold', `Hold ${c.heat}/${c.cool}${at ? ` until ${at}` : ' until cancelled'}`);
-    this.lastWriteAt = 0;
+    this._userChanged();
     return s.hold;
   }
 
@@ -242,16 +262,16 @@ class Engine {
     if (s.hold) this.log('hold', 'Hold cancelled');
     s.hold = null;
     this.store.touch();
-    this.lastWriteAt = 0;
+    this._userChanged();
   }
 
   setAway({ on, heat, cool, hours }) {
     const s = this.store.data;
-    if (!on) { if (s.away) this.log('away', 'Away mode off'); s.away = null; this.lastWriteAt = 0; this.store.touch(); return null; }
+    if (!on) { if (s.away) this.log('away', 'Away mode off'); s.away = null; this._userChanged(); this.store.touch(); return null; }
     const c = clampPair(heat ?? this.settings.limits.heatMin + 4, cool ?? this.settings.limits.coolMax - 2, this.settings.limits);
     s.away = { heat: c.heat, cool: c.cool, until: hours ? new Date(this.now() + hours * 3600000).toISOString() : null, since: this.now() };
     this.log('away', `Away mode on: ${c.heat}/${c.cool}`);
-    this.lastWriteAt = 0;
+    this._userChanged();
     this.store.touch();
     return s.away;
   }

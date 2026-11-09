@@ -26,6 +26,7 @@
 
   function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
   function toast(m) { var t = $('#toast'); t.textContent = m; t.hidden = false; clearTimeout(toast.t); toast.t = setTimeout(function () { t.hidden = true; }, 2600); }
+  var PEND = {};
   function api(method, url, body) {
     var o = { method: method, headers: {} };
     if (body !== undefined) { o.headers['Content-Type'] = 'application/json'; o.body = JSON.stringify(body); }
@@ -145,14 +146,25 @@
         b.innerHTML = '<div class="ctl"><div class="seg modeSeg" role="group" aria-label="Mode"><button data-mode="off">Off</button><button data-mode="heat">Heat</button><button data-mode="cool">Cool</button><button data-mode="auto">Auto</button></div>' +
           '<div class="seg fanSeg" role="group" aria-label="Fan"><button data-fan="auto">Fan auto</button><button data-fan="on">Fan on</button></div>' +
           '<button class="btn awayBtn">Away</button></div>';
-        $$('[data-mode]', b).forEach(function (x) { x.onclick = function () { api('POST', '/api/mode', { mode: x.dataset.mode }).then(refresh).catch(function (e) { toast(e.message); }); }; });
-        $$('[data-fan]', b).forEach(function (x) { x.onclick = function () { api('POST', '/api/fan', { fan: x.dataset.fan }).then(refresh).catch(function (e) { toast(e.message); }); }; });
+        var ctl = function (kind, val) {
+          PEND[kind] = { v: val, at: Date.now() };
+          WIDGETS.controls.update(b);
+          api('POST', '/api/' + kind, kind === 'mode' ? { mode: val } : { fan: val }).then(function () { toast((kind === 'mode' ? 'Mode ' : 'Fan ') + val + ' sent to thermostat'); setTimeout(refresh, 4000); setTimeout(refresh, 12000); }).catch(function (e) { delete PEND[kind]; WIDGETS.controls.update(b); toast(e.message); });
+        };
+        $$('[data-mode]', b).forEach(function (x) { x.onclick = function () { ctl('mode', x.dataset.mode); }; });
+        $$('[data-fan]', b).forEach(function (x) { x.onclick = function () { ctl('fan', x.dataset.fan); }; });
         $('.awayBtn', b).onclick = function () { api('POST', '/api/away', { on: !S.away }).then(refresh).catch(function (e) { toast(e.message); }); };
       },
       update: function (b) {
         var t = S.thermostat;
-        $$('[data-mode]', b).forEach(function (x) { x.classList.toggle('on', !!t && t.mode === x.dataset.mode); });
-        $$('[data-fan]', b).forEach(function (x) { x.classList.toggle('on', !!t && t.fan === x.dataset.fan); });
+        var cur = function (kind) {
+          var p = PEND[kind], real = t && t[kind];
+          if (p && (real === p.v || Date.now() - p.at > 30000)) { delete PEND[kind]; p = null; }
+          return { v: p ? p.v : real, busy: !!p };
+        };
+        var m = cur('mode'), f = cur('fan');
+        $$('[data-mode]', b).forEach(function (x) { x.classList.toggle('on', !!t && m.v === x.dataset.mode); x.classList.toggle('busy', m.busy && m.v === x.dataset.mode); });
+        $$('[data-fan]', b).forEach(function (x) { x.classList.toggle('on', !!t && f.v === x.dataset.fan); x.classList.toggle('busy', f.busy && f.v === x.dataset.fan); });
         var a = $('.awayBtn', b); a.textContent = S.away ? 'Back home' : 'Away'; a.classList.toggle('on', !!S.away);
       }
     },
@@ -175,7 +187,7 @@
         var el = $('.rt', b);
         if (!INS) { el.innerHTML = '<p class="hint">Loading…</p>'; return; }
         var d = INS.daily && INS.daily[INS.daily.length - 1];
-        if (!d) { el.innerHTML = '<p class="hint">No runtime yet.</p>'; return; }
+        if (!d) { el.innerHTML = '<p class="hint">Nothing has run yet today. Heating and cooling time appears here once the system has run.</p>'; return; }
         el.innerHTML = '<div class="pair"><div><b class="big sm heatt">' + hrs1(d.heatMin) + '</b><span class="k">Heating</span></div><div><b class="big sm coolt">' + hrs1(d.coolMin) + '</b><span class="k">Cooling</span></div></div>' +
           '<p class="hint" style="margin:4px 0 0;font-size:.78rem">' + d.cycles + ' cycle' + (d.cycles === 1 ? '' : 's') + (d.cost != null ? ' · about $' + d.cost.toFixed(2) : '') + '</p>';
       }
@@ -363,7 +375,8 @@
   $('#copyWeekdays').onclick = function () { copyTo(['mon', 'tue', 'wed', 'thu', 'fri']); };
   $('#copyAll').onclick = function () { copyTo(DAYS); };
   $('#saveSched').onclick = function () {
-    api('PUT', '/api/schedule', { schedule: sched }).then(function (r) { sched = r.schedule; schedDirty = false; renderSchedule(r.wall); toast('Schedule saved'); refresh(); }).catch(function (e) { toast(e.message); });
+    var sb = $('#saveSched'); sb.disabled = true; var old = sb.textContent; sb.textContent = 'Saving…';
+    api('PUT', '/api/schedule', { schedule: sched }).then(function (r) { sched = r.schedule; schedDirty = false; renderSchedule(r.wall); toast('Schedule saved'); refresh(); }).catch(function (e) { toast(e.message); }).then(function () { sb.disabled = false; sb.textContent = old; });
   };
 
   // ---- rooms
@@ -549,7 +562,7 @@
       $$('#rangeSeg button').forEach(function (b) { b.classList.toggle('on', +b.dataset.h === range); });
       drawBars(a[1].daily);
       $('#findings').innerHTML = (a[1].findings.length ? a[1].findings : ['Nothing unusual. Cold Front will flag short cycling, wall changes, humidity and sensor gaps here.']).map(function (f) { return '<li>' + esc(f) + '</li>'; }).join('');
-      var tt = a[1].totals; $('#totals').textContent = 'Heating ' + Math.round(tt.heatMin / 60 * 10) / 10 + ' h, cooling ' + Math.round(tt.coolMin / 60 * 10) / 10 + ' h' + (tt.cost != null ? ', about $' + tt.cost.toFixed(2) + ' heating' : '') + '.';
+      var tt = a[1].totals; $('#totals').textContent = (!tt.heatMin && !tt.coolMin) ? 'The system has not run in this window yet, or the thermostat has only just been added. Totals build up as it heats and cools.' : 'Heating ' + Math.round(tt.heatMin / 60 * 10) / 10 + ' h, cooling ' + Math.round(tt.coolMin / 60 * 10) / 10 + ' h' + (tt.cost != null ? ', about $' + tt.cost.toFixed(2) + ' heating' : '') + '.';
       $('#roomStats').innerHTML = a[1].rooms.length ? a[1].rooms.map(function (r) {
         return '<div class="rstat"><b>' + esc(r.name) + '</b><span>avg ' + fmtT(r.avgTemp) + '°</span><span>' + fmtT(r.minTemp) + '–' + fmtT(r.maxTemp) + '°</span><span>' + (r.avgHum != null ? Math.round(r.avgHum) + '%' : '') + '</span></div>';
       }).join('') : '<p class="hint">No room sensors reporting yet.</p>';

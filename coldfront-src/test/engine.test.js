@@ -183,3 +183,30 @@ test('room sensors are recorded in history even before a thermostat is paired', 
   assert.equal(s.in, null);
   assert.deepEqual(s.rooms[2], { t: 74, h: 54 });
 });
+
+test('a hold set from the app is not mistaken for a wall change while the thermostat catches up', async () => {
+  const { engine, adapter, clock, store } = setup();
+  await engine.tick();
+  adapter.th.heat = 70; adapter.th.cool = 76;
+  engine.setHold({ heat: 66, cool: 78, until: null });
+  adapter.setSetpoints = async (p) => { adapter.writes.push(p); }; // thermostat is slow to report: values stay old
+  await engine.tick();
+  clock.advance(30000);
+  await engine.tick();
+  assert.equal(store.data.events.some((e) => e.type === 'external'), false);
+  assert.equal(store.data.hold.source, 'app');
+  assert.equal(store.data.hold.heat, 66);
+});
+
+test('a thermostat that drops our write is reported, not turned into a hold', async () => {
+  const { engine, adapter, clock, store } = setup();
+  await engine.tick();
+  adapter.th.heat = 60; adapter.th.cool = 80;
+  engine.setHold({ heat: 66, cool: 78, until: null });
+  adapter.setSetpoints = async (p) => { adapter.writes.push(p); }; // accepted, then ignored
+  await engine.tick();
+  clock.advance(200000);
+  await engine.tick();
+  assert.equal(store.data.hold.source, 'app');
+  assert.equal(store.data.hold.heat, 66);
+});

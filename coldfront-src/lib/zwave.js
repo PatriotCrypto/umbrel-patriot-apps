@@ -213,14 +213,24 @@ class ZWaveAdapter extends EventEmitter {
   async _write(node, cc, prop, pk, value) {
     const v = this._get(node, cc, prop, pk);
     if (!v) throw new Error(`Thermostat has no ${prop}${pk ? ` (${pk})` : ''} value`);
-    await this._send('node.set_value', { nodeId: node.nodeId, valueId: v.id, value }, 15000);
+    const res = await this._send('node.set_value', { nodeId: node.nodeId, valueId: v.id, value }, 20000);
+    const st = res && res.result && res.result.status;
+    // Z-Wave status 2 = Fail, 1 = no device support. 0/3/254/255 = success / working / sent.
+    if (st === 1 || st === 2) throw new Error('The thermostat did not accept the change (it may be asleep or out of range)');
+    // show the new value right away, then confirm with the device a few seconds later
+    node.values.set(keyOf(cc, 0, prop, pk), { ...v, value });
+    node.lastSeen = Date.now();
+    this.emit('update');
+    setTimeout(() => { this._send('node.poll_value', { nodeId: node.nodeId, valueId: v.id }, 15000).catch(() => {}); }, 6000);
   }
 
   async setSetpoints({ heat, cool }) {
     const t = this._findThermostat();
     if (!t) throw new Error('No thermostat found');
-    if (heat != null) { const v = this._get(t, CC.SETPOINT, 'setpoint', 1); if (v) await this._write(t, CC.SETPOINT, 'setpoint', 1, fromF(heat, v.unit)); }
-    if (cool != null) { const v = this._get(t, CC.SETPOINT, 'setpoint', 2); if (v) await this._write(t, CC.SETPOINT, 'setpoint', 2, fromF(cool, v.unit)); }
+    const jobs = [];
+    if (heat != null) { const v = this._get(t, CC.SETPOINT, 'setpoint', 1); if (v) jobs.push(this._write(t, CC.SETPOINT, 'setpoint', 1, fromF(heat, v.unit))); }
+    if (cool != null) { const v = this._get(t, CC.SETPOINT, 'setpoint', 2); if (v) jobs.push(this._write(t, CC.SETPOINT, 'setpoint', 2, fromF(cool, v.unit))); }
+    await Promise.all(jobs);
   }
 
   async setMode(mode) {

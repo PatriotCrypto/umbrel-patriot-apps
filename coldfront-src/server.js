@@ -144,13 +144,15 @@ function createApp({ dataDir, zwaveUrl, now = () => Date.now(), simSpeed = 1, au
   app.post('/api/mode', async (req, res) => {
     const m = req.body?.mode;
     if (!['off', 'heat', 'cool', 'auto'].includes(m)) return bad(res, 'mode must be off, heat, cool or auto');
-    try { await engine.adapter.setMode(m); store.event('mode', `Mode set to ${m}`); res.json({ ok: true }); } catch (e) { bad(res, e.message, 502); }
+    res.json({ ok: true, pending: true });
+    engine.adapter.setMode(m).then(() => store.event('mode', `Mode set to ${m}`), (e) => store.event('error', `Could not set mode ${m}: ${e.message}`));
   });
 
   app.post('/api/fan', async (req, res) => {
     const f = req.body?.fan;
     if (!['auto', 'on'].includes(f)) return bad(res, 'fan must be auto or on');
-    try { await engine.adapter.setFan(f); res.json({ ok: true }); } catch (e) { bad(res, e.message, 502); }
+    res.json({ ok: true, pending: true });
+    engine.adapter.setFan(f).then(() => store.event('fan', `Fan set to ${f}`), (e) => store.event('error', `Could not set fan ${f}: ${e.message}`));
   });
 
   app.get('/api/schedule', (req, res) => res.json({ schedule: store.data.schedule, wall: wallSchedule(store.data.schedule) }));
@@ -164,7 +166,7 @@ function createApp({ dataDir, zwaveUrl, now = () => Date.now(), simSpeed = 1, au
       store.data.schedule = sch;
       store.save();
       store.event('schedule', 'Schedule updated');
-      engine.lastWriteAt = 0;
+      engine._userChanged();
       res.json({ schedule: sch, wall: wallSchedule(sch) });
       engine.tick().catch(() => {});
     } catch (e) { bad(res, e.message); }
@@ -252,8 +254,17 @@ function createApp({ dataDir, zwaveUrl, now = () => Date.now(), simSpeed = 1, au
     res.json({ samples: h.samples.filter((s) => s.t >= since), runs: h.runs.filter((r) => (r.end || now()) >= since) });
   });
 
+  // friendly names from Z-Wave (name, else location) and the thermostat node itself, which is not a room sensor
+  const roomMeta = () => {
+    const snap = (engine.last && engine.last.snap) || {};
+    const names = {}; const skip = [];
+    for (const r of snap.sensors || []) names[r.nodeId] = r.name || r.location || null;
+    if (snap.thermostat && snap.thermostat.nodeId != null) skip.push(snap.thermostat.nodeId);
+    return { names, skip };
+  };
+
   app.get('/api/insights', (req, res) => {
-    res.json(summarize({ history: engine.hist, events: store.data.events, rooms: store.data.rooms, settings: store.data.settings, now: now() }));
+    res.json(summarize({ history: engine.hist, events: store.data.events, rooms: store.data.rooms, ...roomMeta(), settings: store.data.settings, now: now() }));
   });
 
   app.get('/api/events', (req, res) => res.json({ events: store.data.events.slice(-200).reverse() }));

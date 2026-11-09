@@ -4,7 +4,7 @@ const { dateKey } = require('./schedule');
 const avg = (a) => (a.length ? a.reduce((x, y) => x + y, 0) / a.length : null);
 const r1 = (v) => (v == null ? null : Math.round(v * 10) / 10);
 
-function summarize({ history, events, rooms, settings, now = Date.now(), days = 14 }) {
+function summarize({ history, events, rooms, names = {}, skip = [], settings, now = Date.now(), days = 14 }) {
   const tz = settings.tz;
   const since = now - days * 86400000;
   const byDay = new Map();
@@ -52,13 +52,14 @@ function summarize({ history, events, rooms, settings, now = Date.now(), days = 
   const day = history.samples.filter((s) => s.t >= now - 86400000);
   const roomStats = {};
   for (const s of day) for (const [id, v] of Object.entries(s.rooms || {})) {
+    if (skip.includes(String(id)) || skip.includes(+id)) continue;
     const r = (roomStats[id] ||= { t: [], h: [] });
     if (v.t != null) r.t.push(v.t);
     if (v.h != null) r.h.push(v.h);
   }
   const thermoAvg = avg(day.map((s) => s.in).filter((v) => v != null));
   const roomList = Object.entries(roomStats).map(([id, r]) => ({
-    id, name: rooms[id]?.name || `Sensor ${id}`, avgTemp: r1(avg(r.t)), minTemp: r.t.length ? r1(Math.min(...r.t)) : null, maxTemp: r.t.length ? r1(Math.max(...r.t)) : null,
+    id, name: rooms[id]?.name || names[id] || `Sensor ${id}`, avgTemp: r1(avg(r.t)), minTemp: r.t.length ? r1(Math.min(...r.t)) : null, maxTemp: r.t.length ? r1(Math.max(...r.t)) : null,
     avgHum: r1(avg(r.h)), vsThermostat: thermoAvg != null && r.t.length ? r1(avg(r.t) - thermoAvg) : null,
   }));
 

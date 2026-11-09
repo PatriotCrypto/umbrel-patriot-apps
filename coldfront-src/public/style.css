@@ -334,3 +334,6 @@ h4.sub{margin:18px 0 6px}
   /* bigger tap targets */
   .btn{min-height:40px}
 }
+/* ---- pending state for mode/fan (0.3.5) ---- */
+.seg button.busy{animation:cfpulse 1s ease-in-out infinite}
+@keyframes cfpulse{50%{opacity:.55}}
