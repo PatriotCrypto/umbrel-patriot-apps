@@ -22,7 +22,7 @@ Skynet is a joke name for a radio network that watches the sky. It is an indepen
 - Logbook with **ADIF export**
 - Backup and restore of your own data
 
-A cyberdeck-style HUD (corner brackets, scanlines, radar sweep, F-key tabs, UTC clock) in five looks: **Cyberdeck** (default), **Phosphor** (green terminal), **Battlefield** (WW2 field-command: olive drab, brass, rivets, parchment operations map, rubber-stamp status), **Night Red** (red light only, to protect your night vision) and **Princess Deck** (the cyberdeck HUD in bright pink, with a wireframe castle, hearts for nodes and a crown for the base). Press F1 to F6 to jump between screens. And one hidden surprise.
+A cyberdeck-style HUD (corner brackets, scanlines, radar sweep, F-key tabs, UTC clock) in five looks: **Cyberdeck** (default), **Phosphor** (green terminal), **Battlefield** (WW2 field-command: olive drab, brass, rivets, parchment operations map, rubber-stamp status), **Night Red** (red light only, to protect your night vision) and **Princess Deck** (the cyberdeck HUD in bright pink, with hearts for nodes and a crown for the base). Press F1 to F6 to jump between screens. And one hidden surprise.
 
 | Frequencies | Phone | Chat |
 |---|---|---|
