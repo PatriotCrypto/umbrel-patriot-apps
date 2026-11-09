@@ -250,6 +250,7 @@ class Engine {
     let at = null;
     if (until === 'next') { const n = nextBoundary(s.schedule, new Date(this.now()), this.settings.tz); at = n ? n.at.toISOString() : null; }
     else if (typeof until === 'number' && until > 0) at = new Date(this.now() + Math.min(until, 24 * 14) * 3600000).toISOString();
+    if (s.away) { s.away = null; this.log('away', 'Away mode off (a hold was set)'); } // away outranks a hold, so setting a hold means you are home
     s.hold = { heat: c.heat, cool: c.cool, until: at, source: 'app', since: this.now() };
     this.store.touch();
     this.log('hold', `Hold ${c.heat}/${c.cool}${at ? ` until ${at}` : ' until cancelled'}`);

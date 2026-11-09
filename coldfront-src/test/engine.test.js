@@ -210,3 +210,15 @@ test('a thermostat that drops our write is reported, not turned into a hold', as
   assert.equal(store.data.hold.source, 'app');
   assert.equal(store.data.hold.heat, 66);
 });
+
+test('setting a hold while Away is on turns Away off so the hold actually applies', async () => {
+  const { engine, adapter, store } = setup();
+  await engine.tick();
+  engine.setAway({ on: true });
+  await engine.tick();
+  engine.setHold({ heat: 68, cool: 72, until: null });
+  assert.equal(store.data.away, null);
+  await engine.tick();
+  assert.equal(engine.last.desired.heat, 68);
+  assert.equal(engine.last.desired.cool, 72);
+});
