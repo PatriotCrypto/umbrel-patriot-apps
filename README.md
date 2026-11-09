@@ -186,7 +186,7 @@ You need a Wingbits API key (station operators get a free Starter plan). Until y
 
 - **Meshtastic:** every node on a map with trails and a coverage heat map, battery and signal, alerts when a node goes quiet, and chat with the mesh from your browser. Connects to a node over Wi-Fi or Ethernet, and includes a demo mesh so you can try everything first.
 - **Ham radio:** contacts, callsigns and frequencies in one place. Build a channel list for a Baofeng (or any CHIRP-supported radio) and export it as a CHIRP CSV, import your radio's list, keep a logbook, and export ADIF.
-- Five looks (including a pink Princess Deck), and a hidden surprise.
+- Six looks (including a pink Princess Deck and a red-on-steel Machine Vision), and a hidden surprise.
 
 *An independent hobby project, not affiliated with Meshtastic, Baofeng, CHIRP or Umbrel.* · [Details](skynet-src/README.md)
 

@@ -1,6 +1,6 @@
 {
   "name": "skynet",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "description": "Meshtastic + ham radio control room for Umbrel",
   "main": "server.js",
   "license": "MIT",

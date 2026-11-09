@@ -2,7 +2,7 @@
 (function () {
   const $ = (s, el = document) => el.querySelector(s);
   const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-  const SKINS = [['cyberdeck', 'Cyberdeck'], ['terminal', 'Phosphor'], ['battlefield', 'Battlefield'], ['nightred', 'Night Red'], ['princess', 'Princess Deck']];
+  const SKINS = [['cyberdeck', 'Cyberdeck'], ['terminal', 'Phosphor'], ['battlefield', 'Battlefield'], ['nightred', 'Night Red'], ['princess', 'Princess Deck'], ['machine', 'Machine Vision']];
 
   let S = { nodes: [], alerts: [], settings: {}, status: {}, me: null, mode: 'demo' };
   let contacts = [], freqs = [], qsos = [], msgs = [], trails = {}, coverage = [];

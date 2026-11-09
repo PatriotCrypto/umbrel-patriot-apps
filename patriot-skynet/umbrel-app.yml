@@ -2,7 +2,7 @@ manifestVersion: 1
 id: patriot-skynet
 category: networking
 name: Skynet
-version: "0.2.1"
+version: "0.2.2"
 tagline: Your Meshtastic mesh and ham radio in one control room
 description: >-
   Skynet is a control room for your radios, running on your own Umbrel.
@@ -14,7 +14,7 @@ description: >-
   Ham radio: keep contacts, callsigns and frequencies in one place. Build a channel list for a Baofeng (or any CHIRP-supported radio) and export it as a CHIRP CSV, import your radio's current list, keep a logbook, and export it as ADIF.
 
 
-  Everything stays on your Umbrel. Five looks to choose from, including a pink Princess Deck, and a hidden surprise.
+  Everything stays on your Umbrel. Six looks to choose from, including a pink Princess Deck and a red-on-steel Machine Vision, and a hidden surprise.
 
 
   Independent hobby project. Not affiliated with or endorsed by Meshtastic, Baofeng, CHIRP or Umbrel.
@@ -29,7 +29,7 @@ path: ""
 defaultUsername: ""
 defaultPassword: ""
 releaseNotes: >-
-  The Princess Deck look is now just the cyberdeck in bright pink, with no castle in the background or header.
+  New look: Machine Vision, gunmetal steel with a red targeting overlay, a slow scan line and reticle markers on the map. Find it with the LOOK button.
 submitter: PatriotCrypto
 submission: https://github.com/PatriotCrypto/umbrel-patriot-apps
 

@@ -22,7 +22,7 @@ Skynet is a joke name for a radio network that watches the sky. It is an indepen
 - Logbook with **ADIF export**
 - Backup and restore of your own data
 
-A cyberdeck-style HUD (corner brackets, scanlines, radar sweep, F-key tabs, UTC clock) in five looks: **Cyberdeck** (default), **Phosphor** (green terminal), **Battlefield** (WW2 field-command: olive drab, brass, rivets, parchment operations map, rubber-stamp status), **Night Red** (red light only, to protect your night vision) and **Princess Deck** (the cyberdeck HUD in bright pink, with hearts for nodes and a crown for the base). Press F1 to F6 to jump between screens. And one hidden surprise.
+A cyberdeck-style HUD (corner brackets, scanlines, radar sweep, F-key tabs, UTC clock) in six looks: **Cyberdeck** (default), **Phosphor** (green terminal), **Battlefield** (WW2 field-command: olive drab, brass, rivets, parchment operations map, rubber-stamp status), **Night Red** (red light only, to protect your night vision), **Princess Deck** (the cyberdeck HUD in bright pink, with hearts for nodes and a crown for the base) and **Machine Vision** (gunmetal steel with a red targeting overlay, a slow scan line and reticle markers on the map). Press F1 to F6 to jump between screens. And one hidden surprise.
 
 | Frequencies | Phone | Chat |
 |---|---|---|
@@ -33,6 +33,8 @@ A cyberdeck-style HUD (corner brackets, scanlines, radar sweep, F-key tabs, UTC 
 | ![Phosphor](docs/look-phosphor.png) | ![Battlefield](docs/look-battlefield.png) | ![Night Red](docs/look-nightred.png) |
 
 ![Princess Deck](docs/look-princess.png)
+
+![Machine Vision](docs/look-machine.png)
 
 The screenshots show fictional demo stations.
 

@@ -287,3 +287,28 @@ html[data-skin="princess"] .egg { background: rgba(255, 228, 241, .97); }
 html[data-skin="princess"] .egg pre { color: var(--accent); text-shadow: none; }
 html[data-skin="princess"] .stat b { text-shadow: none; }
 html[data-skin="princess"] .tabs button.on, html[data-skin="princess"] .th.on { color: var(--accent-ink); }
+
+/* ---------- Machine Vision: gunmetal steel with a red targeting overlay ---------- */
+html[data-skin="machine"] {
+  --bg: #0a0b0d; --panel: #15181c; --panel2: #1f242a; --fg: #e6eaee; --dim: #8a94a0; --line: #3a424c;
+  --accent: #ff2b1f; --accent2: #c3ccd6; --accent-ink: #140302; --warn: #ffb020; --bad: #ff5c50;
+  --map: #08090b; --grid: #1b2026; --scan: rgba(255, 43, 31, .05); --faint: rgba(255, 255, 255, .03);
+  --glow: 0 0 9px rgba(255, 43, 31, .55); --cut: 4px; --hud-glow: rgba(255, 43, 31, .10);
+  --h2pre: "\25A0  "; --maptitle: "TARGET ACQUISITION"; --marker: reticle;
+  --mapacc: #ff2b1f; --mapacc2: #c3ccd6; --mapwarn: #ffb020; --mapbad: #ff5c50;
+  --tilefilter: invert(1) grayscale(1) contrast(1.1) brightness(.7) sepia(.4) hue-rotate(-40deg) saturate(3); --tilealpha: .55;
+}
+html[data-skin="machine"] body { background: radial-gradient(ellipse 80% 40% at 50% -5%, var(--hud-glow), transparent 70%), repeating-linear-gradient(135deg, rgba(255, 255, 255, .018) 0 2px, transparent 2px 6px), var(--bg); background-attachment: fixed; }
+html[data-skin="machine"] body::before { /* a slow red scan band, like a machine reading the screen */
+  content: ""; position: fixed; left: 0; right: 0; top: 0; height: 120px; z-index: 59; pointer-events: none;
+  background: linear-gradient(180deg, transparent, rgba(255, 43, 31, .06) 60%, rgba(255, 43, 31, .14) 98%, transparent);
+  animation: mvscan 9s linear infinite;
+}
+@keyframes mvscan { from { transform: translateY(-130px); } to { transform: translateY(100vh); } }
+html[data-skin="machine"] body::after { background: repeating-linear-gradient(0deg, var(--scan) 0 1px, transparent 1px 3px), radial-gradient(ellipse at center, transparent 50%, rgba(60, 0, 0, .55) 100%); }
+html[data-skin="machine"] .top { background: linear-gradient(180deg, #232930, #14171b); border-bottom: 2px solid var(--accent); }
+html[data-skin="machine"] .word { letter-spacing: .36em; }
+html[data-skin="machine"] .tabs button { clip-path: polygon(0 0, calc(100% - 8px) 0, 100% 8px, 100% 100%, 0 100%); }
+html[data-skin="machine"] .card, html[data-skin="machine"] .mapwrap, html[data-skin="machine"] dialog, html[data-skin="machine"] .hud > div { background-blend-mode: normal; }
+html[data-skin="machine"] .chip.ok { color: var(--accent2); border-color: var(--accent2); }
+html[data-skin="machine"] .alerts .a { background: rgba(255, 176, 32, .07); }
