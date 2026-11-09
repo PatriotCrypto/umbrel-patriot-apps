@@ -12,7 +12,7 @@ Skynet is a joke name for a radio network that watches the sky. It is an indepen
 - Every node on a map with trails, range rings and a coverage heat map showing where your portable nodes were heard from the base
 - Battery, signal (SNR/RSSI), hops and last-heard for each node
 - Alerts when a node goes quiet or its battery runs low
-- Chat with the whole mesh or one node, with history kept on your Umbrel
+- Chat: a shared **Everyone** feed plus separate **Private** conversations with each node, with history kept on your Umbrel. Archive messages (or have them archived automatically), restore them, or delete them for good
 - Connects to a node over your network (Wi-Fi or Ethernet). A built-in **demo mesh** lets you try everything with no hardware
 
 **Ham radio**
@@ -22,7 +22,7 @@ Skynet is a joke name for a radio network that watches the sky. It is an indepen
 - Logbook with **ADIF export**
 - Backup and restore of your own data
 
-A cyberdeck-style HUD (corner brackets, scanlines, radar sweep, F-key tabs, UTC clock) in four looks: **Cyberdeck** (default), **Phosphor** (green terminal), **Battlefield** (WW2 field-command: olive drab, brass, rivets, parchment operations map, rubber-stamp status) and **Night Red** (red light only, to protect your night vision). Press F1 to F6 to jump between screens. And one hidden surprise.
+A cyberdeck-style HUD (corner brackets, scanlines, radar sweep, F-key tabs, UTC clock) in five looks: **Cyberdeck** (default), **Phosphor** (green terminal), **Battlefield** (WW2 field-command: olive drab, brass, rivets, parchment operations map, rubber-stamp status), **Night Red** (red light only, to protect your night vision) and **Princess Deck** (the cyberdeck HUD in bright pink, with a wireframe castle, hearts for nodes and a crown for the base). Press F1 to F6 to jump between screens. And one hidden surprise.
 
 | Frequencies | Phone | Chat |
 |---|---|---|
@@ -31,6 +31,8 @@ A cyberdeck-style HUD (corner brackets, scanlines, radar sweep, F-key tabs, UTC 
 | Phosphor | Battlefield | Night Red |
 |---|---|---|
 | ![Phosphor](docs/look-phosphor.png) | ![Battlefield](docs/look-battlefield.png) | ![Night Red](docs/look-nightred.png) |
+
+![Princess Deck](docs/look-princess.png)
 
 The screenshots show fictional demo stations.
 

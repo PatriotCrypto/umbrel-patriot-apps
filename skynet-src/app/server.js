@@ -31,6 +31,7 @@ function createApp(store, mesh) {
     });
     next();
   });
+  app.use('/api', (req, res, next) => { res.set('Cache-Control', 'no-store'); next(); }); // always fresh: a cached message list looks like "nothing arrived"
   app.use(express.json({ limit: '2mb' }));
 
   const D = store.data;
@@ -73,6 +74,7 @@ function createApp(store, mesh) {
     }
     if (b.port !== undefined) { const p = parseInt(b.port, 10); if (!(p > 0 && p < 65536)) return bad(res, 'port must be 1-65535'); s.port = p; }
     if (b.staleMinutes !== undefined) { const v = parseInt(b.staleMinutes, 10); if (!(v >= 5 && v <= 1440)) return bad(res, 'silent-node limit must be 5-1440 minutes'); s.staleMinutes = v; }
+    if (b.archiveDays !== undefined) { const v = parseInt(b.archiveDays, 10); if (!(v >= 0 && v <= 365)) return bad(res, 'auto-archive must be 0 (off) to 365 days'); s.archiveDays = v; }
     if (b.lowBattery !== undefined) { const v = parseInt(b.lowBattery, 10); if (!(v >= 1 && v <= 90)) return bad(res, 'low battery must be 1-90'); s.lowBattery = v; }
     if (b.tiles !== undefined) s.tiles = !!b.tiles;
     if (b.home !== undefined) {
@@ -80,14 +82,18 @@ function createApp(store, mesh) {
       s.home = (Number.isFinite(la) && Number.isFinite(lo) && Math.abs(la) <= 90 && Math.abs(lo) <= 180) ? { lat: la, lon: lo } : { lat: null, lon: null };
     }
     store.save();
-    if ([s.mode, s.host, s.port].join('|') !== prevKey) mesh.start();
+    if ([s.mode, s.host, s.port].join('|') !== prevKey) mesh.start(); else mesh.sweepArchive();
     res.json(s);
   });
 
   // ---- mesh ----
   app.get('/api/trails', (req, res) => res.json(mesh.trails));
   app.get('/api/coverage', (req, res) => res.json(mesh.coverage()));
-  app.get('/api/messages', (req, res) => res.json(mesh.messages.slice(-300)));
+  app.get('/api/messages', (req, res) => {
+    const arch = req.query.archived === '1';
+    res.set('X-Msg-Rev', String(mesh.msgRev));
+    res.json(mesh.messages.filter((m) => !!m.archived === arch).slice(-300));
+  });
   app.post('/api/messages', (req, res) => {
     const to = req.body && req.body.to ? String(req.body.to) : '^all';
     if (to !== '^all' && !/^![0-9a-f]{8}$/.test(to)) return bad(res, 'bad destination');
@@ -95,7 +101,33 @@ function createApp(store, mesh) {
     if (!r.ok) return bad(res, r.error, 409);
     res.json({ ok: true });
   });
-  app.delete('/api/messages', (req, res) => { mesh.messages.length = 0; store.save(); mesh.emit('change', 'messages'); res.json({ ok: true }); });
+  // Archive hides messages from the chat (they can be brought back); delete removes them for good.
+  const scopeOf = (v) => (v === undefined || v === 'all' || v === 'everyone' || v === 'private' || /^![0-9a-f]{8}$/.test(String(v)) ? (v || 'all') : null);
+  const filterOf = (src) => {
+    const sc = scopeOf(src.scope); if (sc === null) return null;
+    const f = { scope: sc };
+    if (Array.isArray(src.ids)) f.ids = src.ids.map(String).slice(0, 5000);
+    if (src.olderThanDays !== undefined) { const d = Number(src.olderThanDays); if (!(d >= 0 && d <= 3650)) return null; f.before = Date.now() - d * 86400000; }
+    return f;
+  };
+  app.post('/api/messages/archive', (req, res) => {
+    const f = filterOf(req.body || {}); if (!f) return bad(res, 'bad filter');
+    res.json({ ok: true, n: mesh.archive(f, req.body.archived !== false) });
+  });
+  app.delete('/api/messages', (req, res) => { // ?archived=1 empties the archive; ?scope= limits to one conversation
+    const f = filterOf(req.query); if (!f) return bad(res, 'bad filter');
+    if (req.query.archived === '1') f.archived = true;
+    res.json({ ok: true, n: mesh.remove(f) });
+  });
+  app.delete('/api/messages/:id', (req, res) => { const n = mesh.remove({ ids: [req.params.id] }); if (!n) return bad(res, 'not found', 404); res.json({ ok: true }); });
+
+  // ---- alerts and nodes ----
+  app.post('/api/alerts/dismiss', (req, res) => {
+    const k = req.body && req.body.key;
+    if (!(k === 'all' || /^(silent|lowbat):![0-9a-f]{8}$/.test(String(k)))) return bad(res, 'bad alert');
+    mesh.dismiss(k); res.json({ ok: true });
+  });
+  app.delete('/api/nodes/:id', (req, res) => { if (!mesh.forget(req.params.id)) return bad(res, 'not found (or that is your own node)', 404); res.json({ ok: true }); });
 
   // ---- generic CRUD for the three user collections ----
   function crud(name, key, sanitize, validate) {
@@ -166,9 +198,9 @@ function createApp(store, mesh) {
     if (D.contacts.some((c) => c.sample)) return res.json({ ok: true, already: true });
     const mk = (o) => ({ id: store.id(), created: Date.now(), sample: true, freqIds: [], ...o });
     D.contacts.push(
-      mk({ name: 'Ridge Cabin', callsign: 'N0CALL', nodeId: '!d3m00003', relation: 'Family', notes: 'Sample contact. Portable node, usually on the ridge.' }),
-      mk({ name: 'Outpost', callsign: '', nodeId: '!d3m00002', relation: 'Family', notes: 'Sample contact. Solar-powered fixed node.' }),
-      mk({ name: 'Rover', callsign: '', nodeId: '!d3m00004', relation: 'Friend', notes: 'Sample contact. Vehicle node.' })
+      mk({ name: 'Ridge Cabin', callsign: 'N0CALL', nodeId: '!d3a00003', relation: 'Family', notes: 'Sample contact. Portable node, usually on the ridge.' }),
+      mk({ name: 'Outpost', callsign: '', nodeId: '!d3a00002', relation: 'Family', notes: 'Sample contact. Solar-powered fixed node.' }),
+      mk({ name: 'Rover', callsign: '', nodeId: '!d3a00004', relation: 'Friend', notes: 'Sample contact. Vehicle node.' })
     );
     const now = Date.now();
     D.log.push(

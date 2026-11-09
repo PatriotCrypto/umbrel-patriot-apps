@@ -11,6 +11,7 @@ const DEFAULTS = () => ({
     host: '',              // Meshtastic node address (Wi-Fi/Ethernet), TCP port 4403
     port: 4403,
     staleMinutes: 60,
+    archiveDays: 0,        // auto-archive chat messages older than this many days (0 = off)
     lowBattery: 20,
     tiles: false,          // opt-in OpenStreetMap background
     home: { lat: null, lon: null }
@@ -20,7 +21,8 @@ const DEFAULTS = () => ({
   log: [],
   messages: [],
   nodes: {},
-  trails: {}
+  trails: {},
+  dismissed: {}          // alert keys the user has cleared
 });
 
 class Store {

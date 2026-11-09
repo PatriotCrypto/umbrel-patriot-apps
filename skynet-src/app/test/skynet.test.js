@@ -240,3 +240,124 @@ test('contacts: new fields are sanitised, grid squares normalised', () => {
   // editing keeps existing favorites when the field is not sent
   assert.deepEqual(radio.sanitizeContact({ name: 'Dad' }, { freqIds: ['z'] }).value.freqIds, ['z']);
 });
+
+test('chat: conversations, archive, restore, delete, auto-archive', async () => {
+  const { peerOf } = require('../lib/mesh');
+  const store = new Store(tmp()), mesh = new Mesh(store);
+  mesh.me = '!me';
+  assert.equal(peerOf({ from: '!a', to: '^all' }, '!me'), '^all');
+  assert.equal(peerOf({ from: '!a', to: '!me' }, '!me'), '!a');
+  assert.equal(peerOf({ from: '!me', to: '!b' }, '!me'), '!b');
+  assert.equal(peerOf({ from: 'me', to: '!b' }, '!me'), '!b');
+  const day = 86400000, now = Date.now();
+  const add = (from, to, text, age) => mesh._text({ from, to, text, ts: now - age * day });
+  add('!a', '^all', 'old public', 10); add('!a', '^all', 'new public', 0);
+  add('!a', '!me', 'old private', 9); add('!me', '!a', 'reply', 0);
+  assert.equal(mesh.messages.length, 4);
+  const rev = mesh.msgRev;
+  assert.equal(mesh.archive({ scope: 'everyone', before: now - 5 * day }), 1);
+  assert.ok(mesh.msgRev > rev, 'revision bumps so browsers notice');
+  assert.deepEqual(mesh.messages.filter((m) => m.archived).map((m) => m.text), ['old public']);
+  assert.equal(mesh.archive({ scope: '!a' }), 2, 'scope by person: just that conversation');
+  assert.equal(mesh.archive({ scope: 'all' }, false), 3, 'restore everything that was archived');
+  assert.equal(mesh.archive({ ids: [mesh.messages[1].id] }), 1);
+  assert.equal(mesh.remove({ archived: true }), 1);
+  assert.equal(mesh.messages.length, 3);
+  assert.equal(mesh.remove({ scope: 'private' }), 2);
+  assert.deepEqual(mesh.messages.map((m) => m.text), ['old public']);
+  store.data.settings.archiveDays = 3; mesh.sweepArchive();
+  assert.equal(mesh.messages[0].archived, true, 'auto-archive');
+  assert.ok(mesh.messages.every((m) => typeof m.mine === 'boolean'));
+});
+
+test('chat API: archive, list archived, delete, bad input', async () => {
+  const store = new Store(tmp()), mesh = new Mesh(store), app = createApp(store, mesh); mesh.start();
+  const srv = app.listen(0); const base = `http://127.0.0.1:${srv.address().port}/api/`;
+  const j = async (p, m = 'GET', b) => { const r = await fetch(base + p, { method: m, headers: { 'Content-Type': 'application/json' }, body: b ? JSON.stringify(b) : undefined }); return { s: r.status, j: await r.json().catch(() => null), r }; };
+  try {
+    await wait(200);
+    await j('messages', 'POST', { text: 'one' }); await j('messages', 'POST', { text: 'two' });
+    const all = (await j('messages')).j; assert.equal(all.length, 2);
+    assert.equal((await j('messages')).r.headers.get('cache-control'), 'no-store');
+    assert.equal((await j('messages/archive', 'POST', { ids: [all[0].id] })).j.n, 1);
+    assert.equal((await j('messages')).j.length, 1);
+    assert.equal((await j('messages?archived=1')).j.length, 1);
+    assert.equal((await j('messages/archive', 'POST', { ids: [all[0].id], archived: false })).j.n, 1);
+    assert.equal((await j('messages/archive', 'POST', { scope: 'nonsense' })).s, 400);
+    assert.equal((await j('messages/archive', 'POST', { olderThanDays: 'x' })).s, 400);
+    assert.equal((await j('messages/' + all[0].id, 'DELETE')).s, 200);
+    assert.equal((await j('messages/' + all[0].id, 'DELETE')).s, 404);
+    await j('messages/archive', 'POST', { scope: 'everyone' });
+    assert.equal((await j('messages?scope=bad', 'DELETE')).s, 400);
+    assert.equal((await j('messages?archived=1', 'DELETE')).j.n, 1);
+    assert.equal((await j('messages?archived=1')).j.length, 0);
+    assert.equal((await j('settings', 'PUT', { archiveDays: 400 })).s, 400);
+    assert.equal((await j('settings', 'PUT', { archiveDays: 7 })).j.archiveDays, 7);
+    assert.ok(typeof (await j('state')).j.msgRev === 'number');
+  } finally { mesh.stop(); srv.close(); store.flush(); }
+});
+
+test('alerts: clearing sticks until the cause goes away', async () => {
+  const store = new Store(tmp()), mesh = new Mesh(store), app = createApp(store, mesh);
+  const srv = app.listen(0); const base = `http://127.0.0.1:${srv.address().port}/api/`;
+  const j = async (p, m = 'GET', b) => { const r = await fetch(base + p, { method: m, headers: { 'Content-Type': 'application/json' }, body: b ? JSON.stringify(b) : undefined }); return { s: r.status, j: await r.json().catch(() => null) }; };
+  try {
+    const t = Math.floor(Date.now() / 1000);
+    mesh.me = '!00000001';
+    mesh.nodes = { '!00000001': { id: '!00000001', lastHeard: t }, '!0000000a': { id: '!0000000a', long: 'Old', lastHeard: t - 3 * 86400 }, '!0000000b': { id: '!0000000b', long: 'Weak', lastHeard: t, battery: 9 } };
+    let a = mesh.alerts(); assert.equal(a.length, 2);
+    assert.match(a.find((x) => x.type === 'silent').msg, /3 days/);
+    assert.equal((await j('alerts/dismiss', 'POST', { key: 'silent:!0000000a' })).s, 200);
+    assert.equal((await j('alerts/dismiss', 'POST', { key: 'bogus' })).s, 400);
+    assert.deepEqual(mesh.alerts().map((x) => x.type), ['lowbat']);
+    mesh.nodes['!0000000a'].lastHeard = t; // heard again
+    assert.equal(mesh.alerts().length, 1);
+    mesh.nodes['!0000000a'].lastHeard = t - 2 * 86400; // silent again later: it is allowed to nag again
+    assert.equal(mesh.alerts().length, 2);
+    assert.equal((await j('alerts/dismiss', 'POST', { key: 'all' })).s, 200);
+    assert.equal(mesh.alerts().length, 0);
+    assert.equal((await j('nodes/!0000000a', 'DELETE')).s, 200);
+    assert.equal(mesh.nodes['!0000000a'], undefined);
+    assert.equal((await j('nodes/!00000001', 'DELETE')).s, 404, 'cannot forget your own node');
+  } finally { srv.close(); store.flush(); }
+});
+
+test('live mode: a node that only answers keep-alives stays connected; drops are logged', async () => {
+  const net = require('net');
+  let conns = 0, beats = 0, sockets = [];
+  const server = net.createServer((sock) => {
+    conns++; sockets.push(sock); sock.on('error', () => {});
+    let buf = Buffer.alloc(0);
+    sock.on('data', (d) => {
+      buf = Buffer.concat([buf, d]);
+      while (buf.length >= 4 && buf[0] === 0x94) {
+        const len = (buf[2] << 8) | buf[3]; if (buf.length < 4 + len) break;
+        const m = pb.decode(buf.subarray(4, 4 + len)); buf = buf.subarray(4 + len);
+        if (m[7]) { beats++; sock.write(frame(pb.wBytes(11, Buffer.alloc(0)))); } // any reply counts as life
+        else if (m[3]) sock.write(frame(pb.wVarint(7, 1)));
+      }
+    });
+  });
+  await new Promise((r) => server.listen(0, '127.0.0.1', r));
+  const store = new Store(tmp()); store.data.settings.mode = 'live'; store.data.settings.host = '127.0.0.1'; store.data.settings.port = server.address().port;
+  const mesh = new Mesh(store);
+  const { Live } = require('../lib/live');
+  mesh.start(); mesh.src.removeAllListeners(); mesh.src.stop(); // swap in a fast-timed connector, same wiring
+  mesh.src = new Live({ host: '127.0.0.1', port: server.address().port, quietMs: 500, tickMs: 50, beatMs: 100 });
+  mesh.src.on('status', (st) => { const was = !!mesh.status.connected; mesh.status = { ...mesh.status, ...st }; if (was !== !!mesh.status.connected) mesh._linkEvent(!!mesh.status.connected, mesh.status.error); });
+  mesh.src.start();
+  try {
+    await wait(1500); // three times the silence limit
+    assert.equal(mesh.status.connected, true, 'keep-alives held the link open');
+    assert.equal(conns, 1);
+    assert.ok(beats >= 5);
+    sockets[0].destroy(); // the node drops us
+    for (let i = 0; i < 60 && conns < 2; i++) await wait(100);
+    assert.equal(conns, 2, 'reconnected');
+    await wait(200);
+    const info = mesh.linkInfo();
+    assert.equal(info.drops24h, 1);
+    assert.deepEqual(info.events.map((e) => e.ev), ['up', 'down', 'up']);
+    assert.match(info.events[1].why, /closed|ECONNRESET/);
+  } finally { mesh.stop(); mesh.src && mesh.src.stop(); server.close(); for (const s of sockets) s.destroy(); }
+});

@@ -178,7 +178,9 @@
           g.strokeStyle = hex2rgba(col, 0.5 * (1 - ph)); g.lineWidth = 1.5; g.beginPath(); g.arc(x, y, 6 + ph * 14, 0, 7); g.stroke();
         }
         g.fillStyle = isMe ? acc2 : col; g.strokeStyle = isMe ? acc2 : col; g.lineWidth = 2;
-        if (isMe) { g.fillRect(x - 6, y - 6, 12, 12); g.strokeRect(x - 11, y - 11, 22, 22); }
+        if (isMe && marker === 'heart') { g.beginPath(); g.moveTo(x - 9, y + 7); g.lineTo(x - 9, y - 3); g.lineTo(x - 5, y + 1); g.lineTo(x - 3, y - 7); g.lineTo(x, y - 1); g.lineTo(x + 3, y - 7); g.lineTo(x + 5, y + 1); g.lineTo(x + 9, y - 3); g.lineTo(x + 9, y + 7); g.closePath(); g.fill(); } // a little crown for the base
+        else if (isMe) { g.fillRect(x - 6, y - 6, 12, 12); g.strokeRect(x - 11, y - 11, 22, 22); }
+        else if (marker === 'heart') { g.beginPath(); g.moveTo(x, y + 7); g.bezierCurveTo(x - 12, y - 1, x - 6, y - 10, x, y - 4); g.bezierCurveTo(x + 6, y - 10, x + 12, y - 1, x, y + 7); g.closePath(); g.fill(); }
         else if (marker === 'box') { g.fillRect(x - 8, y - 5.5, 16, 11); g.strokeStyle = fg; g.lineWidth = 1.2; g.strokeRect(x - 8, y - 5.5, 16, 11); if (old) { g.beginPath(); g.moveTo(x - 8, y - 5.5); g.lineTo(x + 8, y + 5.5); g.moveTo(x + 8, y - 5.5); g.lineTo(x - 8, y + 5.5); g.stroke(); } }
         else { g.beginPath(); g.moveTo(x, y - 7); g.lineTo(x + 7, y); g.lineTo(x, y + 7); g.lineTo(x - 7, y); g.closePath(); g.fill(); }
         if (n.id === this.data.selected) { // targeting brackets

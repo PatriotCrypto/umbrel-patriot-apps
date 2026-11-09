@@ -64,10 +64,11 @@ function decodeFromRadio(buf) {
 }
 
 class Live extends EventEmitter {
-  constructor({ host, port, quietMs, tickMs }) {
+  constructor({ host, port, quietMs, tickMs, beatMs }) {
     super();
     this.host = host; this.port = port || 4403;
-    this.quietMs = quietMs || 90000; this.tickMs = tickMs || 10000; // silence this long = node is gone
+    this.quietMs = quietMs || 150000; this.tickMs = tickMs || 10000; // silence this long = node is gone
+    this.beatMs = beatMs || 30000; this.connectedAt = 0; this.reason = '';
     this.lastRx = 0; this.lastBeat = 0; this.lastProbe = 0;
     this.sock = null; this.buf = Buffer.alloc(0);
     this.stopped = false; this.retry = 2000; this.connected = false;
@@ -84,9 +85,11 @@ class Live extends EventEmitter {
     const s = net.createConnection({ host: this.host, port: this.port });
     this.sock = s; this.buf = Buffer.alloc(0);
     s.setTimeout(30000);
+    s.setNoDelay(true); s.setKeepAlive(true, 15000); // let the OS notice a dead link too
+    this.reason = '';
     s.on('connect', () => {
-      this.connected = true; this.retry = 2000;
-      this.lastRx = this.lastBeat = this.lastProbe = Date.now();
+      this.connected = true; this.reason = '';
+      this.lastRx = this.lastBeat = this.lastProbe = this.connectedAt = Date.now();
       this.emit('status', { connected: true, synced: false, error: undefined });
       s.write(frame(pb.wVarint(3, (Math.random() * 0xfffffff + 1) >>> 0))); // want_config_id
       clearInterval(this.hb);
@@ -94,20 +97,28 @@ class Live extends EventEmitter {
       this.hb = setInterval(() => {
         const now = Date.now(), quiet = now - this.lastRx;
         try {
-          if (quiet > this.quietMs) { this.connected = false; this.emit('status', { connected: false, error: 'no response from node' }); s.destroy(); return; }
-          if (quiet > this.quietMs * 0.45 && now - this.lastProbe > this.quietMs * 0.2) { // ask for a config dump: a live node always answers
+          if (quiet > this.quietMs) { this.connected = false; this.reason = 'no response from node'; this.emit('status', { connected: false, error: this.reason }); s.destroy(); return; }
+          // Keep-alive first: it holds the node's own idle timer open and is cheap. Only if the node stays
+          // silent do we ask for a config dump (a live node always answers that, but it is heavy, so go easy).
+          if (quiet > this.quietMs * 0.5 && now - this.lastProbe > this.quietMs * 0.5) {
             this.lastProbe = now; s.write(frame(pb.wVarint(3, (Math.random() * 0xfffffff + 1) >>> 0)));
-          } else if (now - this.lastBeat > 60000) { this.lastBeat = now; s.write(frame(pb.wBytes(7, Buffer.alloc(0)))); }
+          } else if (now - this.lastBeat > this.beatMs) { this.lastBeat = now; s.write(frame(pb.wBytes(7, Buffer.alloc(0)))); }
         } catch (_) {}
       }, this.tickMs);
     });
     s.on('timeout', () => { if (!this.connected) s.destroy(); }); // never got through (node off): give up and retry
     s.on('data', (d) => this._data(d));
-    s.on('error', (e) => this.emit('status', { connected: false, error: e.code || String(e.message) }));
+    s.on('error', (e) => { this.reason = e.code || String(e.message); this.emit('status', { connected: false, error: this.reason }); });
     s.on('close', () => {
+      const was = this.connected, lived = this.connectedAt ? Date.now() - this.connectedAt : 0;
+      this.connectedAt = 0;
       this.connected = false; clearInterval(this.hb);
-      this.emit('status', { connected: false });
-      if (!this.stopped) { this.rt = setTimeout(() => this._connect(), this.retry); this.retry = Math.min(this.retry * 2, 60000); }
+      if (was && !this.reason) this.reason = 'node closed the connection';
+      this.emit('status', { connected: false, error: this.reason || undefined });
+      if (this.stopped) return;
+      // A link that held for a while starts fresh; one that keeps dropping backs off so we do not hammer the node.
+      if (lived >= 30000) this.retry = 2000;
+      this.rt = setTimeout(() => this._connect(), this.retry); this.retry = Math.min(this.retry * 2, 30000);
     });
   }
   _data(d) {

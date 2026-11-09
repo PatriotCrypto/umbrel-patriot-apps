@@ -2,14 +2,16 @@
 (function () {
   const $ = (s, el = document) => el.querySelector(s);
   const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-  const SKINS = [['cyberdeck', 'Cyberdeck'], ['terminal', 'Phosphor'], ['battlefield', 'Battlefield'], ['nightred', 'Night Red']];
+  const SKINS = [['cyberdeck', 'Cyberdeck'], ['terminal', 'Phosphor'], ['battlefield', 'Battlefield'], ['nightred', 'Night Red'], ['princess', 'Princess Deck']];
 
   let S = { nodes: [], alerts: [], settings: {}, status: {}, me: null, mode: 'demo' };
   let contacts = [], freqs = [], qsos = [], msgs = [], trails = {}, coverage = [];
   let view = 'nodes', selected = null, map = null, showTrails = true, showCov = true, search = '';
   let folded = new Set();
   try { folded = new Set(JSON.parse(localStorage.getItem('sk.fold') || '[]')); } catch (_) {}
-  let chatTo = '^all';
+  let chatThread = '^all', showArchive = false, archivedMsgs = [];
+  let knownRev = -1, msgSeq = 0, readAt = {};
+  try { readAt = JSON.parse(localStorage.getItem('sk.read') || '{}') || {}; } catch (_) {}
 
   // ---------- helpers ----------
   async function api(path, opts = {}) {
@@ -80,11 +82,15 @@
   // ---------- data ----------
   async function loadAll() {
     const [st, c, fr, q, m, tr, cv] = await Promise.all([api('state'), api('contacts'), api('freqs'), api('log'), api('messages'), api('trails'), api('coverage')]);
-    S = st; contacts = c; freqs = fr; qsos = q; msgs = m; trails = tr; coverage = cv;
+    S = st; contacts = c; freqs = fr; qsos = q; msgs = m; trails = tr; coverage = cv; knownRev = S.msgRev;
+    for (const t of new Set(msgs.map(peerOf))) if (readAt[t] === undefined) readAt[t] = Math.max(...msgs.filter((x) => peerOf(x) === t).map((x) => x.ts)); // nothing already here counts as new
+    if (readAt['^all'] === undefined) readAt['^all'] = 0;
+    saveRead();
   }
   async function refreshMesh() {
     const [st, tr, cv] = await Promise.all([api('state'), api('trails'), api('coverage')]);
-    S = st; trails = tr; coverage = cv; header(); if (view === 'nodes') drawNodes(); else if (view === 'contacts') render();
+    S = st; trails = tr; coverage = cv; header(); if (view === 'nodes') drawNodes(); else if (view === 'contacts') render(); else if (view === 'settings') drawLink();
+    if (S.msgRev !== knownRev) refreshMsgs().catch(() => {}); // the live feed missed something: catch up
   }
   // Message ping: one short two-note chime, off by default, remembered per browser. Only for incoming texts.
   const Ping = {
@@ -108,16 +114,52 @@
   };
   document.addEventListener('pointerdown', () => { if (Ping.on()) Ping.ready(); }, { passive: true }); // browsers only allow sound after a tap or click
   let unread = 0;
-  document.addEventListener('visibilitychange', () => { if (!document.hidden) { unread = 0; document.title = 'Skynet'; } });
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) { unread = 0; document.title = 'Skynet'; if (view === 'chat') { markRead(chatThread); drawThreads(); } updateBadge(); resync(); } });
+  // ---------- conversations ----------
+  const isMine = (m) => !!(m.mine || m.from === 'me' || (S.me && m.from === S.me));
+  function peerOf(m) { return !m.to || m.to === '^all' ? '^all' : (isMine(m) ? m.to : m.from); }
+  const saveRead = () => { try { localStorage.setItem('sk.read', JSON.stringify(readAt)); } catch (_) {} };
+  const unreadIn = (t) => msgs.filter((m) => !isMine(m) && peerOf(m) === t && m.ts > (readAt[t] || 0)).length;
+  function markRead(t) {
+    const last = Math.max(readAt[t] || 0, ...msgs.filter((m) => peerOf(m) === t).map((m) => m.ts));
+    if (last !== readAt[t]) { readAt[t] = last; saveRead(); }
+  }
+  function threadList() { // private conversations, most recent first
+    const by = new Map();
+    for (const m of msgs.concat(archivedMsgs)) { const p = peerOf(m); if (p === '^all') continue; by.set(p, Math.max(by.get(p) || 0, m.ts)); }
+    if (chatThread !== '^all' && !by.has(chatThread)) by.set(chatThread, Date.now()); // a conversation you just opened
+    return [...by.entries()].sort((a, b) => b[1] - a[1]).map((e) => e[0]);
+  }
+  function updateBadge() {
+    const open = view === 'chat' && !document.hidden ? chatThread : null;
+    const n = ['^all', ...threadList()].filter((t) => t !== open).reduce((a, t) => a + unreadIn(t), 0);
+    const b = $('#chatbdg'); if (b) { b.hidden = !n; b.textContent = n > 99 ? '99+' : n; }
+  }
+  let refreshing = null;
   async function refreshMsgs() {
-    const seen = new Set(msgs.map((m) => m.id));
-    msgs = await api('messages');
-    const fresh = msgs.filter((m) => !seen.has(m.id) && !m.mine);
-    if (fresh.length) {
-      Ping.play();
-      if (document.hidden) { unread += fresh.length; document.title = '(' + unread + ') Skynet'; }
-    }
-    if (view === 'chat') drawMsgs(true);
+    if (refreshing) { refreshing.again = true; return refreshing.p; } // one at a time; run once more afterwards if something changed meanwhile
+    const job = refreshing = { again: false };
+    job.p = (async () => {
+      try {
+        do {
+          job.again = false;
+          const seen = new Set(msgs.map((m) => m.id));
+          const r = await fetch('/api/messages'); if (!r.ok) throw new Error('messages ' + r.status);
+          const rev = Number(r.headers.get('X-Msg-Rev')), list = await r.json();
+          if (view === 'chat') { try { archivedMsgs = await api('messages?archived=1'); } catch (_) {} }
+          msgs = list; knownRev = rev;
+          const fresh = msgs.filter((m) => !seen.has(m.id) && !isMine(m));
+          if (fresh.length) {
+            Ping.play();
+            if (document.hidden) { unread += fresh.length; document.title = '(' + unread + ') Skynet'; }
+          }
+          if (view === 'chat' && !document.hidden) markRead(chatThread);
+          if (view === 'chat') { drawThreads(); drawMsgs(false); }
+          updateBadge();
+        } while (job.again);
+      } finally { refreshing = null; }
+    })();
+    return job.p;
   }
 
   function header() {
@@ -125,6 +167,7 @@
     const l = $('#link'); let cls = 'chip', t;
     if (S.mode === 'demo') { cls += ' warn'; t = 'DEMO MESH'; }
     else if (S.status && S.status.connected) { cls += ' ok'; t = 'LIVE · ' + (S.settings.host || ''); }
+    else if (S.settings.host && S.link && S.link.downSince && (S.now || Date.now()) - S.link.downSince < 20000) { cls += ' warn'; t = 'RECONNECTING…'; } // a brief blip is not an outage
     else { cls += ' bad'; t = S.settings.host ? 'NODE OFFLINE' : 'NO NODE SET'; }
     l.className = cls; l.textContent = t;
   }
@@ -134,7 +177,9 @@
     for (const b of document.querySelectorAll('#tabs button')) b.classList.toggle('on', b.dataset.v === view);
     const v = $('#view');
     if (view !== 'nodes' && map) { map = null; }
+    if (view === 'chat') markRead(chatThread);
     ({ nodes: vNodes, chat: vChat, contacts: vContacts, freqs: vFreqs, log: vLog, settings: vSettings }[view])(v);
+    updateBadge();
   }
 
   // --- Nodes ---
@@ -145,6 +190,7 @@
         <div class="row small" style="margin-top:8px"><label class="chk"><input type="checkbox" id="ct" ${showTrails ? 'checked' : ''}> Trails</label><label class="chk"><input type="checkbox" id="cc" ${showCov ? 'checked' : ''}> Coverage</label><span class="dim" id="mapnote"></span></div></div>
       <div><div class="card tbl" id="nodelist"></div><div class="card" id="nodedetail"></div><div class="card" id="feed"></div></div></div>`;
     map = new window.MapView($('#map'), (id) => { selected = id; drawNodes(); });
+    $('#alerts').onclick = async (e) => { const b = e.target.closest('[data-dis]'); if (!b) return; try { await api('alerts/dismiss', { method: 'POST', body: { key: b.dataset.dis } }); await refreshMesh(); } catch (err) { toast(err.message); } };
     $('#zi').onclick = () => map.zoom(0.5); $('#zo').onclick = () => map.zoom(-0.5); $('#zf').onclick = () => { map.fit(); map.draw(); };
     $('#ct').onchange = (e) => { showTrails = e.target.checked; drawNodes(); };
     $('#cc').onchange = (e) => { showCov = e.target.checked; drawNodes(); };
@@ -152,7 +198,8 @@
   }
   function drawNodes() {
     if (view !== 'nodes' || !map) return;
-    $('#alerts').innerHTML = S.alerts.map((a) => `<div class="a">⚠ ${esc(a.msg)}</div>`).join('');
+    $('#alerts').innerHTML = S.alerts.map((a) => `<div class="a"><span>⚠ ${esc(a.msg)}</span><button type="button" class="x" data-dis="${esc(a.key)}" title="Clear this notice" aria-label="Clear this notice">✕</button></div>`).join('')
+      + (S.alerts.length > 1 ? '<div class="clearall"><button type="button" class="btn sec" data-dis="all">Clear all notices</button></div>' : '');
     const live = S.nodes.filter((x) => !isStale(x)).length, mine = S.nodes.find((x) => x.id === S.me);
     const best = S.nodes.filter((x) => x.id !== S.me && typeof x.snr === 'number').sort((a, b) => b.snr - a.snr)[0];
     $('#hud').innerHTML = `<div><span>Nodes</span><b>${S.nodes.length}</b></div><div><span>Online</span><b>${live}</b></div>
@@ -177,6 +224,7 @@
     const n = selected && nodeOf(selected);
     $('#nodedetail').innerHTML = n ? detail(n) : '<div class="dim small">Tap a node on the map or in the list for details.</div>';
     const sc = $('#savec'); if (sc) sc.onclick = () => contactForm({ name: n.long || n.short || '', nodeId: n.id });
+    const fg = $('#forget'); if (fg) fg.onclick = async () => { if (!confirmBox('Remove ' + nodeName(n.id) + ' from the list? It comes back if it is heard again.')) return; try { await api('nodes/' + encodeURIComponent(n.id), { method: 'DELETE' }); selected = null; await refreshMesh(); } catch (err) { toast(err.message); } };
     const unplaced = S.nodes.filter((x) => typeof x.lat !== 'number');
     $('#mapnote').textContent = unplaced.length ? 'Not on the map (no GPS position yet): ' + unplaced.map((x) => nodeName(x.id)).join(', ') : '';
     const act = (S.activity || []).slice(-8).reverse();
@@ -198,32 +246,84 @@
       <span>Uptime</span><span>${typeof n.uptime === 'number' ? Math.round(n.uptime / 3600) + ' h' : '–'}</span>
       <span>Last heard</span><span>${ago(n.lastHeard)}</span>
       <span>Contact</span><span>${c ? esc(c.name) : '<span class="dim">not saved</span>'}</span></div>
-      ${c || n.id === S.me ? '' : '<div style="margin-top:10px"><button class="btn sec" id="savec">Save as contact</button></div>'}`;
+      <div class="row" style="margin-top:10px">${c || n.id === S.me ? '' : '<button class="btn sec" id="savec">Save as contact</button>'}${n.id === S.me ? '' : '<button class="btn sec" id="forget" title="Remove this node from the list">Remove node</button>'}</div>`;
   }
 
   // --- Chat ---
+  const scopeOf = () => (chatThread === '^all' ? 'everyone' : chatThread);
+  const threadName = (t) => (t === '^all' ? 'Everyone' : nodeName(t));
   function vChat(v) {
-    const opts = [['^all', 'Everyone']].concat(S.nodes.filter((n) => n.id !== S.me).map((n) => [n.id, nodeName(n.id)]));
-    v.innerHTML = `<div class="card chat"><h2>Mesh channel</h2><div class="msgs" id="msgs"></div>
-      <form id="send" class="prompt"><select id="to" style="width:36%">${opts.map((o) => `<option value="${esc(o[0])}" ${o[0] === chatTo ? 'selected' : ''}>${esc(o[1])}</option>`).join('')}</select>
-      <span class="pm">&gt;</span><input id="txt" maxlength="200" placeholder="Transmit…  (max 200)" autocomplete="off"><button class="btn" type="submit">Send</button></form></div>`;
-    $('#to').onchange = (e) => (chatTo = e.target.value);
+    showArchive = false;
+    v.innerHTML = `<div class="card chat"><div class="threads" id="threads"></div>
+      <div class="chathead"><h2 id="chtitle"></h2><div class="grow"></div><div class="row" id="chtools"></div></div>
+      <div class="small dim chatnote" id="chnote"></div>
+      <div class="msgs" id="msgs"></div>
+      <form id="send" class="prompt"><span class="pm">&gt;</span><input id="txt" maxlength="200" placeholder="Transmit…  (max 200)" autocomplete="off"><button class="btn" type="submit">Send</button></form></div>`;
     $('#send').onsubmit = async (e) => {
       e.preventDefault();
       const t = $('#txt').value.trim(); if (!t) return;
       if (t.toLowerCase() === '/skynet') { $('#txt').value = ''; return egg(); }
-      try { await api('messages', { method: 'POST', body: { text: t, to: chatTo } }); $('#txt').value = ''; await refreshMsgs(); } catch (err) { toast(err.message); }
+      try { await api('messages', { method: 'POST', body: { text: t, to: chatThread } }); $('#txt').value = ''; await refreshMsgs(); drawMsgs(true); } catch (err) { toast(err.message); }
     };
-    drawMsgs(true);
+    $('#msgs').onclick = async (e) => {
+      const b = e.target.closest('button[data-act]'); if (!b) return;
+      const id = b.dataset.id;
+      try {
+        if (b.dataset.act === 'del') { if (!confirmBox('Delete this message for good?')) return; await api('messages/' + id, { method: 'DELETE' }); }
+        else await api('messages/archive', { method: 'POST', body: { ids: [id], archived: b.dataset.act === 'arch' } });
+        await refreshMsgs();
+      } catch (err) { toast(err.message); }
+    };
+    drawThreads(); drawMsgs(true);
+    refreshMsgs().catch(() => {}); // always show what the node has now, even if the live feed was asleep
+  }
+  function openThread(t) { chatThread = t; showArchive = false; markRead(t); drawThreads(); drawMsgs(true); updateBadge(); const i = $('#txt'); if (i && !('ontouchstart' in window)) i.focus(); }
+  function drawThreads() {
+    const box = $('#threads'); if (!box) return;
+    const chip = (t, label, icon) => { const u = t === chatThread && !document.hidden ? 0 : unreadIn(t); return `<button type="button" class="th ${t === chatThread ? 'on' : ''}" data-t="${esc(t)}"><span class="ic">${icon}</span>${esc(label)}${u ? `<b class="bdg">${u}</b>` : ''}</button>`; };
+    box.innerHTML = chip('^all', 'Everyone', '#') + threadList().map((t) => chip(t, nodeName(t), '✉')).join('') + '<button type="button" class="th new" id="newpm">+ Private</button>';
+    for (const b of box.querySelectorAll('button[data-t]')) b.onclick = () => openThread(b.dataset.t);
+    $('#newpm').onclick = newPrivate;
+    $('#chtitle').textContent = chatThread === '^all' ? 'Everyone' : 'Private · ' + threadName(chatThread);
+    $('#chnote').textContent = showArchive ? 'Archived messages are hidden from the chat but kept. Restore them, or delete them for good.'
+      : chatThread === '^all' ? 'Seen by everyone on your mesh’s main channel.' : 'Sent to this node only. Encrypted end to end on Meshtastic firmware 2.5 and newer.';
+    const n = archivedMsgs.filter((m) => peerOf(m) === chatThread).length;
+    $('#chtools').innerHTML = showArchive
+      ? `<button class="btn sec" id="backchat" type="button">← Back to chat</button><button class="btn danger" id="emptyarch" type="button" ${n ? '' : 'disabled'}>Delete all ${n}</button>`
+      : `<button class="btn sec" id="archmenu" type="button">Archive…</button><button class="btn sec" id="viewarch" type="button">Archived${n ? ' (' + n + ')' : ''}</button>`;
+    if (showArchive) {
+      $('#backchat').onclick = () => { showArchive = false; drawThreads(); drawMsgs(true); };
+      $('#emptyarch').onclick = async () => { if (!confirmBox('Delete all ' + n + ' archived messages in this chat for good?')) return; try { await api('messages?archived=1&scope=' + encodeURIComponent(scopeOf()), { method: 'DELETE' }); await refreshMsgs(); } catch (err) { toast(err.message); } };
+    } else {
+      $('#viewarch').onclick = () => { showArchive = true; $('#send').hidden = true; drawThreads(); drawMsgs(true); };
+      $('#archmenu').onclick = archiveDialog;
+    }
+    $('#send').hidden = showArchive;
+  }
+  function newPrivate() {
+    const seen = new Set(), opts = [['', 'Choose…']];
+    const add = (id, name) => { if (!id || id === S.me || seen.has(id)) return; seen.add(id); opts.push([id, name]); };
+    for (const n of S.nodes) add(n.id, nodeName(n.id));
+    for (const c of contacts) add(c.nodeId, c.name || c.nodeId);
+    if (opts.length === 1) return toast('No other nodes heard yet.');
+    form('New private message', [{ k: 'to', l: 'Send to', t: 'select', o: opts }], { to: '' }, async (o) => { if (!o.to) throw new Error('Pick someone first.'); openThread(o.to); });
+  }
+  function archiveDialog() {
+    form('Archive messages in this chat', [{ k: 'age', l: 'Archive', t: 'select', o: [['7', 'Older than 7 days'], ['1', 'Older than 1 day'], ['30', 'Older than 30 days'], ['0', 'Everything in this chat']] }],
+      { age: '7' }, async (o) => {
+        const r = await api('messages/archive', { method: 'POST', body: { scope: scopeOf(), olderThanDays: Number(o.age) } });
+        toast(r.n ? `Archived ${r.n} message${r.n === 1 ? '' : 's'}` : 'Nothing that old to archive'); await refreshMsgs();
+      }, { pre: '<p class="small dim">Archived messages leave the chat but are kept. You can restore or delete them from <b>Archived</b>. To archive automatically, set it under Config.</p>' });
   }
   function drawMsgs(stick) {
     const box = $('#msgs'); if (!box) return;
     const atEnd = stick || box.scrollHeight - box.scrollTop - box.clientHeight < 60;
-    box.innerHTML = msgs.length ? msgs.map((m) => {
-      const mine = m.mine || m.from === S.me || m.from === 'me';
-      const dm = m.to && m.to !== '^all';
-      return `<div class="ln ${mine ? 'mine' : ''}"><span class="t">${hhmm(m.ts)}</span><span class="who">${esc(mine ? 'YOU' : nodeName(m.from).toUpperCase())}</span>${dm ? `<span class="dm">→${esc(nodeName(m.to).toUpperCase())}</span>` : ''}<span class="tx">${esc(m.text)}</span>${typeof m.snr === 'number' && !mine ? `<span class="sn">${m.snr.toFixed(1)} dB</span>` : ''}</div>`;
-    }).join('') : '<div class="empty">// channel quiet. Transmit something.</div>';
+    const list = (showArchive ? archivedMsgs : msgs).filter((m) => peerOf(m) === chatThread);
+    const acts = (m) => showArchive ? `<button type="button" class="x" data-act="res" data-id="${esc(m.id)}" title="Restore">↩</button><button type="button" class="x" data-act="del" data-id="${esc(m.id)}" title="Delete for good">✕</button>` : `<button type="button" class="x" data-act="arch" data-id="${esc(m.id)}" title="Archive this message" aria-label="Archive this message">⌫</button>`;
+    box.innerHTML = list.length ? list.map((m) => {
+      const mine = isMine(m);
+      return `<div class="ln ${mine ? 'mine' : ''}"><span class="t">${showArchive ? dstr(m.ts) : hhmm(m.ts)}</span><span class="who">${esc(mine ? 'YOU' : nodeName(m.from).toUpperCase())}</span><span class="tx">${esc(m.text)}</span>${typeof m.snr === 'number' && !mine ? `<span class="sn">${m.snr.toFixed(1)} dB</span>` : ''}<span class="acts">${acts(m)}</span></div>`;
+    }).join('') : `<div class="empty">${showArchive ? '// nothing archived in this chat.' : chatThread === '^all' ? '// channel quiet. Transmit something.' : '// no messages with ' + esc(threadName(chatThread)) + ' yet.'}</div>`;
     if (atEnd) box.scrollTop = box.scrollHeight;
   }
 
@@ -370,6 +470,19 @@
   }
 
   // --- Settings ---
+  const WHY = { ECONNRESET: 'the node reset the connection', ECONNREFUSED: 'the node refused the connection (another app may be connected to it)', ETIMEDOUT: 'the node did not answer', EHOSTUNREACH: 'the node could not be reached (check its Wi-Fi)', ENETUNREACH: 'no route to the node', ENOTFOUND: 'the node’s name was not found', 'no response from node': 'the node stopped answering', 'node closed the connection': 'the node closed the connection' };
+  function drawLink() {
+    const box = $('#linkinfo'); if (!box) return;
+    const L = S.link; if (!L || S.mode !== 'live') { box.innerHTML = ''; return; }
+    const dur = (ms) => { const m = Math.round(ms / 60000); return m < 1 ? 'under a minute' : m < 90 ? m + ' min' : m < 2880 ? Math.round(m / 60) + ' h' : Math.round(m / 1440) + ' days'; };
+    const now = S.now || Date.now();
+    let h = L.upSince ? `<div>Connected for ${dur(now - L.upSince)}.</div>` : '<div>Not connected right now.</div>';
+    h += `<div class="dim">${L.drops24h ? 'Dropped ' + L.drops24h + ' time' + (L.drops24h === 1 ? '' : 's') + ' in the last 24 hours.' : 'No drops in the last 24 hours.'}</div>`;
+    if (L.drops24h >= 3) h += '<div style="color:var(--warn);margin-top:4px">A node only talks to one program at a time. If the Meshtastic phone app, the web client or another Skynet is connected to it, they will keep knocking each other off. Close the others and this settles down.</div>';
+    const ev = (L.events || []).slice().reverse();
+    if (ev.length) h += '<div class="dim" style="margin-top:6px">' + ev.map((e) => `${hhmm(e.ts)} ${e.ev === 'up' ? 'connected' : 'dropped' + (e.why ? ': ' + esc(WHY[e.why] || e.why) : '')}`).join('<br>') + '</div>';
+    box.innerHTML = h;
+  }
   function vSettings(v) {
     const s = S.settings, st = S.status || {};
     v.innerHTML = `<div class="grid2 eq"><div>
@@ -381,11 +494,14 @@
         <label>Mode</label><select id="s_mode"><option value="demo" ${s.mode === 'demo' ? 'selected' : ''}>Demo mesh (fictional stations)</option><option value="live" ${s.mode === 'live' ? 'selected' : ''}>Live (connect to my node)</option></select>
         <label>Node address</label><div class="row" style="flex-wrap:nowrap"><input id="s_host" value="${esc(s.host)}" placeholder="192.168.1.50 or meshtastic.local"><input id="s_port" value="${s.port}" style="max-width:100px" inputmode="numeric"></div>
         <div class="small dim">Your node needs Wi-Fi or Ethernet and must be on the same network as your Umbrel. Skynet uses the node’s TCP port (default 4403).</div>
-        <div style="margin-top:8px">Link: <span class="chip ${st.connected ? 'ok' : s.mode === 'demo' ? 'warn' : 'bad'}">${s.mode === 'demo' ? 'demo' : st.connected ? 'connected' : 'not connected'}${st.error ? ' · ' + esc(st.error) : ''}</span></div></div>
+        <div style="margin-top:8px">Link: <span class="chip ${st.connected ? 'ok' : s.mode === 'demo' ? 'warn' : 'bad'}">${s.mode === 'demo' ? 'demo' : st.connected ? 'connected' : 'not connected'}${st.error ? ' · ' + esc(st.error) : ''}</span></div><div id="linkinfo" class="small"></div></div>
       <div class="card"><h2>Alerts &amp; map</h2><label>Flag a node as silent after (minutes)</label><input id="s_stale" value="${s.staleMinutes}" inputmode="numeric">
         <label>Low battery warning at (%)</label><input id="s_low" value="${s.lowBattery}" inputmode="numeric">
         <label class="chk" style="margin-top:12px"><input type="checkbox" id="s_tiles" ${s.tiles ? 'checked' : ''}> Show OpenStreetMap background on the map</label>
         <div class="small dim">Off by default so the app stays fully private and offline. When on, your browser downloads map tiles from openstreetmap.org.</div></div>
+      <div class="card"><h2>Messages</h2><label>Archive messages automatically after</label>
+        <select id="s_arch">${[[0, 'Never (I will archive them myself)'], [1, '1 day'], [3, '3 days'], [7, '7 days'], [14, '14 days'], [30, '30 days'], [90, '90 days']].map((o) => `<option value="${o[0]}" ${Number(s.archiveDays || 0) === o[0] ? 'selected' : ''}>${o[1]}</option>`).join('')}</select>
+        <div class="small dim">Archived messages are hidden from Chat but kept. Open <b>Archived</b> in a chat to restore or delete them.</div></div>
       <div class="card"><h2>Message ping</h2><label class="chk"><input type="checkbox" id="s_ping" ${Ping.on() ? 'checked' : ''}> Play a short chime when a message arrives</label>
         <div class="row" style="margin-top:8px"><button class="btn sec" id="pingtest">Test chime</button></div>
         <div class="small dim">Off by default and set per browser. The Skynet tab has to be open, and your browser only allows sound after you have clicked or tapped the page once. When the tab is in the background, the tab title also shows how many new messages arrived.</div></div>
@@ -401,11 +517,12 @@
       const m = /^\s*(-?\d{1,3}(?:\.\d+)?)\s*[,;\s]\s*(-?\d{1,3}(?:\.\d+)?)\s*$/.exec(e.target.value);
       if (m) { e.target.value = m[1]; $('#s_lon').value = m[2]; }
     });
+    drawLink();
     $('#s_ping').onchange = (e) => { Ping.set(e.target.checked); if (e.target.checked) Ping.play(true); };
     $('#pingtest').onclick = () => Ping.play(true);
     $('#save').onclick = async () => {
       try {
-        S.settings = await api('settings', { method: 'PUT', body: { callsign: $('#s_call').value, mode: $('#s_mode').value, host: $('#s_host').value, port: $('#s_port').value, staleMinutes: $('#s_stale').value, lowBattery: $('#s_low').value, tiles: $('#s_tiles').checked, home: { lat: $('#s_lat').value, lon: $('#s_lon').value } } });
+        S.settings = await api('settings', { method: 'PUT', body: { callsign: $('#s_call').value, mode: $('#s_mode').value, host: $('#s_host').value, port: $('#s_port').value, staleMinutes: $('#s_stale').value, lowBattery: $('#s_low').value, archiveDays: $('#s_arch').value, tiles: $('#s_tiles').checked, home: { lat: $('#s_lat').value, lon: $('#s_lon').value } } });
         toast('Saved'); setTimeout(async () => { await refreshMesh(); if (view === 'settings') render(); }, 800);
       } catch (err) { toast(err.message); }
     };
@@ -471,15 +588,22 @@
     document.documentElement.setAttribute('data-skin', nx[0]); try { localStorage.setItem('sk.skin', nx[0]); } catch (_) {}
     toast('Look: ' + nx[1]); if (map) map.draw();
   };
-  let rt = null;
+  let rt = null, es = null, esRetry = null;
+  // The live feed can go quiet without telling the page (phone asleep, Wi-Fi hop, a proxy timing out the
+  // connection). So the page also asks the server for its message counter every so often, and again whenever
+  // the feed reconnects or the tab comes back, and catches up if it is behind.
+  const resync = () => refreshMesh().catch(() => {});
   function connectEvents() {
-    const es = new EventSource('/api/events');
+    clearTimeout(esRetry); if (es) { try { es.close(); } catch (_) {} }
+    es = new EventSource('/api/events');
+    es.onopen = resync;
+    es.onerror = () => { if (es.readyState === 2) { clearTimeout(esRetry); esRetry = setTimeout(connectEvents, 3000); } }; // closed for good by the browser: reopen ourselves
     es.addEventListener('change', (e) => {
       let w = []; try { w = JSON.parse(e.data); } catch (_) {}
-      if (w.includes('messages')) refreshMsgs();
+      if (w.includes('messages')) refreshMsgs().catch(() => {});
       if (w.includes('nodes') || w.includes('status') || w.includes('activity')) { clearTimeout(rt); rt = setTimeout(refreshMesh, 300); }
     });
   }
-  loadAll().then(() => { header(); render(); connectEvents(); }).catch((e) => { $('#view').innerHTML = '<div class="card"><div class="empty">Could not reach Skynet: ' + esc(e.message) + '</div></div>'; });
-  setInterval(() => { if (view === 'nodes' && map) refreshMesh().catch(() => {}); }, 60000); // keep "last heard" fresh
+  loadAll().then(() => { header(); render(); connectEvents(); updateBadge(); }).catch((e) => { $('#view').innerHTML = '<div class="card"><div class="empty">Could not reach Skynet: ' + esc(e.message) + '</div></div>'; });
+  setInterval(() => { if (!document.hidden) resync(); }, 20000); // safety net + keeps "last heard" fresh
 })();

@@ -17,13 +17,13 @@ class Demo extends EventEmitter {
   constructor() {
     super();
     this.t0 = Date.now();
-    this.me = '!d3m00001';
+    this.me = '!d3a00001';
     this.nodes = {
-      '!d3m00001': { id: '!d3m00001', long: 'BASE (roof)', short: 'BASE', fixed: true, ox: 0, oy: 0, battery: 101, voltage: 5.0, hops: 0 },
-      '!d3m00002': { id: '!d3m00002', long: 'OUTPOST', short: 'OUTP', fixed: true, ox: 1800, oy: 900, battery: 88, hops: 1 },
-      '!d3m00003': { id: '!d3m00003', long: 'RIDGE', short: 'RDGE', ox: -900, oy: 1500, battery: 74, hops: 1, phase: 0 },
-      '!d3m00004': { id: '!d3m00004', long: 'ROVER', short: 'RVR', ox: 600, oy: -700, battery: 92, hops: 0, phase: 2 },
-      '!d3m00005': { id: '!d3m00005', long: 'TRAIL', short: 'TRL', ox: -1500, oy: -1100, battery: 31, hops: 2, phase: 4 }
+      '!d3a00001': { id: '!d3a00001', long: 'BASE (roof)', short: 'BASE', fixed: true, ox: 0, oy: 0, battery: 101, voltage: 5.0, hops: 0 },
+      '!d3a00002': { id: '!d3a00002', long: 'OUTPOST', short: 'OUTP', fixed: true, ox: 1800, oy: 900, battery: 88, hops: 1 },
+      '!d3a00003': { id: '!d3a00003', long: 'RIDGE', short: 'RDGE', ox: -900, oy: 1500, battery: 74, hops: 1, phase: 0 },
+      '!d3a00004': { id: '!d3a00004', long: 'ROVER', short: 'RVR', ox: 600, oy: -700, battery: 92, hops: 0, phase: 2 },
+      '!d3a00005': { id: '!d3a00005', long: 'TRAIL', short: 'TRL', ox: -1500, oy: -1100, battery: 31, hops: 2, phase: 4 }
     };
     this.silentTrail = false;
   }
@@ -55,8 +55,8 @@ class Demo extends EventEmitter {
     const el = (Date.now() - this.t0) / 1000;
     for (const n of Object.values(this.nodes)) {
       if (n.fixed && n.id === this.me) { this._emitNode(n); continue; }
-      if (n.id === '!d3m00002') { n.battery = Math.round(80 + 15 * Math.sin(el / 300)); this._emitNode(n); continue; }
-      if (n.id === '!d3m00005') {
+      if (n.id === '!d3a00002') { n.battery = Math.round(80 + 15 * Math.sin(el / 300)); this._emitNode(n); continue; }
+      if (n.id === '!d3a00005') {
         // TRAIL wanders off and goes quiet for a stretch so the alert shows up
         const cyc = el % 600;
         n.battery = Math.max(8, 31 - Math.floor(el / 90) % 24);
@@ -66,18 +66,18 @@ class Demo extends EventEmitter {
       n.ox += Math.cos(n.phase) * 18 + (Math.random() - 0.5) * 8;
       n.oy += Math.sin(n.phase * 0.9) * 18 + (Math.random() - 0.5) * 8;
       const d = Math.hypot(n.ox, n.oy); if (d > 3200) { n.ox *= 0.9; n.oy *= 0.9; }
-      if (n.id !== '!d3m00005') n.battery = Math.max(15, n.battery - (Math.random() < 0.02 ? 1 : 0));
+      if (n.id !== '!d3a00005') n.battery = Math.max(15, n.battery - (Math.random() < 0.02 ? 1 : 0));
       this._emitNode(n);
     }
   }
   _chatter() {
-    const pool = ['!d3m00003', '!d3m00004', '!d3m00002'];
+    const pool = ['!d3a00003', '!d3a00004', '!d3a00002'];
     const from = pool[Math.floor(Math.random() * pool.length)];
     this.emit('text', { from, to: '^all', channel: 0, text: LINES[Math.floor(Math.random() * LINES.length)], ts: Date.now(), snr: 6 });
   }
   sendText(text) {
     // a demo neighbour answers a few seconds later
-    setTimeout(() => this.emit('text', { from: '!d3m00004', to: this.me, channel: 0, text: 'Copy: ' + text.slice(0, 40), ts: Date.now(), snr: 7 }), 3000).unref?.();
+    setTimeout(() => this.emit('text', { from: '!d3a00004', to: this.me, channel: 0, text: 'Copy: ' + text.slice(0, 40), ts: Date.now(), snr: 7 }), 3000).unref?.();
     return true;
   }
 }

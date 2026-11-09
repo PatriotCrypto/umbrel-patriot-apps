@@ -240,3 +240,53 @@ button.fold:focus-visible { outline: 1px solid var(--accent); outline-offset: 3p
 .pick { max-height: 160px; overflow-y: auto; border: 1px solid var(--line); padding: 6px 8px; display: grid; gap: 4px; }
 .feedrow { font-size: 12px; padding: 4px 0; border-bottom: 1px solid var(--line); }
 .feedrow:last-child { border-bottom: 0; }
+
+/* ---------- chat conversations, archive, cleared notices (0.2.0) ---------- */
+.threads { display: flex; gap: 6px; overflow-x: auto; padding-bottom: 8px; margin-bottom: 8px; border-bottom: 1px solid var(--line); scrollbar-width: thin; }
+.th { flex: none; background: none; border: 1px solid var(--line); padding: 7px 12px; min-height: 36px; cursor: pointer; color: var(--dim); white-space: nowrap; font-size: 12px; letter-spacing: .06em; text-transform: uppercase; }
+.th .ic { color: var(--accent2); margin-right: 6px; }
+.th:hover { color: var(--fg); border-color: var(--accent); }
+.th.on { color: var(--accent-ink); background: var(--accent); border-color: var(--accent); font-weight: 700; } .th.on .ic { color: var(--accent-ink); }
+.th.new { border-style: dashed; }
+.bdg { display: inline-block; min-width: 18px; padding: 0 5px; margin-left: 7px; border-radius: 9px; background: var(--accent2); color: var(--accent-ink); font-size: 10px; line-height: 18px; text-align: center; font-weight: 700; letter-spacing: 0; vertical-align: 1px; }
+.tabs button.on .bdg { background: var(--accent-ink); color: var(--accent); }
+.chathead { display: flex; align-items: flex-start; gap: 8px; flex-wrap: wrap; } .chathead h2 { margin-bottom: 4px; }
+.chatnote { margin-bottom: 6px; }
+.ln .acts { margin-left: auto; flex: none; display: flex; gap: 2px; opacity: .35; } .ln:hover .acts, .ln:focus-within .acts { opacity: 1; }
+.ln .sn + .acts { margin-left: 8px; } .ln .sn { margin-left: auto; }
+@media (hover: none) { .ln .acts { opacity: .8; } }
+button.x { background: none; border: 0; color: var(--dim); cursor: pointer; font-size: 14px; line-height: 1; padding: 4px 7px; min-width: 28px; min-height: 28px; }
+button.x:hover { color: var(--accent2); }
+.alerts .a { display: flex; align-items: center; gap: 10px; justify-content: space-between; } .alerts .a button.x { color: inherit; }
+.alerts .clearall { margin-bottom: 8px; text-align: right; } .alerts .clearall .btn { min-height: 30px; padding: 4px 12px; font-size: 11px; }
+#linkinfo { margin-top: 8px; line-height: 1.5; }
+
+/* ---------- Princess Deck: the cyberdeck HUD in bright pink ---------- */
+html[data-skin="princess"] {
+  color-scheme: light;
+  --bg: #ffd3e8; --panel: #fff1f8; --panel2: #ffc1de; --fg: #4a0f35; --dim: #9c3f6c; --line: #f08cbc;
+  --accent: #e6007e; --accent2: #b3005f; --accent-ink: #ffffff; --warn: #b05a00; --bad: #d1002f;
+  --map: #fff1f8; --grid: #ffc2dc; --scan: rgba(230, 0, 126, .05); --faint: rgba(230, 0, 126, .07);
+  --glow: none; --hud-glow: rgba(255, 255, 255, .8);
+  --maptitle: "ROYAL SECTOR"; --marker: heart;
+  --mapfg: #4a0f35; --mapdim: #b25a85; --mapacc: #e6007e; --mapacc2: #b3005f; --mapwarn: #b05a00; --mapbad: #d1002f;
+  --tilefilter: sepia(.4) hue-rotate(300deg) saturate(1.3); --tilealpha: .85;
+}
+html[data-skin="princess"] body { background: radial-gradient(ellipse 80% 40% at 50% -5%, #fff, transparent 70%), linear-gradient(var(--faint) 1px, transparent 1px) 0 0 / 44px 44px, linear-gradient(90deg, var(--faint) 1px, transparent 1px) 0 0 / 44px 44px, linear-gradient(180deg, #ffc9e4, #ffdcee 60%, #ffc2de); background-attachment: fixed; }
+html[data-skin="princess"] body::after { background: repeating-linear-gradient(0deg, var(--scan) 0 1px, transparent 1px 3px), radial-gradient(ellipse at center, transparent 60%, rgba(230, 0, 126, .12) 100%); }
+html[data-skin="princess"] body::before { content: ""; position: fixed; inset: 0; z-index: -1; pointer-events: none; opacity: .4; background: url("data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%20800%20270'%20preserveAspectRatio='xMidYMax%20meet'%3E%3Cg%20fill='none'%20stroke='%23e6007e'%20stroke-width='2.5'%20stroke-linejoin='round'%3E%20%3Cpath%20d='M165,270V150h50v35h30V95h60v32h20V62h80V127h20V95h60v90h30V150h50V270'/%3E%20%3Cpath%20d='M158,150L190,100L222,150M235,95L275,38L315,95M350,62L400,6L450,62M485,95L525,38L565,95M578,150L610,100L642,150'/%3E%20%3Cpath%20d='M372,270V228a28,28%200%200%201%2056,0V270'/%3E%3Cpath%20d='M190,100V80M275,38V16M400,6V-14M525,38V16M610,100V80'/%3E%3Cpath%20d='M170,185H630'%20stroke-dasharray='6%206'/%3E%3C/g%3E%20%3Cg%20fill='%23e6007e'%3E%3Ccircle%20cx='268'%20cy='140'%20r='3.5'/%3E%3Ccircle%20cx='532'%20cy='140'%20r='3.5'/%3E%3Ccircle%20cx='400'%20cy='100'%20r='3.5'/%3E%3Ccircle%20cx='336'%20cy='180'%20r='3.5'/%3E%3Ccircle%20cx='464'%20cy='180'%20r='3.5'/%3E%3C/g%3E%3C/svg%3E") center bottom / min(980px, 100%) auto no-repeat; }
+html[data-skin="princess"] .logo { display: none; }
+html[data-skin="princess"] .brand::before { content: ""; width: 28px; height: 28px; background: url("data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%2032%2032'%3E%3Cg%20fill='none'%20stroke='%23e6007e'%20stroke-width='2'%20stroke-linejoin='round'%3E%3Cpath%20d='M3,29V15h7v-5h12v5h7V29z'/%3E%3Cpath%20d='M2,15L6.5,7L11,15M9,10L16,1L23,10M21,15L25.5,7L30,15'/%3E%3Cpath%20d='M13,29v-6a3,3%200%200%201%206,0v6'/%3E%3C/g%3E%3C/svg%3E") center / contain no-repeat; }
+html[data-skin="princess"] .top { background: linear-gradient(180deg, #ffb3d7, #ffd6ea); }
+html[data-skin="princess"] .word, html[data-skin="princess"] .hud b, html[data-skin="princess"] h2 { text-shadow: none; }
+html[data-skin="princess"] input, html[data-skin="princess"] select, html[data-skin="princess"] textarea { background: #fff; }
+html[data-skin="princess"] .mapbar button { background: #fff; }
+html[data-skin="princess"] .bat { background: repeating-linear-gradient(90deg, transparent 0 4px, rgba(255, 255, 255, .9) 4px 5px); }
+html[data-skin="princess"] .ln:hover { background: rgba(230, 0, 126, .06); }
+html[data-skin="princess"] .alerts .a { background: #fff0cc; color: var(--warn); }
+html[data-skin="princess"] dialog::backdrop { background: rgba(120, 0, 60, .4); }
+html[data-skin="princess"] .toast { background: #fff; }
+html[data-skin="princess"] .egg { background: rgba(255, 228, 241, .97); }
+html[data-skin="princess"] .egg pre { color: var(--accent); text-shadow: none; }
+html[data-skin="princess"] .stat b { text-shadow: none; }
+html[data-skin="princess"] .tabs button.on, html[data-skin="princess"] .th.on { color: var(--accent-ink); }
