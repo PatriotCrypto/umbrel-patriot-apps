@@ -32,13 +32,39 @@ class ZWaveAdapter extends EventEmitter {
     this._stopped = false;
   }
 
-  start() { this._stopped = false; this._connect(); }
+  start() {
+    this._stopped = false; this._connect();
+    // The thermostat is mains powered but only reports when something changes. Ask it every few minutes so a steady room
+    // is not mistaken for a silent device, and so mode/setpoint changes made at the wall are noticed quickly.
+    clearInterval(this._pollTimer);
+    this._pollTimer = setInterval(() => this._pollThermostat().catch(() => {}), this.pollMs || 4 * 60000);
+    setTimeout(() => this._pollThermostat().catch(() => {}), 20000);
+  }
 
   stop() {
     this._stopped = true;
-    clearTimeout(this._retry);
+    clearTimeout(this._retry); clearInterval(this._pollTimer);
     try { this.ws?.close(); } catch { /* ignore */ }
     this.connected = false;
+  }
+
+  async _pollThermostat() {
+    if (!this.connected || this._polling) return;
+    const node = this._findThermostat();
+    if (!node) return;
+    this._polling = true;
+    try {
+      let heard = false;
+      for (const [k, v] of node.values) {
+        const cc = Number(k.split(':')[0]);
+        if (![CC.SENSOR, CC.MODE, CC.OPSTATE, CC.SETPOINT, CC.FAN].includes(cc) || !v.id) continue;
+        const r = await this._send('node.poll_value', { nodeId: node.nodeId, valueId: v.id }, 15000).catch(() => null);
+        if (!r) continue;
+        heard = true;
+        if (r.value !== undefined && r.value !== null && r.value !== v.value) node.values.set(k, { ...v, value: r.value });
+      }
+      if (heard) { node.lastSeen = Date.now(); this.emit('update'); }
+    } finally { this._polling = false; }
   }
 
   setPreferredNode(id) { this.preferred = id ? Number(id) : null; }
