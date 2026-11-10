@@ -1,0 +1,35 @@
+manifestVersion: 1
+id: patriot-studio-notebook
+category: files
+name: Studio Notebook
+version: "0.1.0"
+tagline: Write songs, find the right word, track every release
+icon: https://raw.githubusercontent.com/PatriotCrypto/umbrel-patriot-apps/main/patriot-studio-notebook/icon.svg
+description: >-
+  Studio Notebook is a private songwriter's notebook that lives on your Umbrel.
+
+
+  Every song gets a lyric sheet that counts the syllables in each line, colours the words that rhyme, and warns you when the lyrics run past a character limit you set. Beside the sheet is a full set of word tools that work with no internet: perfect, close and wide rhymes, multi-syllable rhymes, rhyming phrases, word families, meanings with synonyms and opposites, a phrase dictionary, alliteration, figures of speech and a searchable King James Bible.
+
+
+  Keep the story behind each song, production notes, cover art and audio takes with the lyrics. Earlier drafts are kept automatically so you can compare them or go back. A release checklist, release date and links follow each song from first idea to release day, and an ideas page catches lines, hooks and titles before they get away.
+
+
+  Four looks, and one hidden surprise. Everything stays on your Umbrel. No accounts, no subscription, no telemetry.
+
+
+  Studio Notebook is an independent hobby project. It is not affiliated with or endorsed by MasterWriter, Suno, DistroKid, Spotify, Apple or Umbrel.
+developer: PatriotCrypto
+website: https://github.com/PatriotCrypto/umbrel-patriot-apps
+dependencies: []
+repo: https://github.com/PatriotCrypto/umbrel-patriot-apps
+support: https://github.com/PatriotCrypto/umbrel-patriot-apps/issues
+port: 3983
+gallery: []
+path: ""
+defaultUsername: ""
+defaultPassword: ""
+submitter: PatriotCrypto
+submission: https://github.com/PatriotCrypto/umbrel-patriot-apps
+releaseNotes: >-
+  First release. Lyric sheet with syllable counts, rhyme colours and a character limit, offline word tools (rhymes, word families, meanings, phrases, alliteration, figures of speech, King James Bible), versions, notes, cover art and audio takes, release checklist, ideas, collections, backup and four looks.

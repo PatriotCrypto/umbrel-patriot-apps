@@ -1,0 +1,19 @@
+{
+  "name": "studio-notebook",
+  "version": "0.1.0",
+  "private": true,
+  "description": "A songwriter's notebook for Umbrel: lyrics, word tools, versions and release tracking.",
+  "license": "MIT",
+  "type": "commonjs",
+  "engines": { "node": ">=22" },
+  "scripts": {
+    "start": "node server.js",
+    "build-data": "node scripts/build-data.js",
+    "test": "node --test test/*.test.js"
+  },
+  "devDependencies": {
+    "cmu-pronouncing-dictionary": "3.0.0",
+    "wordlist-english": "1.2.1",
+    "wordnet-db": "3.1.14"
+  }
+}

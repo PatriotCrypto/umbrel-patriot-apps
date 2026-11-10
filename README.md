@@ -2,7 +2,7 @@
 
 # Patriot Apps
 
-**Fourteen self-hosted apps for your Umbrel. One store, no accounts, no cloud.**
+**Fifteen self-hosted apps for your Umbrel. One store, no accounts, no cloud.**
 
 Everything you put in these apps stays on your own server.
 
@@ -50,6 +50,7 @@ Umbrel re-checks community stores every so often, so a new app or update can tak
   <tr>
     <td align="center"><a href="#cold-front"><img src="patriot-coldfront/icon.svg" width="84" alt="Cold Front"><br><b>Cold Front</b></a><br><sub>Local thermostat control</sub></td>
     <td align="center"><a href="#constellation"><img src="constellation-src/app/public/icon.svg" width="84" alt="Constellation"><br><b>Constellation</b></a><br><sub>Your network in 3D</sub></td>
+    <td align="center"><a href="#studio-notebook"><img src="patriot-studio-notebook/icon.svg" width="84" alt="Studio Notebook"><br><b>Studio Notebook</b></a><br><sub>Songwriting and word tools</sub></td>
   </tr>
 </table>
 
@@ -237,6 +238,20 @@ You need a USB DVD drive and a free MakeMKV beta key (the app gets it for you fr
 - Built and tested for the iPod nano 5th generation. That model needs one sync with iTunes (or Apple Devices or Finder) first so its database signature is learned.
 
 [Details](ipod-sync-src/README.md)
+
+### Studio Notebook
+<img src="patriot-studio-notebook/icon.svg" width="96" align="right" alt="Studio Notebook icon">
+
+**A songwriter's notebook with the word tools built in.** Write lyrics, find the right word and follow every song to its release, with nothing leaving your Umbrel.
+
+- A lyric sheet that counts syllables per line, colours the words that rhyme, and warns you when you pass a character limit you set.
+- Offline word tools: perfect, close, wide and multi-syllable rhymes, rhyming phrases, word families, meanings with synonyms and opposites, a phrase dictionary, alliteration, figures of speech and a searchable King James Bible.
+- Earlier drafts are kept automatically. Compare any version line by line, or go back to it.
+- Notes, cover art and audio takes with each song, plus a release checklist, release date and links.
+- An ideas page for lines, hooks and titles, word collections you keep across songs, text import, and backup.
+- Four looks (Studio, Analog, Legal Pad, Midnight) and a hidden surprise.
+
+*An independent hobby project, not affiliated with MasterWriter, Suno, DistroKid, Spotify, Apple or Umbrel.* · [Details](studio-notebook-src/README.md)
 
 ---
 

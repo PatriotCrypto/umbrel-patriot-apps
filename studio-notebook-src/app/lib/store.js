@@ -1,0 +1,280 @@
+'use strict';
+/* JSON file store with atomic writes and a rolling daily backup. */
+const fs = require('fs');
+const path = require('path');
+const crypto = require('crypto');
+
+const STATUSES = ['idea', 'writing', 'polishing', 'producing', 'scheduled', 'released', 'shelved'];
+
+const DEFAULT_CHECKLIST = [
+  'Lyrics final and proofread',
+  'Lyrics fit the character limit',
+  'Final audio exported',
+  'Cover art ready (3000 x 3000)',
+  'Uploaded to the distributor with a release date',
+  'Lyrics submitted to streaming services',
+  'Website updated: song page, lyrics, behind the lyrics',
+  'Announced',
+];
+
+const id = () => crypto.randomBytes(6).toString('hex');
+const now = () => new Date().toISOString();
+const str = (v, max) => String(v == null ? '' : v).slice(0, max);
+
+class Store {
+  constructor(dir) {
+    this.dir = dir;
+    this.file = path.join(dir, 'db.json');
+    this.filesDir = path.join(dir, 'files');
+    this.versionsDir = path.join(dir, 'versions');
+    this.backupDir = path.join(dir, 'backups');
+    for (const d of [dir, this.filesDir, this.versionsDir, this.backupDir]) fs.mkdirSync(d, { recursive: true });
+    this.db = { songs: [], ideas: [], collections: [], settings: {} };
+    if (fs.existsSync(this.file)) {
+      try { this.db = Object.assign(this.db, JSON.parse(fs.readFileSync(this.file, 'utf8'))); }
+      catch (e) {
+        // keep the unreadable file for recovery instead of overwriting it
+        fs.copyFileSync(this.file, this.file + '.corrupt-' + Date.now());
+      }
+    }
+    this.db.settings = Object.assign({ charLimit: 3000, artist: '', checklist: DEFAULT_CHECKLIST.slice() }, this.db.settings);
+    this.timer = null;
+  }
+
+  /* ---- persistence ---- */
+  save() {
+    if (this.timer) return;
+    this.timer = setTimeout(() => { this.timer = null; this.flush(); }, 150);
+  }
+  flush() {
+    if (this.timer) { clearTimeout(this.timer); this.timer = null; }
+    const tmp = this.file + '.tmp';
+    fs.writeFileSync(tmp, JSON.stringify(this.db));
+    fs.renameSync(tmp, this.file);
+    this.dailyBackup();
+  }
+  dailyBackup() {
+    const name = 'db-' + now().slice(0, 10) + '.json';
+    const target = path.join(this.backupDir, name);
+    if (fs.existsSync(target)) return;
+    try {
+      fs.copyFileSync(this.file, target);
+      const old = fs.readdirSync(this.backupDir).filter((f) => /^db-\d{4}-\d\d-\d\d\.json$/.test(f)).sort();
+      while (old.length > 7) fs.unlinkSync(path.join(this.backupDir, old.shift()));
+    } catch (e) { /* a failed backup must not block saving */ }
+  }
+
+  /* ---- songs ---- */
+  summary(s) {
+    const lines = s.lyrics.split('\n').filter((l) => l.trim() && !/^\s*\[.*\]\s*$/.test(l));
+    return {
+      id: s.id, title: s.title, status: s.status, project: s.project, tags: s.tags,
+      releaseDate: s.releaseDate, cover: s.cover, created: s.created, updated: s.updated,
+      words: (s.lyrics.match(/[A-Za-z][A-Za-z'’]*/g) || []).length,
+      chars: s.lyrics.length, first: lines.slice(0, 2).join(' / ').slice(0, 140),
+      checklistDone: s.checklist.filter((c) => c.done).length, checklistTotal: s.checklist.length,
+      takes: s.audio.length,
+    };
+  }
+  listSongs() { return this.db.songs.map((s) => this.summary(s)); }
+  getSong(sid) { return this.db.songs.find((s) => s.id === sid) || null; }
+
+  createSong(input = {}) {
+    const t = now();
+    const song = {
+      id: id(), title: str(input.title, 200) || 'Untitled', lyrics: str(input.lyrics, 200000),
+      status: STATUSES.includes(input.status) ? input.status : 'writing',
+      project: str(input.project, 120), tags: [], releaseDate: '', notes: str(input.notes, 100000),
+      production: { style: '', bpm: '', key: '', voice: '', notes: '' },
+      links: { spotify: '', apple: '', distributor: '', site: '', other: '' },
+      ids: { isrc: '', upc: '' },
+      checklist: this.db.settings.checklist.map((text) => ({ id: id(), text, done: false })),
+      collected: [], cover: '', audio: [], created: t, updated: t,
+    };
+    this.db.songs.unshift(song);
+    this.save();
+    return song;
+  }
+
+  updateSong(sid, patch) {
+    const s = this.getSong(sid);
+    if (!s) return null;
+    if (typeof patch.lyrics === 'string' && patch.lyrics !== s.lyrics) {
+      this.autoVersion(s);
+      s.lyrics = patch.lyrics.slice(0, 200000);
+    }
+    if (typeof patch.title === 'string') s.title = patch.title.slice(0, 200) || 'Untitled';
+    if (STATUSES.includes(patch.status)) s.status = patch.status;
+    if (typeof patch.project === 'string') s.project = patch.project.slice(0, 120);
+    if (typeof patch.notes === 'string') s.notes = patch.notes.slice(0, 100000);
+    if (typeof patch.releaseDate === 'string' && /^(\d{4}-\d\d-\d\d)?$/.test(patch.releaseDate)) s.releaseDate = patch.releaseDate;
+    if (Array.isArray(patch.tags)) s.tags = patch.tags.slice(0, 20).map((t) => str(t, 40)).filter(Boolean);
+    for (const group of ['production', 'links', 'ids']) {
+      if (patch[group] && typeof patch[group] === 'object') {
+        for (const k of Object.keys(s[group])) {
+          if (typeof patch[group][k] === 'string') s[group][k] = patch[group][k].slice(0, 4000);
+        }
+      }
+    }
+    if (Array.isArray(patch.checklist)) {
+      s.checklist = patch.checklist.slice(0, 60).map((c) => ({ id: str(c.id, 20) || id(), text: str(c.text, 200), done: !!c.done })).filter((c) => c.text);
+    }
+    if (Array.isArray(patch.collected)) {
+      s.collected = patch.collected.slice(0, 500).map((c) => str(c, 200)).filter(Boolean);
+    }
+    if (Array.isArray(patch.audioNotes)) {
+      for (const n of patch.audioNotes) {
+        const a = s.audio.find((x) => x.id === n.id);
+        if (a) { if (typeof n.note === 'string') a.note = n.note.slice(0, 500); if (typeof n.name === 'string' && n.name.trim()) a.name = n.name.slice(0, 160); }
+      }
+    }
+    s.updated = now();
+    this.save();
+    return s;
+  }
+
+  deleteSong(sid) {
+    const i = this.db.songs.findIndex((s) => s.id === sid);
+    if (i < 0) return false;
+    this.db.songs.splice(i, 1);
+    fs.rmSync(path.join(this.filesDir, sid), { recursive: true, force: true });
+    fs.rmSync(path.join(this.versionsDir, sid + '.json'), { force: true });
+    for (const idea of this.db.ideas) if (idea.songId === sid) idea.songId = '';
+    this.save();
+    return true;
+  }
+
+  /* ---- versions (one file per song, so the main file stays small) ---- */
+  versionFile(sid) { return path.join(this.versionsDir, sid + '.json'); }
+  readVersions(sid) {
+    try { return JSON.parse(fs.readFileSync(this.versionFile(sid), 'utf8')); } catch (e) { return []; }
+  }
+  writeVersions(sid, list) {
+    const tmp = this.versionFile(sid) + '.tmp';
+    fs.writeFileSync(tmp, JSON.stringify(list));
+    fs.renameSync(tmp, this.versionFile(sid));
+  }
+  addVersion(song, label, auto) {
+    const list = this.readVersions(song.id);
+    const v = { id: id(), label: str(label, 120), auto: !!auto, at: now(), title: song.title, lyrics: song.lyrics };
+    list.unshift(v);
+    // keep every named version; trim only the oldest automatic ones
+    let autos = 0;
+    const kept = list.filter((x) => !x.auto || ++autos <= 30);
+    this.writeVersions(song.id, kept.slice(0, 200));
+    return v;
+  }
+  /* Before the first edit of a day, keep what the lyrics looked like. */
+  autoVersion(song) {
+    if (!song.lyrics.trim()) return;
+    const today = now().slice(0, 10);
+    if (song.autoDay === today) return;
+    song.autoDay = today;
+    const list = this.readVersions(song.id);
+    if (list.length && list[0].lyrics === song.lyrics) return;
+    this.addVersion(song, 'Before edits on ' + today, true);
+  }
+  deleteVersion(sid, vid) {
+    const list = this.readVersions(sid);
+    const next = list.filter((v) => v.id !== vid);
+    if (next.length === list.length) return false;
+    this.writeVersions(sid, next);
+    return true;
+  }
+
+  /* ---- ideas ---- */
+  createIdea(input) {
+    const idea = { id: id(), text: str(input.text, 4000).trim(), kind: ['line', 'title', 'hook', 'concept'].includes(input.kind) ? input.kind : 'line', songId: '', pinned: false, created: now() };
+    if (!idea.text) return null;
+    this.db.ideas.unshift(idea);
+    this.save();
+    return idea;
+  }
+  updateIdea(iid, patch) {
+    const idea = this.db.ideas.find((x) => x.id === iid);
+    if (!idea) return null;
+    if (typeof patch.text === 'string' && patch.text.trim()) idea.text = patch.text.slice(0, 4000).trim();
+    if (['line', 'title', 'hook', 'concept'].includes(patch.kind)) idea.kind = patch.kind;
+    if (typeof patch.pinned === 'boolean') idea.pinned = patch.pinned;
+    if (typeof patch.songId === 'string') idea.songId = this.getSong(patch.songId) ? patch.songId : '';
+    this.save();
+    return idea;
+  }
+  deleteIdea(iid) {
+    const n = this.db.ideas.length;
+    this.db.ideas = this.db.ideas.filter((x) => x.id !== iid);
+    this.save();
+    return this.db.ideas.length < n;
+  }
+
+  /* ---- collections ---- */
+  createCollection(name) {
+    const c = { id: id(), name: str(name, 80).trim() || 'New collection', items: [], created: now() };
+    this.db.collections.push(c);
+    this.save();
+    return c;
+  }
+  updateCollection(cid, patch) {
+    const c = this.db.collections.find((x) => x.id === cid);
+    if (!c) return null;
+    if (typeof patch.name === 'string' && patch.name.trim()) c.name = patch.name.slice(0, 80).trim();
+    if (Array.isArray(patch.items)) c.items = [...new Set(patch.items.map((x) => str(x, 200).trim()).filter(Boolean))].slice(0, 2000);
+    if (typeof patch.add === 'string' && patch.add.trim() && !c.items.includes(patch.add.trim())) c.items.push(patch.add.slice(0, 200).trim());
+    this.save();
+    return c;
+  }
+  deleteCollection(cid) {
+    const n = this.db.collections.length;
+    this.db.collections = this.db.collections.filter((x) => x.id !== cid);
+    this.save();
+    return this.db.collections.length < n;
+  }
+
+  /* ---- settings ---- */
+  updateSettings(patch) {
+    const s = this.db.settings;
+    if (Number.isFinite(+patch.charLimit)) s.charLimit = Math.max(0, Math.min(100000, Math.round(+patch.charLimit)));
+    if (typeof patch.artist === 'string') s.artist = patch.artist.slice(0, 120);
+    if (Array.isArray(patch.checklist)) s.checklist = patch.checklist.map((t) => str(t, 200).trim()).filter(Boolean).slice(0, 60);
+    this.save();
+    return s;
+  }
+
+  /* ---- backup ---- */
+  exportAll() {
+    const versions = {};
+    for (const s of this.db.songs) { const v = this.readVersions(s.id); if (v.length) versions[s.id] = v; }
+    return { app: 'studio-notebook', format: 1, exported: now(), db: this.db, versions };
+  }
+  importAll(data) {
+    if (!data || data.app !== 'studio-notebook' || !data.db || !Array.isArray(data.db.songs)) throw new Error('This is not a Studio Notebook backup file.');
+    this.flush();
+    fs.copyFileSync(this.file, path.join(this.backupDir, 'before-restore-' + Date.now() + '.json'));
+    const clean = { songs: [], ideas: [], collections: [], settings: this.db.settings };
+    const old = this.db;
+    this.db = clean;
+    try {
+      this.updateSettings(data.db.settings || {});
+      for (const src of data.db.songs) {
+        if (!src || !/^[a-f0-9]{6,24}$/.test(src.id || '')) continue;
+        const s = this.createSong({ title: src.title, lyrics: src.lyrics, status: src.status, project: src.project, notes: src.notes });
+        this.db.songs.shift();
+        const keepFiles = old.songs.find((o) => o.id === src.id);
+        s.id = src.id;
+        s.created = str(src.created, 30) || s.created;
+        this.db.songs.push(s);
+        this.updateSong(s.id, { tags: src.tags || [], releaseDate: src.releaseDate || '', production: src.production, links: src.links, ids: src.ids, checklist: src.checklist || [], collected: src.collected || [] });
+        s.updated = str(src.updated, 30) || s.updated;
+        // audio and cover files are not part of a backup; keep the ones already here
+        if (keepFiles) { s.cover = keepFiles.cover; s.audio = keepFiles.audio; }
+        const v = data.versions && data.versions[src.id];
+        if (Array.isArray(v)) this.writeVersions(s.id, v.slice(0, 200).map((x) => ({ id: str(x.id, 20) || id(), label: str(x.label, 120), auto: !!x.auto, at: str(x.at, 30), title: str(x.title, 200), lyrics: str(x.lyrics, 200000) })));
+      }
+      for (const i of data.db.ideas || []) { const idea = this.createIdea(i || {}); if (idea) { this.db.ideas.shift(); idea.created = str(i.created, 30) || idea.created; idea.pinned = !!i.pinned; idea.songId = this.getSong(i.songId) ? i.songId : ''; this.db.ideas.push(idea); } }
+      for (const c of data.db.collections || []) { const col = this.createCollection(c && c.name); this.updateCollection(col.id, { items: (c && c.items) || [] }); }
+    } catch (e) { this.db = old; throw e; }
+    this.flush();
+  }
+}
+
+module.exports = { Store, STATUSES, DEFAULT_CHECKLIST, id };

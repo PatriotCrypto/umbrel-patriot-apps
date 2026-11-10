@@ -1,0 +1,26 @@
+version: "3.7"
+
+services:
+  app_proxy:
+    environment:
+      APP_HOST: patriot-studio-notebook_web_1
+      APP_PORT: 3983
+
+  web:
+    image: ghcr.io/patriotcrypto/studio-notebook:0.1.0@sha256:f993977a7416f65ec7b9b11be02e9e7d1a296bc3c25b05434a8e45b0858277b3
+    user: "1000:1000"
+    init: true
+    restart: on-failure
+    stop_grace_period: 1m
+    read_only: true
+    tmpfs:
+      - /tmp
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    environment:
+      PORT: 3983
+      DATA_DIR: /data
+    volumes:
+      - ${APP_DATA_DIR}/data:/data
