@@ -63,7 +63,7 @@ across songs.
   with links and release dates. Without a key it sees only your current top
   tracks; a free Spotify API key lets it read all of them.
   Sync is the only time the app goes online.
-- The five words you use most, on the Desk.
+- The five words and the five lines you use most, on the Desk.
 
 ## What it does not do
 

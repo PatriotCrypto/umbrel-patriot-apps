@@ -260,10 +260,10 @@ export async function songView(app, id, tabName) {
       const wordsN = (text.match(/[A-Za-z][A-Za-z'’]*/g) || []).length;
       const linesN = lines.filter((l) => l.trim() && !isTag(l)).length;
       const over = limit > 0 && text.length > limit;
-      counts.replaceChildren(
+      counts.replaceChildren(...[
         h('span', { class: over ? 'over' : '' }, limit > 0 ? `${text.length.toLocaleString()} / ${limit.toLocaleString()} characters` : `${text.length.toLocaleString()} characters`),
         over ? h('span', { class: 'over' }, `${(text.length - limit).toLocaleString()} over the limit`) : null,
-        h('span', null, `${wordsN.toLocaleString()} words`), h('span', null, `${linesN} lines`), h('span', null, `${syllables.toLocaleString()} syllables`));
+        h('span', null, `${wordsN.toLocaleString()} words`), h('span', null, `${linesN} lines`), h('span', null, `${syllables.toLocaleString()} syllables`)].filter(Boolean));
       meter.classList.toggle('hide', !(limit > 0));
       meter.classList.toggle('over', over);
       meterBar.style.width = limit > 0 ? Math.min(100, (text.length / limit) * 100) + '%' : '0';

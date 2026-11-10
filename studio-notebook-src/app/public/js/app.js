@@ -48,7 +48,7 @@ function drawRail(active) {
     h('a', { class: 'brand', href: '#/' }, 'Studio', h('br'), 'Notebook', h('i')),
     ...NAV.map(([key, href, label]) => h('a', { class: 'nav', href, 'aria-current': active === key ? 'page' : null }, icon(key), label)),
     h('div', { class: 'foot' },
-      h('a', { class: 'sig', href: 'https://wyleymusic.com', target: '_blank', rel: 'noopener noreferrer', title: 'wyleymusic.com' }, h('img', { src: '/wyley.png', alt: 'Wyley', width: 120, height: 53 })),
+      h('a', { class: 'sig', href: 'https://wyleymusic.com', target: '_blank', rel: 'noopener noreferrer', title: 'wyleymusic.com' }, h('img', { src: '/wyley.png', alt: 'Wyley', width: 120, height: 63 })),
       app.state.version ? 'Version ' + app.state.version : ''));
 }
 
@@ -122,10 +122,21 @@ function deskView() {
         h('span', { class: 'rank' }, i + 1), h('b', null, w.word), h('span', { class: 'small mute' }, `${w.count} times in ${w.songs} ${w.songs === 1 ? 'song' : 'songs'}`)))),
       h('p', { class: 'small mute' }, 'Across every song, leaving out small words like "the" and "and". Pick one to find other ways to say it.')));
   }
+  const lines = app.state.topLines || [];
+  if (lines.length) {
+    el.append(h('section', { class: 'sect' }, h('h2', null, 'Most used lines'),
+      h('div', { class: 'list' }, lines.map((l) => h('div', { class: 'item topline' },
+        h('div', { class: 'grow' }, h('div', { class: 't' }, l.line),
+          l.variants.length ? h('div', { class: 'small mute' }, 'Also: ' + l.variants.join(' / ')) : null,
+          h('div', { class: 's' }, l.songs.map((s, i) => [i ? ', ' : '', h('a', { href: `#/song/${s.id}` }, s.title)]), l.more ? ` and ${l.more} more` : '')),
+        h('div', { class: 'days' }, l.songCount > 1 ? `${l.songCount} songs` : `${l.count} times`)))),
+      h('p', { class: 'small mute' }, 'Lines that are the same or nearly the same, in more than one song first.')));
+  }
   const sb = suggestBox(false);
   if (sb) el.append(sb);
   el.append(h('section', { class: 'sect' }, h('div', { class: 'stats' },
-    h('div', { class: 'stat' }, h('b', null, songs.filter((s) => !['released', 'shelved'].includes(s.status)).length), h('span', null, 'in progress')),
+    h('div', { class: 'stat' }, h('b', null, songs.filter((s) => !['scheduled', 'released', 'shelved'].includes(s.status)).length), h('span', null, 'in progress')),
+    h('div', { class: 'stat' }, h('b', null, songs.filter((s) => s.status === 'scheduled').length), h('span', null, 'scheduled')),
     h('div', { class: 'stat' }, h('b', null, songs.filter((s) => s.status === 'released').length), h('span', null, 'released')),
     h('div', { class: 'stat' }, h('b', null, songs.reduce((n, s) => n + s.words, 0).toLocaleString()), h('span', null, 'words written')),
     h('div', { class: 'stat' }, ideaCount, h('span', null, 'ideas waiting')))));
@@ -275,8 +286,7 @@ function songsView() {
       coverEl(s),
       h('div', { class: 't' }, s.title),
       hits && lines.get(s.id) && lines.get(s.id).length ? h('div', { class: 'small mute' }, lines.get(s.id)[0]) : null,
-      h('div', { class: 'meta' }, h('span', { class: 'status', dataset: { s: s.status } }, STATUS_LABEL[s.status]), h('span', null, s.releaseDate ? day(s.releaseDate) : ago(s.updated))),
-      s.onSpotify ? h('div', { class: 'live' }, h('span', { class: 'pill spotify' }, 'Spotify')) : null))));
+      h('div', { class: 'meta' }, h('span', { class: 'status', dataset: { s: s.status } }, STATUS_LABEL[s.status]), h('span', null, s.releaseDate ? day(s.releaseDate) : ago(s.updated)))))));
   }
   el.append(h('div', { class: 'pagehead' }, h('div', { class: 'grow' }, h('h1', null, 'Songs')), h('button', { class: 'btn', type: 'button', onclick: () => syncStreams(draw) }, 'Sync Spotify'), h('button', { class: 'btn primary', type: 'button', onclick: () => newSong() }, 'New song')),
     h('div', { class: 'row' }, search), chips, grid);
@@ -440,7 +450,7 @@ function settingsView() {
           h('p', { class: 'small mute' }, 'Without a key, only your current top tracks on Spotify can be seen. A free key from developer.spotify.com (create an app, then copy its Client ID and Client secret) lets Sync see all of them. The secret is kept on your Umbrel and is left out of backups.'),
           field('Client ID', streamInput('spotifyClientId', '')),
           field('Client secret', h('input', { class: 'input mono', type: 'password', autocomplete: 'off', placeholder: s.spotifyKeySaved ? 'Saved. Type to replace it.' : '', oninput: (e) => saveSettings({ spotifyClientSecret: e.target.value }) })))),
-      h('div', { class: 'row' }, h('button', { class: 'btn', type: 'button', onclick: () => syncStreams() }, 'Sync now'), h('span', { class: 'small mute' }, s.lastSync ? 'Last synced ' + ago(s.lastSync) : 'Not synced yet'))),
+      h('div', { class: 'row' }, h('button', { class: 'btn', type: 'button', onclick: () => syncStreams(route) }, 'Sync now'), h('span', { class: 'small mute' }, s.lastSync ? 'Last synced ' + ago(s.lastSync) : 'Not synced yet'))),
     h('section', { class: 'sect stack' }, h('h2', null, 'Release planning'),
       field('Gap between releases', cadence, 'Used for the suggested next release date on the Desk and the Calendar.')),
     h('section', { class: 'sect stack' }, h('h2', null, 'Release checklist for new songs'), field('One step per line', checklist, 'Songs you already have keep their own checklists.')),

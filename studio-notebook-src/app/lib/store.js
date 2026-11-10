@@ -271,6 +271,56 @@ class Store {
     return [...counts].sort((a, b) => b[1] - a[1] || (a[0] < b[0] ? -1 : 1)).slice(0, n).map(([word, count]) => ({ word, count, songs: inSongs.get(word) }));
   }
 
+  /* Lines written more than once, the same or nearly the same. Lines shared by several songs come first. */
+  topLines(n = 5) {
+    const SMALL = new Set(['a', 'an', 'the', 'and', 'but', 'or', 'so', 'oh', 'yeah', 'uh', 'ooh', 'ah', 'hey', 'na', 'la']);
+    const groups = new Map(); // exact key -> group
+    for (const song of this.db.songs) {
+      for (const raw of song.lyrics.split('\n')) {
+        const text = raw.trim();
+        if (!text || /^\s*[\[(].*[\])]\s*$/.test(text)) continue;
+        const words = (text.toLowerCase().replace(/[\u2018\u2019]/g, "'").match(/[a-z0-9][a-z0-9']*/g) || []).map((w) => w.replace(/in'$/, 'ing'));
+        const core = words.filter((w) => !SMALL.has(w));
+        if (core.length < 3) continue;
+        const key = core.join(' ');
+        let g = groups.get(key);
+        if (!g) { g = { key, set: new Set(core), len: core.length, count: 0, songs: new Map(), texts: new Map() }; groups.set(key, g); }
+        g.count++;
+        g.songs.set(song.id, song.title);
+        const shown = text.replace(/[\s,;:.!?\u2014-]+$/, '');
+        g.texts.set(shown, (g.texts.get(shown) || 0) + 1);
+      }
+    }
+    /* Join lines that share nearly all of their words. */
+    const list = [...groups.values()].sort((a, b) => b.count - a.count).slice(0, 4000);
+    const merged = [];
+    for (const g of list) {
+      let home = null;
+      if (g.len >= 4) {
+        for (const m of merged) {
+          if (m.len < 4 || Math.abs(m.len - g.len) > 2) continue;
+          let same = 0;
+          for (const w of g.set) if (m.set.has(w)) same++;
+          if (same / (g.set.size + m.set.size - same) >= 0.75) { home = m; break; }
+        }
+      }
+      if (!home) { merged.push({ set: g.set, len: g.len, count: g.count, songs: new Map(g.songs), texts: new Map(g.texts) }); continue; }
+      home.count += g.count;
+      for (const [id, t] of g.songs) home.songs.set(id, t);
+      for (const [t, c] of g.texts) home.texts.set(t, (home.texts.get(t) || 0) + c);
+    }
+    return merged.filter((m) => m.count > 1)
+      .sort((a, b) => b.songs.size - a.songs.size || b.count - a.count)
+      .slice(0, n)
+      .map((m) => {
+        const texts = [...m.texts].sort((a, b) => b[1] - a[1]).map((x) => x[0]);
+        const lower = new Set();
+        const variants = texts.filter((t) => { const k = t.toLowerCase(); if (lower.has(k)) return false; lower.add(k); return true; });
+        const songs = [...m.songs].map(([id, title]) => ({ id, title }));
+        return { line: variants[0], variants: variants.slice(1, 3), count: m.count, songCount: songs.length, songs: songs.slice(0, 4), more: Math.max(0, songs.length - 4) };
+      });
+  }
+
   /* Fill a song in from what a streaming service says about it. Existing details are kept. */
   applyTrack(sid, t, today) {
     const s = this.getSong(sid);

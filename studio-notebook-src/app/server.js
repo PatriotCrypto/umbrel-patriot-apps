@@ -162,7 +162,7 @@ async function api(req, res, url) {
     return json(res, {
       version: pkg.version, statuses: STATUSES, settings: store.publicSettings(), songs: store.listSongs(),
       ideas: store.db.ideas, collections: store.db.collections, words: words.available(),
-      topWords: store.topWords(5), today: localDay(q.get('today')),
+      topWords: store.topWords(5), topLines: store.topLines(5), today: localDay(q.get('today')),
       suggest: release.suggest(store.db.songs, store.db.settings.cadenceWeeks, localDay(q.get('today'))),
     });
   }

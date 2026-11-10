@@ -326,7 +326,10 @@ dialog.wide { width: min(94vw, 760px); }
 .item > :last-child { white-space: nowrap; flex: none; }
 
 /* ---------- 0.2.0: signature, live badges, most used words, calendar ---------- */
-.rail .foot .sig { display: block; width: 120px; margin: 0 0 8px -4px; opacity: .92; }
+.rail .foot .sig { display: block; width: 120px; margin: 0 0 10px -4px; opacity: .92; }
+.topline .t { font-family: inherit; font-weight: 600; font-size: 15px; }
+.topline .s { white-space: normal; }
+.topline .s a { color: inherit; }
 .rail .foot .sig:hover { opacity: 1; }
 .rail .foot .sig img { display: block; width: 100%; height: auto; }
 .live { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }

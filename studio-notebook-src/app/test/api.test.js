@@ -183,3 +183,15 @@ test('a matched track fills in a song, and the Spotify secret stays on the serve
   assert.ok(!JSON.stringify((await call('GET', '/api/backup')).data).includes('hush'));
   assert.strictEqual((await call('POST', '/api/streams/link', { song: made.id, track: { spotify: 'javascript:alert(1)' } })).data.filled.length, 0);
 });
+
+test('most used lines groups the same and nearly the same lines', async () => {
+  const a = (await call('POST', '/api/songs', { title: 'Line A', lyrics: '[Chorus]\nI was lost but now I am found again\nSomething only here\nI was lost but now I am found again' })).data;
+  const b = (await call('POST', '/api/songs', { title: 'Line B', lyrics: 'I was lost, but now I\u2019m found again!\nOh yeah\nI was lost but now I am found once again' })).data;
+  const top = (await call('GET', '/api/state?today=2026-11-10')).data.topLines;
+  assert.ok(Array.isArray(top) && top.length >= 1);
+  assert.strictEqual(top[0].songCount, 2);
+  assert.strictEqual(top[0].count, 4);
+  assert.ok(/lost but now/i.test(top[0].line));
+  assert.ok(!top.some((l) => /only here|oh yeah/i.test(l.line)));
+  assert.ok(a.id && b.id);
+});
