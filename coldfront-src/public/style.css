@@ -425,3 +425,13 @@ h1{text-shadow:0 2px 24px rgba(0,0,0,.18)}[data-theme=light] h1{text-shadow:none
 .themeopt .sw em{position:absolute;left:14%;right:14%;top:30%;height:40%;border-radius:10px;background:linear-gradient(140deg,rgba(255,255,255,.4),rgba(255,255,255,.1));border:1px solid rgba(255,255,255,.45);box-shadow:inset 0 1px 0 rgba(255,255,255,.6)}
 .themeopt.on{box-shadow:0 0 0 2px var(--accent),0 8px 24px rgba(0,0,0,.25)}
 [data-theme=light] .themeopt{background:rgba(255,255,255,.6);border-color:rgba(255,255,255,.95)}
+
+/* schedule rows: give the boxed glass rows room to breathe (0.4.1) */
+.card>.row.spread{margin-bottom:18px}
+.period{padding:14px 16px 16px;gap:12px;margin-bottom:12px;border-radius:22px}
+.period label{gap:6px;font-size:.68rem}
+.period input{width:100%;min-width:0}
+.period .x{align-self:end}
+@media(max-width:600px){.period{padding:14px;gap:10px}.period:last-of-type{border-bottom:1px solid rgba(255,255,255,.12)}}
+#periods{margin-bottom:6px}
+.daytabs{margin-bottom:18px}
