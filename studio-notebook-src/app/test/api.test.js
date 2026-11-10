@@ -19,7 +19,7 @@ const call = async (method, url, body, headers = H) => {
 };
 
 test.before(() => new Promise((r) => server.listen(0, '127.0.0.1', () => { base = 'http://127.0.0.1:' + server.address().port; r(); })));
-test.after(() => { server.close(); fs.rmSync(dir, { recursive: true, force: true }); });
+test.after(() => { store.flush(); server.close(); fs.rmSync(dir, { recursive: true, force: true }); });
 
 test('pages, health and security headers', async () => {
   assert.strictEqual((await call('GET', '/healthz')).data, 'ok');
@@ -139,4 +139,51 @@ test('word tools over http', async (t) => {
   assert.strictEqual((await call('GET', '/api/w/nothing?q=fire')).status, 404);
   const a = (await call('POST', '/api/analyze', { text: 'hello world' })).data;
   assert.strictEqual(a.lines[0].syl, 3);
+});
+
+/* ---- 0.2.0 ---- */
+const release = require('../lib/release');
+const services = require('../lib/services');
+
+test('the suggested release date is a Friday that respects the gap, the lead time and the quiet weeks', () => {
+  const a = release.suggest([{ title: 'A', status: 'released', releaseDate: '2026-10-30' }], 4, '2026-11-10');
+  assert.strictEqual(a.date, '2026-12-04');
+  assert.strictEqual(new Date(a.date + 'T00:00:00Z').getUTCDay(), 5);
+  const b = release.suggest([{ title: 'B', status: 'scheduled', releaseDate: '2026-11-27' }], 4, '2026-11-10');
+  assert.strictEqual(b.date, '2027-01-08', 'Christmas and New Year Fridays are skipped');
+  assert.ok(b.alternates.some((x) => x.label === 'Sooner' && x.date < b.date));
+  assert.strictEqual(release.suggest([], 4, '2026-11-10').date, '2026-12-04', 'three weeks of lead time with no songs');
+  assert.strictEqual(release.suggest([{ title: 'old', status: 'shelved', releaseDate: '2027-06-04' }], 4, '2026-11-10').date, '2026-12-04');
+  assert.deepStrictEqual(release.events('2027-03-20', '2027-03-31').map((e) => e.name), ['Good Friday', 'Easter']);
+});
+
+test('titles from the services match notebook titles', () => {
+  assert.ok(services.sameTitle('Homesick WV', 'Homesick West Virginia'));
+  assert.ok(services.sameTitle('Mya’s Song', "Mya's Song (feat. Someone)"));
+  assert.ok(!services.sameTitle('Fireproof', 'Fire'));
+  assert.ok(!services.sameTitle('Till Death', 'Till Death Do Us Part'));
+  assert.strictEqual(services.appleArtistId('https://music.apple.com/us/artist/wyley/1791234567?l=en'), '1791234567');
+  assert.strictEqual(services.spotifyArtistId('https://open.spotify.com/artist/4ZXoylQFyUeNq4UJEAFObg?si=abc'), '4ZXoylQFyUeNq4UJEAFObg');
+  const apple = services.parseApple({ results: [{ wrapperType: 'artist' }, { wrapperType: 'track', kind: 'song', trackName: 'No Reason', collectionName: 'No Reason - Single',
+    trackViewUrl: 'https://music.apple.com/us/album/no-reason/1?i=2&uo=4', releaseDate: '2026-05-01T07:00:00Z', artworkUrl100: 'https://is1-ssl.mzstatic.com/image/thumb/Music/x/100x100bb.jpg' }] });
+  assert.deepStrictEqual(apple[0], { title: 'No Reason', album: 'No Reason', apple: 'https://music.apple.com/us/album/no-reason/1?i=2', date: '2026-05-01', art: 'https://is1-ssl.mzstatic.com/image/thumb/Music/x/1000x1000bb.jpg' });
+  const merged = services.merge(apple, [{ title: 'No Reason', spotify: 'https://open.spotify.com/track/abc', date: '' }, { title: 'Click', spotify: 'https://open.spotify.com/track/def', date: '' }]);
+  assert.strictEqual(merged.length, 2);
+  assert.strictEqual(merged[0].spotify, 'https://open.spotify.com/track/abc');
+});
+
+test('a matched track fills in a song, and the Spotify secret stays on the server', async () => {
+  const made = (await call('POST', '/api/songs', { title: 'No Reason', lyrics: 'Fire fire fire and the rain\nFire in the rain again\n[Chorus]\nthe the the' })).data;
+  const linked = (await call('POST', '/api/streams/link', { song: made.id, today: '2026-11-10', track: { title: 'No Reason', spotify: 'https://open.spotify.com/track/abc123', apple: 'https://music.apple.com/us/album/x/1?i=2', date: '2026-05-01', art: 'https://evil.example/x.jpg' } })).data;
+  assert.ok(linked.filled.includes('Spotify link') && linked.filled.includes('release date') && linked.filled.includes('status'));
+  await call('PUT', '/api/settings', { spotifyClientId: 'id', spotifyClientSecret: 'hush', cadenceWeeks: 6 });
+  const state = (await call('GET', '/api/state?today=2026-11-10')).data;
+  const song = state.songs.find((s) => s.id === made.id);
+  assert.ok(song.onSpotify && song.onApple && song.status === 'released' && !song.cover);
+  assert.strictEqual(state.settings.spotifyClientSecret, undefined);
+  assert.strictEqual(state.settings.spotifyKeySaved, true);
+  assert.strictEqual(state.suggest.cadenceWeeks, 6);
+  assert.ok(state.topWords.some((w) => w.word === 'fire' && w.count >= 4) && !state.topWords.some((w) => w.word === 'the'));
+  assert.ok(!JSON.stringify((await call('GET', '/api/backup')).data).includes('hush'));
+  assert.strictEqual((await call('POST', '/api/streams/link', { song: made.id, track: { spotify: 'javascript:alert(1)' } })).data.filled.length, 0);
 });

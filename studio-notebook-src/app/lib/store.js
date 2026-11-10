@@ -6,6 +6,8 @@ const crypto = require('crypto');
 
 const STATUSES = ['idea', 'writing', 'polishing', 'producing', 'scheduled', 'released', 'shelved'];
 
+const COMMON = new Set(('a about after again ain all also am an and any are aren around as at back be because been before being but by can cant come could couldn did didn do does doesn don done dont down each else even ever every for from get gets go goes going gon gonna got gotta had has hasn have haven having he her here hers him his how i if ill im in into is isn it its ive just know let like made make me might more most much must my need never no nor not now of off oh on once one only or other our out over own really said same say see she should so some still such take than that thats the their them then there these they thing things this those though through til till to too up upon us very want wanna was wasn way we well went were what when where which while who whom why will with won would wouldn yeah yes yet you your yours youre').split(' '));
+
 const DEFAULT_CHECKLIST = [
   'Lyrics final and proofread',
   'Lyrics fit the character limit',
@@ -37,7 +39,7 @@ class Store {
         fs.copyFileSync(this.file, this.file + '.corrupt-' + Date.now());
       }
     }
-    this.db.settings = Object.assign({ charLimit: 3000, artist: '', checklist: DEFAULT_CHECKLIST.slice() }, this.db.settings);
+    this.db.settings = Object.assign({ charLimit: 3000, artist: '', checklist: DEFAULT_CHECKLIST.slice(), cadenceWeeks: 4, appleUrl: '', spotifyUrl: '', spotifyClientId: '', spotifyClientSecret: '', lastSync: '' }, this.db.settings);
     this.timer = null;
   }
 
@@ -73,7 +75,7 @@ class Store {
       words: (s.lyrics.match(/[A-Za-z][A-Za-z'’]*/g) || []).length,
       chars: s.lyrics.length, first: lines.slice(0, 2).join(' / ').slice(0, 140),
       checklistDone: s.checklist.filter((c) => c.done).length, checklistTotal: s.checklist.length,
-      takes: s.audio.length,
+      takes: s.audio.length, onSpotify: /^https:\/\/open\.spotify\.com\//.test(s.links.spotify), onApple: /^https:\/\/music\.apple\.com\//.test(s.links.apple),
     };
   }
   listSongs() { return this.db.songs.map((s) => this.summary(s)); }
@@ -236,15 +238,59 @@ class Store {
     if (Number.isFinite(+patch.charLimit)) s.charLimit = Math.max(0, Math.min(100000, Math.round(+patch.charLimit)));
     if (typeof patch.artist === 'string') s.artist = patch.artist.slice(0, 120);
     if (Array.isArray(patch.checklist)) s.checklist = patch.checklist.map((t) => str(t, 200).trim()).filter(Boolean).slice(0, 60);
+    if ([2, 3, 4, 6, 8].includes(+patch.cadenceWeeks)) s.cadenceWeeks = +patch.cadenceWeeks;
+    for (const k of ['appleUrl', 'spotifyUrl', 'spotifyClientId', 'spotifyClientSecret']) if (typeof patch[k] === 'string') s[k] = patch[k].trim().slice(0, 300);
     this.save();
     return s;
+  }
+
+  /* Settings as the browser sees them: the Spotify key's secret never leaves the server. */
+  publicSettings() {
+    const s = Object.assign({}, this.db.settings);
+    s.spotifyKeySaved = !!(s.spotifyClientId && s.spotifyClientSecret);
+    delete s.spotifyClientSecret;
+    return s;
+  }
+
+  /* The words used most across every song, leaving out the small connecting words. */
+  topWords(n = 5) {
+    const counts = new Map(), inSongs = new Map();
+    for (const song of this.db.songs) {
+      const seen = new Set();
+      for (const line of song.lyrics.split('\n')) {
+        if (/^\s*[\[(].*[\])]\s*$/.test(line)) continue;
+        for (const raw of line.toLowerCase().replace(/[\u2018\u2019]/g, "'").match(/[a-z][a-z']*/g) || []) {
+          const w = raw.replace(/'(s|m|re|ve|ll|d|t)$/, '').replace(/^'+|'+$/g, '');
+          if (w.length < 3 || COMMON.has(w)) continue;
+          counts.set(w, (counts.get(w) || 0) + 1);
+          if (!seen.has(w)) { seen.add(w); inSongs.set(w, (inSongs.get(w) || 0) + 1); }
+        }
+      }
+    }
+    return [...counts].sort((a, b) => b[1] - a[1] || (a[0] < b[0] ? -1 : 1)).slice(0, n).map(([word, count]) => ({ word, count, songs: inSongs.get(word) }));
+  }
+
+  /* Fill a song in from what a streaming service says about it. Existing details are kept. */
+  applyTrack(sid, t, today) {
+    const s = this.getSong(sid);
+    if (!s) return null;
+    const filled = [];
+    if (/^https:\/\/open\.spotify\.com\/track\/[A-Za-z0-9]+$/.test(t.spotify || '') && s.links.spotify !== t.spotify) { s.links.spotify = t.spotify; filled.push('Spotify link'); }
+    if (/^https:\/\/music\.apple\.com\/\S+$/.test(t.apple || '') && s.links.apple !== t.apple) { s.links.apple = t.apple.slice(0, 400); filled.push('Apple Music link'); }
+    if (/^\d{4}-\d\d-\d\d$/.test(t.date || '') && !s.releaseDate) { s.releaseDate = t.date; filled.push('release date'); }
+    if (t.album && !s.project && t.album.toLowerCase() !== s.title.toLowerCase()) { s.project = str(t.album, 120); filled.push('project'); }
+    const out = !s.releaseDate || s.releaseDate <= today;
+    if ((s.links.spotify || s.links.apple) && out && s.status !== 'released') { s.status = 'released'; filled.push('status'); }
+    if (filled.length) { s.updated = now(); this.save(); }
+    return filled;
   }
 
   /* ---- backup ---- */
   exportAll() {
     const versions = {};
     for (const s of this.db.songs) { const v = this.readVersions(s.id); if (v.length) versions[s.id] = v; }
-    return { app: 'studio-notebook', format: 1, exported: now(), db: this.db, versions };
+    const db = Object.assign({}, this.db, { settings: Object.assign({}, this.db.settings, { spotifyClientSecret: '' }) });
+    return { app: 'studio-notebook', format: 1, exported: now(), db, versions };
   }
   importAll(data) {
     if (!data || data.app !== 'studio-notebook' || !data.db || !Array.isArray(data.db.songs)) throw new Error('This is not a Studio Notebook backup file.');

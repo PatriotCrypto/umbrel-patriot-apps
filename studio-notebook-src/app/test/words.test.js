@@ -60,7 +60,16 @@ test('line analysis', { skip }, () => {
   const a = words.analyze('[Verse 1]\nI kept the letters that I never sent\n\nzzyzx road');
   assert.strictEqual(a[0].tag, true);
   assert.strictEqual(a[1].syl, 10);
-  assert.strictEqual(a[1].toks[a[1].toks.length - 1][2], 'EH');
+  assert.ok(a[1].toks[a[1].toks.length - 1][2].includes('v:EH'));
   assert.strictEqual(a[2].tag, true);
-  assert.strictEqual(a[3].toks[0][2], '');
+  assert.deepStrictEqual(a[3].toks[0][2], []);
+});
+
+test('long words that share an ending are heard as rhymes', { skip }, () => {
+  const line = words.analyze('particular molecular muscular vernacular spectacular articulate banana')[0];
+  const keys = line.toks.map((t) => t[2]);
+  const share = (a, b) => keys[a].some((k) => keys[b].includes(k));
+  assert.ok(share(0, 1) && share(1, 2) && share(2, 3) && share(3, 4), 'the -cular family');
+  assert.ok(share(5, 0), 'articulate and particular');
+  assert.ok(!share(6, 0));
 });

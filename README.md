@@ -248,6 +248,7 @@ You need a USB DVD drive and a free MakeMKV beta key (the app gets it for you fr
 - Offline word tools: perfect, close, wide and multi-syllable rhymes, rhyming phrases, word families, meanings with synonyms and opposites, a phrase dictionary, alliteration, figures of speech and a searchable King James Bible.
 - Earlier drafts are kept automatically. Compare any version line by line, or go back to it.
 - Notes, cover art and audio takes with each song, plus a release checklist, release date and links.
+- A release calendar with a suggested next release date, and a Sync button that finds your songs on Spotify and Apple Music and marks the ones that are live.
 - An ideas page for lines, hooks and titles, word collections you keep across songs, text import, and backup.
 - Four looks (Studio, Analog, Legal Pad, Midnight) and a hidden surprise.
 

@@ -3,8 +3,8 @@ import { h, api, toast, fail, confirmBox, promptBox, dialog, copyText, STATUS_LA
 import { wordPanel } from './wordtools.js';
 
 const TABS = [['lyrics', 'Lyrics'], ['notes', 'Notes'], ['takes', 'Art and takes'], ['release', 'Release'], ['versions', 'Versions']];
-const SECTIONS = ['Verse', 'Chorus', 'Hook', 'Bridge', 'Intro', 'Outro'];
-const STOP = new Set('a an and are as at be but by do for from got had has have he her him his i if im in is it its just me my no not of on or our she so that the their them they this to up us was we were what when with you your'.split(' '));
+const SECTIONS = ['Verse', 'Pre-Chorus', 'Chorus', 'Hook', 'Bridge', 'Intro', 'Outro'];
+const STOP = new Set('a an and are as at be but by do for from got had has have he her him his i if im in is it its just me my no not of on or our she so that the their them they this to up us was we were what when with you your youre ive ill id dont cant wont thats theres whats aint into than then been am did does would could should while'.split(' '));
 const isTag = (line) => /^\s*[\[(].*[\])]\s*$/.test(line);
 const pref = (k, d) => { try { return localStorage.getItem(k) || d; } catch (e) { return d; } };
 const setPref = (k, v) => { try { localStorage.setItem(k, v); } catch (e) { /* ignore */ } };
@@ -174,29 +174,52 @@ export async function songView(app, id, tabName) {
       collectedEl.lastChild.style.marginTop = '8px';
     }
 
+    /* Words in a stanza rhyme when they share any rhyme sound. Linked words form a family and
+       each family gets a colour. A word repeating itself is not a rhyme, so a family needs two
+       different words. */
     function colorize(lines) {
       const colors = lines.map(() => null);
       if (mode === 'off') return colors;
       let stanza = [];
       const assign = () => {
-        const seen = new Map();
         const picks = [];
         for (const i of stanza) {
           const a = cache.get(lines[i]);
           if (!a) continue;
           const toks = mode === 'ends' ? a.toks.slice(-1).map((t) => [t, a.toks.length - 1]) : a.toks.map((t, k) => [t, k]);
           for (const [t, k] of toks) {
-            if (!t[2]) continue;
-            if (mode === 'all' && STOP.has(lines[i].slice(t[0], t[1]).toLowerCase().replace(/[^a-z]/g, ''))) continue;
-            seen.set(t[2], (seen.get(t[2]) || 0) + 1);
-            picks.push([i, k, t[2]]);
+            const keys = Array.isArray(t[2]) ? t[2] : [];
+            const word = lines[i].slice(t[0], t[1]).toLowerCase().replace(/[^a-z]/g, '');
+            if (!keys.length || (mode === 'all' && STOP.has(word))) continue;
+            picks.push([i, k, word, keys]);
           }
         }
-        const colorOf = new Map();
-        for (const [i, k, key] of picks) {
-          if (seen.get(key) < 2) continue;
-          if (!colorOf.has(key)) colorOf.set(key, colorOf.size % 8);
-          (colors[i] || (colors[i] = new Map())).set(k, colorOf.get(key));
+        // strong links: the same vowels from the stress on, or the same last two syllables
+        const parent = picks.map((_, n) => n);
+        const find = (n) => { while (parent[n] !== n) { parent[n] = parent[parent[n]]; n = parent[n]; } return n; };
+        const first = new Map();
+        picks.forEach((p, n) => { for (const key of p[3]) { if (key[0] === 'h') continue; if (first.has(key)) parent[find(n)] = find(first.get(key)); else first.set(key, n); } });
+        const group = () => {
+          const fams = new Map();
+          picks.forEach((p, n) => { const r = find(n); if (!fams.has(r)) fams.set(r, []); fams.get(r).push(n); });
+          return fams;
+        };
+        const real = (fam) => new Set(fam.map((n) => picks[n][2])).size > 1;
+        // weak link: a long word with no family joins a neighbour (same or next line) that opens its rhyme the same way
+        const before = group();
+        const alone = (n) => !real(before.get(find(n)));
+        picks.forEach((p, n) => {
+          if (!alone(n)) return;
+          const weak = p[3].filter((k) => k[0] === 'h');
+          if (!weak.length) return;
+          const mate = picks.findIndex((q, m) => m !== n && q[2] !== p[2] && Math.abs(q[0] - p[0]) <= 1 && q[3].some((k) => weak.includes(k)));
+          if (mate > -1) parent[find(n)] = find(mate);
+        });
+        let colour = 0;
+        for (const fam of group().values()) {
+          if (!real(fam)) continue;
+          for (const n of fam) { const [i, k] = picks[n]; (colors[i] || (colors[i] = new Map())).set(k, colour % 8); }
+          colour++;
         }
         stanza = [];
       };
@@ -283,7 +306,7 @@ export async function songView(app, id, tabName) {
     function addSection(name) {
       const v = ta.value;
       const lineStart = v.lastIndexOf('\n', sel[0] - 1) + 1;
-      const n = (v.match(new RegExp('^\\[' + name + '( \\d+)?\\]', 'gmi')) || []).length;
+      const n = (v.match(new RegExp('^\\[' + name.replace('-', '[- ]?') + '( \\d+)?\\]', 'gmi')) || []).length;
       const label = name === 'Verse' ? `[Verse ${n + 1}]` : `[${name}]`;
       const lead = lineStart > 0 && v.slice(0, lineStart).replace(/\n$/, '').split('\n').pop().trim() ? '\n' : '';
       ta.setRangeText(lead + label + '\n', lineStart, lineStart, 'end');
@@ -422,12 +445,21 @@ export async function songView(app, id, tabName) {
     const setId = (k) => (e) => change({ ids: Object.assign({}, song.ids, { [k]: e.target.value }) });
     const link = (k, label) => field(label, h('input', { class: 'input', type: 'url', value: song.links[k], placeholder: 'https://', oninput: setLink(k) }));
     drawChecks();
+    const dateInput = h('input', { class: 'input', type: 'date', value: song.releaseDate, onchange: (e) => { change({ releaseDate: e.target.value }); flush(); } });
+    const sg = app.state.suggest;
+    const nice = (d) => new Date(d + 'T12:00:00').toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' });
+    const suggestEl = sg && song.status !== 'released' && !song.releaseDate ? h('p', { class: 'small mute' }, `Suggested: ${nice(sg.date)}. `,
+      h('button', { class: 'linkbtn', type: 'button', onclick: () => { dateInput.value = sg.date; change({ releaseDate: sg.date }); flush(); toast('Release date set'); } }, 'Use this date'), ' ',
+      h('a', { href: '#/calendar' }, 'Why this date')) : null;
+    const on = [['spotify', 'Spotify', /^https:\/\/open\.spotify\.com\//], ['apple', 'Apple Music', /^https:\/\/music\.apple\.com\//]].filter(([k, , re]) => re.test(song.links[k]));
+    const liveEl = h('div', { class: 'live' }, on.length ? on.map(([k, label]) => h('a', { class: 'pill ' + k, href: song.links[k], target: '_blank', rel: 'noopener noreferrer' }, 'Live on ' + label))
+      : h('span', { class: 'small mute' }, 'Not found on Spotify or Apple Music yet. Sync from the Songs page, or paste the links below.'));
     return h('div', { class: 'two' },
       h('div', null,
         h('div', { class: 'row' }, h('h2', { class: 'grow' }, 'Release checklist'), prog), listEl, addStep,
         h('p', { class: 'small mute' }, 'New songs start with the checklist from Settings. Changes here only affect this song.')),
       h('div', { class: 'stack' },
-        field('Release date', h('input', { class: 'input', type: 'date', value: song.releaseDate, onchange: (e) => { change({ releaseDate: e.target.value }); flush(); } })),
+        field('Release date', dateInput), suggestEl, liveEl,
         link('spotify', 'Spotify link'), link('apple', 'Apple Music link'), link('distributor', 'Distributor link'), link('site', 'Website page'), link('other', 'Other link'),
         h('div', { class: 'cols' },
           field('ISRC', h('input', { class: 'input mono', value: song.ids.isrc, oninput: setId('isrc') })),

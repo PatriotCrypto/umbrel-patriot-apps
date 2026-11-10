@@ -410,6 +410,24 @@ function bible(q) {
 /* ------------------------------------------------------------- analyze */
 const TOKEN = /[A-Za-z][A-Za-z'’]*/g;
 
+/* The ways a word can rhyme inside a verse, loosest last:
+   v: the vowels from the stressed syllable on (bubbling, stumbling; confusion, illusion)
+   t: the last two syllables exactly, for long words (particular, molecular, muscular)
+   h: the first two vowels of a long tail (articulate, particular)
+   Two words rhyme when they share any one of these. */
+function rhymeSounds(prons) {
+  const out = new Set();
+  for (const ph of prons.slice(0, 2)) {
+    const tail = P.vowels(ph.slice(P.rhymeStart(ph)));
+    if (tail.length) out.add('v:' + tail.join(' '));
+    if (tail.length >= 3) out.add('h:' + tail.slice(0, 2).join(' '));
+    const idx = [];
+    ph.forEach((x, i) => { if (P.isVowel(x)) idx.push(i); });
+    if (idx.length >= 3) out.add('t:' + ph.slice(idx[idx.length - 2]).map((x) => (P.isVowel(x) ? P.normVowel(x) : x)).join(' '));
+  }
+  return [...out];
+}
+
 /* Per-line syllable counts and a rhyme sound for every word, used by the
    editor to show bar lengths and colour words that rhyme. */
 function analyze(text) {
@@ -423,10 +441,10 @@ function analyze(text) {
     let m;
     while ((m = TOKEN.exec(line))) {
       const p = pronsOf(m[0]);
-      let s, key = '';
+      let s, key = [];
       if (p) {
         s = P.vowels(p[0]).length;
-        key = P.vowels(p[0].slice(P.rhymeStart(p[0]))).join(' ');
+        key = rhymeSounds(p);
       } else s = P.guessSyllables(m[0]);
       syl += s;
       toks.push([m.index, m.index + m[0].length, key]);

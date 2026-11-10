@@ -1,16 +1,21 @@
 /* Studio Notebook: shell, routing and the smaller screens. */
-import { h, api, toast, fail, confirmBox, promptBox, copyText, STATUS_LABEL, day, ago, daysUntil, icon, coverEl, debounce } from './util.js';
+import { h, api, toast, fail, dialog, confirmBox, promptBox, copyText, STATUS_LABEL, day, ago, daysUntil, icon, coverEl, debounce } from './util.js';
 import { songView } from './song.js';
 import { wordPanel } from './wordtools.js';
 import './egg.js';
 
 const LOOKS = [['studio', 'Studio', 'Black, white and one red line'], ['analog', 'Analog', 'Warm tape-machine amber'], ['legalpad', 'Legal Pad', 'Yellow ruled paper'], ['midnight', 'Midnight', 'Deep blue and brass']];
 const KINDS = [['line', 'Line'], ['hook', 'Hook'], ['title', 'Title'], ['concept', 'Concept']];
-const NAV = [['desk', '#/', 'Desk'], ['songs', '#/songs', 'Songs'], ['ideas', '#/ideas', 'Ideas'], ['words', '#/words', 'Words'], ['collections', '#/collections', 'Collected'], ['settings', '#/settings', 'Settings']];
+const NAV = [['desk', '#/', 'Desk'], ['songs', '#/songs', 'Songs'], ['calendar', '#/calendar', 'Calendar'], ['ideas', '#/ideas', 'Ideas'], ['words', '#/words', 'Words'], ['collections', '#/collections', 'Collected'], ['settings', '#/settings', 'Settings']];
+
+const pad2 = (n) => String(n).padStart(2, '0');
+const ymd = (d) => `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
+const localToday = () => ymd(new Date());
+const longDay = (s) => new Date(s + 'T12:00:00').toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
 
 const app = {
   state: { songs: [], ideas: [], collections: [], settings: { charLimit: 3000, checklist: [], artist: '' }, statuses: [], version: '' },
-  async reload() { this.state = await api('/api/state'); },
+  async reload() { this.state = await api('/api/state?today=' + localToday()); },
   patchSong(summary) {
     const i = this.state.songs.findIndex((s) => s.id === summary.id);
     if (i > -1) this.state.songs[i] = summary;
@@ -42,7 +47,9 @@ function drawRail(active) {
   rail.replaceChildren(
     h('a', { class: 'brand', href: '#/' }, 'Studio', h('br'), 'Notebook', h('i')),
     ...NAV.map(([key, href, label]) => h('a', { class: 'nav', href, 'aria-current': active === key ? 'page' : null }, icon(key), label)),
-    h('div', { class: 'foot' }, app.state.version ? 'Version ' + app.state.version : ''));
+    h('div', { class: 'foot' },
+      h('a', { class: 'sig', href: 'https://wyleymusic.com', target: '_blank', rel: 'noopener noreferrer', title: 'wyleymusic.com' }, h('img', { src: '/wyley.png', alt: 'Wyley', width: 120, height: 53 })),
+      app.state.version ? 'Version ' + app.state.version : ''));
 }
 
 async function newSong(seed = {}) {
@@ -108,11 +115,127 @@ function deskView() {
     }))));
   }
   drawCount();
+  const top = app.state.topWords || [];
+  if (top.length) {
+    el.append(h('section', { class: 'sect' }, h('h2', null, 'Most used words'),
+      h('div', { class: 'topwords' }, top.map((w, i) => h('a', { class: 'topword', href: '#/words/' + encodeURIComponent(w.word), title: 'Look up ' + w.word },
+        h('span', { class: 'rank' }, i + 1), h('b', null, w.word), h('span', { class: 'small mute' }, `${w.count} times in ${w.songs} ${w.songs === 1 ? 'song' : 'songs'}`)))),
+      h('p', { class: 'small mute' }, 'Across every song, leaving out small words like "the" and "and". Pick one to find other ways to say it.')));
+  }
+  const sb = suggestBox(false);
+  if (sb) el.append(sb);
   el.append(h('section', { class: 'sect' }, h('div', { class: 'stats' },
     h('div', { class: 'stat' }, h('b', null, songs.filter((s) => !['released', 'shelved'].includes(s.status)).length), h('span', null, 'in progress')),
     h('div', { class: 'stat' }, h('b', null, songs.filter((s) => s.status === 'released').length), h('span', null, 'released')),
     h('div', { class: 'stat' }, h('b', null, songs.reduce((n, s) => n + s.words, 0).toLocaleString()), h('span', null, 'words written')),
     h('div', { class: 'stat' }, ideaCount, h('span', null, 'ideas waiting')))));
+  return { el };
+}
+
+/* ------------------------------------------------- streaming services */
+const LIVE = [['onSpotify', 'On Spotify'], ['onApple', 'On Apple Music']];
+
+async function syncStreams(after) {
+  const set = app.state.settings;
+  if (!set.appleUrl && !set.spotifyUrl) { toast('Add your artist links in Settings first', true); location.hash = '#/settings'; return; }
+  toast('Checking Spotify and Apple Music');
+  let r;
+  try { r = await api('/api/streams/sync', { method: 'POST', body: { today: localToday() } }); } catch (e) { return fail(e); }
+  await app.reload();
+  if (after) after();
+  const changed = r.matched.filter((m) => m.filled.length);
+  const open = app.state.songs.filter((s) => !r.matched.some((m) => m.id === s.id));
+  const body = h('div', { class: 'stack' },
+    h('p', null, `Found ${r.counts.apple} ${r.counts.apple === 1 ? 'song' : 'songs'} on Apple Music and ${r.counts.spotify} on Spotify. ${r.matched.length} matched songs in your notebook.`),
+    r.notes.map((n) => h('p', { class: 'small warn' }, n)),
+    r.haveSpotify && !r.spotifyFull ? h('p', { class: 'small mute' }, 'Without a Spotify key, only your current top tracks on Spotify can be checked. Add a key in Settings to check every song, or paste a Spotify link on a song\u2019s Release tab.') : null,
+    !r.haveApple ? h('p', { class: 'small mute' }, 'Add your Apple Music artist link in Settings to check every song there and fill in release dates and cover art.') : null,
+    changed.length ? h('div', null, h('h3', null, 'Updated'), h('ul', { class: 'plain' }, changed.map((m) => h('li', null, h('b', null, m.title), ': ' + m.filled.join(', '))))) : null);
+  if (r.unmatched.length) {
+    const rows = r.unmatched.map((t) => {
+      const pick = h('select', { class: 'input' }, h('option', { value: '' }, 'Leave it'), h('option', { value: 'new' }, 'Add as a new song'), open.map((s) => h('option', { value: s.id }, 'It is: ' + s.title)));
+      return { t, pick, el: h('label', { class: 'field' }, h('span', null, `${t.title}${t.date ? ' (' + day(t.date) + ')' : ''}, on ${[t.apple && 'Apple Music', t.spotify && 'Spotify'].filter(Boolean).join(' and ')}`), pick) };
+    });
+    body.append(h('div', { class: 'stack' }, h('h3', null, 'Not matched to a song in your notebook'), rows.map((x) => x.el)));
+    const ok = await dialog({ title: 'Spotify and Apple Music', body, wide: true, buttons: [{ label: 'Close', value: false, kind: 'ghost' }, { label: 'Apply choices', value: true, kind: 'primary' }] });
+    if (!ok) return;
+    let n = 0;
+    for (const x of rows) {
+      if (!x.pick.value) continue;
+      try { await api('/api/streams/link', { method: 'POST', body: { song: x.pick.value, track: x.t, today: localToday() } }); n++; } catch (e) { fail(e); }
+    }
+    if (n) { await app.reload(); if (after) after(); toast(`Updated ${n} ${n === 1 ? 'song' : 'songs'}`); }
+  } else await dialog({ title: 'Spotify and Apple Music', body, wide: true });
+}
+
+/* -------------------------------------------------------------- calendar */
+function suggestBox(full) {
+  const sg = app.state.suggest;
+  if (!sg) return null;
+  return h('section', { class: 'sect suggest' }, h('h2', null, 'Next release date'),
+    h('p', { class: 'bigdate' }, longDay(sg.date)),
+    h('ul', { class: 'plain small' }, (full ? sg.reasons : sg.reasons.slice(1, 2)).map((r) => h('li', null, r))),
+    full ? h('div', { class: 'row' }, sg.alternates.map((a) => h('span', { class: 'small mute' }, h('b', null, a.label + ': '), longDay(a.date) + '. ' + a.note))) : h('a', { class: 'small', href: '#/calendar' }, 'Open the calendar'),
+    full ? h('p', { class: 'small mute' }, 'This follows common advice for independent releases. It moves by itself whenever you schedule or release a song. Change the gap between releases in Settings. Spotify and Apple do not publish how their recommendations work, so treat it as a sensible default, not a guarantee.') : null);
+}
+
+function calendarView() {
+  const el = h('div', { class: 'page' });
+  const today = localToday();
+  let month = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
+  const title = h('h1');
+  const grid = h('div', { class: 'cal' });
+  const list = h('div', { class: 'list' });
+
+  async function schedule(dateStr) {
+    const open = app.state.songs.filter((s) => s.status !== 'released' && s.status !== 'shelved');
+    if (!open.length) return toast('No unreleased songs to schedule', true);
+    const pick = h('select', { class: 'input' }, open.map((s) => h('option', { value: s.id }, s.title + (s.releaseDate ? ' (now ' + day(s.releaseDate) + ')' : ''))));
+    const ok = await dialog({ title: longDay(dateStr), body: h('label', { class: 'field' }, h('span', null, 'Schedule this song for release on this day'), pick),
+      buttons: [{ label: 'Cancel', value: false, kind: 'ghost' }, { label: 'Schedule', value: true, kind: 'primary' }] });
+    if (!ok) return;
+    try { await api('/api/songs/' + pick.value, { method: 'PUT', body: { releaseDate: dateStr, status: 'scheduled' } }); await app.reload(); draw(); toast('Scheduled'); } catch (e) { fail(e); }
+  }
+
+  async function draw() {
+    const y = month.getFullYear(), m = month.getMonth();
+    title.textContent = month.toLocaleDateString(undefined, { month: 'long', year: 'numeric' });
+    const start = new Date(y, m, 1 - new Date(y, m, 1).getDay());
+    const days = [];
+    for (let i = 0; i < 42; i++) days.push(new Date(start.getFullYear(), start.getMonth(), start.getDate() + i));
+    if (days[35].getMonth() !== m) days.length = 35;
+    let events = [];
+    try { events = (await api(`/api/calendar?from=${ymd(days[0])}&to=${ymd(days[days.length - 1])}`)).events; } catch (e) { /* the calendar still works without them */ }
+    const sg = app.state.suggest;
+    const cells = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((d) => h('div', { class: 'cal-head' }, d));
+    const rows = [];
+    for (const d of days) {
+      const ds = ymd(d);
+      const songs = app.state.songs.filter((s) => s.releaseDate === ds && s.status !== 'shelved');
+      const ev = events.filter((e) => e.date === ds);
+      const suggested = sg && sg.date === ds && !songs.length;
+      cells.push(h('div', { class: 'cal-day' + (d.getMonth() !== m ? ' out' : '') + (ds === today ? ' today' : '') + (suggested ? ' suggested' : ''), role: 'button', tabindex: 0, 'aria-label': longDay(ds),
+        onclick: (e) => { if (!e.target.closest('a')) schedule(ds); }, onkeydown: (e) => { if (e.key === 'Enter') schedule(ds); } },
+        h('span', { class: 'num' }, d.getDate()),
+        songs.map((s) => h('a', { class: 'cal-song', href: `#/song/${s.id}/release`, dataset: { s: s.status === 'released' ? 'released' : 'scheduled' }, title: s.title }, s.title)),
+        ev.map((e) => h('span', { class: 'cal-event', title: e.name }, e.name)),
+        suggested ? h('span', { class: 'cal-suggest' }, 'Suggested') : null));
+      if (d.getMonth() === m) {
+        for (const s of songs) rows.push(h('a', { class: 'item', href: `#/song/${s.id}/release` }, coverEl(s), h('div', { class: 'grow' }, h('div', { class: 't' }, s.title), h('div', { class: 's' }, longDay(ds))), h('span', { class: 'status', dataset: { s: s.status } }, STATUS_LABEL[s.status])));
+        for (const e of ev) rows.push(h('div', { class: 'item' }, h('div', { class: 'grow' }, h('div', { class: 's' }, e.name + ', ' + longDay(ds)))));
+      }
+    }
+    grid.replaceChildren(...cells);
+    list.replaceChildren(...(rows.length ? rows : [h('p', { class: 'mute' }, 'Nothing is scheduled this month. Pick a day to schedule a song.')]));
+  }
+  const move = (n) => { month = new Date(month.getFullYear(), month.getMonth() + n, 1); draw(); };
+  el.append(h('div', { class: 'pagehead' }, h('div', { class: 'grow' }, title),
+      h('button', { class: 'btn', type: 'button', onclick: () => move(-1) }, 'Earlier'),
+      h('button', { class: 'btn', type: 'button', onclick: () => { month = new Date(new Date().getFullYear(), new Date().getMonth(), 1); draw(); } }, 'Today'),
+      h('button', { class: 'btn', type: 'button', onclick: () => move(1) }, 'Later'),
+      app.state.suggest ? h('button', { class: 'btn', type: 'button', onclick: () => { const d = new Date(app.state.suggest.date + 'T12:00:00'); month = new Date(d.getFullYear(), d.getMonth(), 1); draw(); } }, 'Go to suggested date') : null),
+    grid, h('section', { class: 'sect' }, h('h2', null, 'This month'), list), suggestBox(true));
+  draw();
   return { el };
 }
 
@@ -138,12 +261,13 @@ function songsView() {
     const counts = {};
     for (const s of songs) counts[s.status] = (counts[s.status] || 0) + 1;
     chips.replaceChildren(h('button', { class: 'chip', type: 'button', 'aria-pressed': String(filter === 'all'), onclick: () => { filter = 'all'; draw(); } }, 'All', h('span', { class: 'n' }, songs.length)),
-      app.state.statuses.filter((s) => counts[s]).map((s) => h('button', { class: 'chip', type: 'button', 'aria-pressed': String(filter === s), onclick: () => { filter = s; draw(); } }, STATUS_LABEL[s], h('span', { class: 'n' }, counts[s]))));
+      ...app.state.statuses.filter((s) => counts[s]).map((s) => h('button', { class: 'chip', type: 'button', 'aria-pressed': String(filter === s), onclick: () => { filter = s; draw(); } }, STATUS_LABEL[s], h('span', { class: 'n' }, counts[s]))),
+      ...LIVE.filter(([k]) => songs.some((x) => x[k])).map(([k, label]) => h('button', { class: 'chip', type: 'button', 'aria-pressed': String(filter === k), onclick: () => { filter = k; draw(); } }, label, h('span', { class: 'n' }, songs.filter((x) => x[k]).length))));
     if (!songs.length) {
       return grid.replaceChildren(h('div', { class: 'empty' }, h('h2', null, 'No songs yet'), h('p', null, 'Every song gets its own page for lyrics, notes, takes and its release.'),
         h('div', { class: 'row' }, h('button', { class: 'btn primary', type: 'button', onclick: () => newSong() }, 'Start a song'))));
     }
-    let list = songs.filter((s) => filter === 'all' || s.status === filter);
+    let list = songs.filter((s) => filter === 'all' || s.status === filter || s[filter] === true || (filter === 'offline' && s.status === 'released' && !s.onSpotify && !s.onApple));
     const lines = new Map();
     if (hits) { for (const x of hits) lines.set(x.id, x.lines); list = list.filter((s) => lines.has(s.id)); }
     list.sort((a, b) => (a.updated < b.updated ? 1 : -1));
@@ -152,9 +276,10 @@ function songsView() {
       coverEl(s),
       h('div', { class: 't' }, s.title),
       hits && lines.get(s.id) && lines.get(s.id).length ? h('div', { class: 'small mute' }, lines.get(s.id)[0]) : null,
-      h('div', { class: 'meta' }, h('span', { class: 'status', dataset: { s: s.status } }, STATUS_LABEL[s.status]), h('span', null, s.releaseDate ? day(s.releaseDate) : ago(s.updated)))))));
+      h('div', { class: 'meta' }, h('span', { class: 'status', dataset: { s: s.status } }, STATUS_LABEL[s.status]), h('span', null, s.releaseDate ? day(s.releaseDate) : ago(s.updated))),
+      s.onSpotify || s.onApple ? h('div', { class: 'live' }, s.onSpotify ? h('span', { class: 'pill spotify' }, 'Spotify') : null, s.onApple ? h('span', { class: 'pill apple' }, 'Apple Music') : null) : null))));
   }
-  el.append(h('div', { class: 'pagehead' }, h('div', { class: 'grow' }, h('h1', null, 'Songs')), h('button', { class: 'btn primary', type: 'button', onclick: () => newSong() }, 'New song')),
+  el.append(h('div', { class: 'pagehead' }, h('div', { class: 'grow' }, h('h1', null, 'Songs')), h('button', { class: 'btn', type: 'button', onclick: () => syncStreams(draw) }, 'Sync Spotify and Apple Music'), h('button', { class: 'btn primary', type: 'button', onclick: () => newSong() }, 'New song')),
     h('div', { class: 'row' }, search), chips, grid);
   chips.style.margin = '16px 0 24px';
   draw();
@@ -296,6 +421,11 @@ function settingsView() {
     catch (err) { fail(err); }
   } });
   const field = (label, node, hint) => h('label', { class: 'field' }, h('span', null, label), node, hint ? h('span', { class: 'small' }, hint) : null);
+  const streamInput = (key, placeholder) => h('input', { class: 'input', value: s[key] || '', placeholder, autocomplete: 'off', spellcheck: 'false', oninput: (e) => saveSettings({ [key]: e.target.value }) });
+  const cadence = h('select', { class: 'input', onchange: async (e) => { try { app.state.settings = await api('/api/settings', { method: 'PUT', body: { cadenceWeeks: +e.target.value } }); await app.reload(); toast('Saved'); } catch (err) { fail(err); } } },
+    [2, 3, 4, 6, 8].map((n) => h('option', { value: n }, `A new song every ${n} weeks`)));
+  cadence.value = String(s.cadenceWeeks || 4);
+  cadence.style.maxWidth = '280px';
 
   el.append(
     h('div', { class: 'pagehead' }, h('h1', null, 'Settings')),
@@ -303,6 +433,18 @@ function settingsView() {
     h('section', { class: 'sect stack' }, h('h2', null, 'Writing'),
       field('Character limit for lyrics', limit, 'The sheet warns you when lyrics run past this. AI music tools often cap lyrics at around 3,000 characters. Use 0 for no limit.'),
       field('Artist name', artist)),
+    h('section', { class: 'sect stack' }, h('h2', null, 'Spotify and Apple Music'),
+      h('p', { class: 'mute' }, 'Paste the links to your artist pages. Sync then finds your songs on each service, marks the ones that are live, and fills in links, release dates and missing cover art. It only runs when you press Sync, and only your public artist ids are sent.'),
+      field('Apple Music artist link', streamInput('appleUrl', 'https://music.apple.com/us/artist/...')),
+      field('Spotify artist link', streamInput('spotifyUrl', 'https://open.spotify.com/artist/...')),
+      h('details', null, h('summary', null, 'Optional: a Spotify key, to check every song on Spotify'),
+        h('div', { class: 'stack' },
+          h('p', { class: 'small mute' }, 'Without a key, only your current top tracks on Spotify can be seen. A free key from developer.spotify.com (create an app, then copy its Client ID and Client secret) lets Sync see all of them. The secret is kept on your Umbrel and is left out of backups.'),
+          field('Client ID', streamInput('spotifyClientId', '')),
+          field('Client secret', h('input', { class: 'input mono', type: 'password', autocomplete: 'off', placeholder: s.spotifyKeySaved ? 'Saved. Type to replace it.' : '', oninput: (e) => saveSettings({ spotifyClientSecret: e.target.value }) })))),
+      h('div', { class: 'row' }, h('button', { class: 'btn', type: 'button', onclick: () => syncStreams() }, 'Sync now'), h('span', { class: 'small mute' }, s.lastSync ? 'Last synced ' + ago(s.lastSync) : 'Not synced yet'))),
+    h('section', { class: 'sect stack' }, h('h2', null, 'Release planning'),
+      field('Gap between releases', cadence, 'Used for the suggested next release date on the Desk and the Calendar.')),
     h('section', { class: 'sect stack' }, h('h2', null, 'Release checklist for new songs'), field('One step per line', checklist, 'Songs you already have keep their own checklists.')),
     h('section', { class: 'sect stack' }, h('h2', null, 'Bring lyrics in'),
       h('p', { class: 'mute' }, 'Pick one or more plain text files. Each file becomes a song named after the file. To move from another writing app, export or copy each lyric to a .txt file first.'),
@@ -312,7 +454,7 @@ function settingsView() {
       h('div', { class: 'row' }, h('a', { class: 'btn', href: '/api/backup', download: '' }, 'Download backup'), h('a', { class: 'btn', href: '/api/export/lyrics.txt', download: '' }, 'Download all lyrics'), restorePick, h('button', { class: 'btn', type: 'button', onclick: () => restorePick.click() }, 'Restore from a backup'))),
     h('section', { class: 'sect' }, h('h2', null, 'About the word tools'), h('div', { class: 'credits' },
       h('p', null, 'Rhymes and syllables come from the CMU Pronouncing Dictionary. Meanings and synonyms come from Princeton WordNet. Word families come from the Moby Thesaurus, which is in the public domain. Commonness ranking uses SCOWL word lists. The Bible text is the King James Version.'),
-      h('p', null, 'The figures of speech are a short hand-picked list, and there is no pop-culture dictionary. Nothing you type is sent anywhere.'),
+      h('p', null, 'The figures of speech are a short hand-picked list, and there is no pop-culture dictionary. Nothing you write is sent anywhere. The only time the app goes online is when you press Sync for Spotify and Apple Music.'),
       h('p', null, 'Studio Notebook is an independent hobby project. It is not affiliated with MasterWriter, Suno, DistroKid, Spotify, Apple or Umbrel.'))));
   for (const sec of el.querySelectorAll('section > h2')) sec.style.marginBottom = '12px';
   return { el };
@@ -326,6 +468,7 @@ async function route() {
   let key = parts[0] || 'desk', view;
   if (key === 'song' && parts[1]) { view = await songView(app, parts[1], parts[2]); key = 'songs'; }
   else if (key === 'songs') view = songsView();
+  else if (key === 'calendar') view = calendarView();
   else if (key === 'ideas') view = ideasView();
   else if (key === 'words') view = wordsView(parts.slice(1).join('/'));
   else if (key === 'collections') view = collectionsView();
