@@ -4,7 +4,7 @@ storage:
   dataRoot: data
 category: media
 name: Disc Ripper
-version: "0.4.1"
+version: "0.4.2"
 tagline: "Pop in a DVD and walk away. It rips, names it for Jellyfin and ejects."
 description: >-
   Plug a USB DVD drive into your Umbrel, put a disc in, and walk away. Disc Ripper notices the disc, works out whether it is a movie
