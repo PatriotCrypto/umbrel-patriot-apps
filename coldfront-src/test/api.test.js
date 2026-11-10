@@ -260,3 +260,11 @@ test('weather module turns an Open-Meteo reply into a small summary and survives
   const b = await w.get(loc);
   assert.equal(b.stale, true); assert.equal(b.now.temp, 41.2);
 });
+
+test('reconnect is refused in demo mode', async () => {
+  const t = await boot();
+  try {
+    const r = await t.j('/api/reconnect', 'POST', {});
+    assert.equal(r.status, 409);
+  } finally { t.close(); }
+});

@@ -38,7 +38,8 @@ class ZWaveAdapter extends EventEmitter {
     // is not mistaken for a silent device, and so mode/setpoint changes made at the wall are noticed quickly.
     clearInterval(this._pollTimer);
     this._pollTimer = setInterval(() => this._pollThermostat().catch(() => {}), this.pollMs || 4 * 60000);
-    setTimeout(() => this._pollThermostat().catch(() => {}), 20000);
+    this._pollTimer.unref?.();
+    setTimeout(() => this._pollThermostat().catch(() => {}), 20000).unref?.();
   }
 
   stop() {
@@ -67,6 +68,9 @@ class ZWaveAdapter extends EventEmitter {
     } finally { this._polling = false; }
   }
 
+  /** Drop the connection and start over (the Reconnect button). */
+  reconnect() { this.stop(); this._backoff = 2000; this.error = 'Reconnecting'; this.start(); }
+
   setPreferredNode(id) { this.preferred = id ? Number(id) : null; }
 
   _connect() {
@@ -77,8 +81,11 @@ class ZWaveAdapter extends EventEmitter {
     } catch (e) { this.error = e.message; this._reconnect(); return; }
     this.ws.onopen = () => {
       this.error = 'Connected, loading nodes';
-      this._send('start_listening', {}, 15000).then((res) => { this._load(res); this.connected = true; this.error = null; this._backoff = 2000; this.emit('update'); })
-        .catch((e) => { this.error = `Could not load Z-Wave state: ${e.message}`; });
+      // Z-Wave JS UI accepts connections before its driver has finished opening the stick, so the first request can fail or
+      // stall during an app restart or update. Don't sit on a half-open socket: drop it and try again shortly.
+      const sock = this.ws;
+      this._send('start_listening', {}, 30000).then((res) => { this._load(res); this.connected = true; this.error = null; this._backoff = 2000; this.emit('update'); })
+        .catch((e) => { this.error = `Could not load Z-Wave state (${e.message}), retrying`; try { sock.close(); } catch { /* ignore */ } });
     };
     this.ws.onmessage = (ev) => { try { this._onMessage(JSON.parse(typeof ev.data === 'string' ? ev.data : String(ev.data))); } catch { /* ignore bad frame */ } };
     this.ws.onerror = () => { if (!this.connected) this.error = `Cannot reach the Z-Wave JS server at ${this.url}. Is the Z-Wave JS UI container running with its WS server turned on?`; };
@@ -96,7 +103,7 @@ class ZWaveAdapter extends EventEmitter {
     clearTimeout(this._retry);
     this._retry = setTimeout(() => this._connect(), this._backoff);
     this._retry.unref?.();
-    this._backoff = Math.min(this._backoff * 2, 60000);
+    this._backoff = Math.min(this._backoff * 2, 15000);
   }
 
   _send(command, args = {}, timeout = 10000) {

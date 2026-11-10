@@ -152,3 +152,23 @@ test('a node with only a binary water sensor also counts, and room sensors are n
   assert.equal(snap.leaks.length, 1);
   assert.ok(snap.sensors.some((s) => s.nodeId === 7));
 });
+
+test('a failed first load (Z-Wave JS still opening the stick) drops the socket and reconnects on its own', async () => {
+  const sockets = [];
+  class WS {
+    constructor() { this.readyState = 1; this.sent = []; sockets.push(this); setImmediate(() => this.onopen?.()); }
+    send(s) {
+      const m = JSON.parse(s); this.sent.push(m);
+      // first socket: server says the driver is not ready; second socket: success
+      setImmediate(() => this.onmessage?.({ data: JSON.stringify(sockets.length === 1 ? { type: 'result', messageId: m.messageId, success: false, errorCode: 'driver_not_ready' } : { type: 'result', messageId: m.messageId, success: true, result: STATE }) }));
+    }
+    close() { this.readyState = 3; setImmediate(() => this.onclose?.()); }
+  }
+  const a = new ZWaveAdapter({ url: 'ws://x', WebSocketImpl: WS });
+  a._backoff = 10;
+  a.start();
+  await new Promise((r) => setTimeout(r, 400));
+  assert.equal(sockets.length >= 2, true, 'tried again');
+  assert.equal(a.connected, true);
+  a.stop();
+});

@@ -13,7 +13,7 @@ const { classify } = require('./lib/classify');
 const META = require('./lib/meta');
 const DRV = require('./lib/drive');
 
-const VERSION = '0.4.0';
+const VERSION = '0.4.1';
 const PORT = parseInt(process.env.PORT || '3000', 10);
 const DATA_DIR = path.resolve(process.env.DATA_DIR || '/data');
 const ROOTS = [
@@ -253,7 +253,8 @@ function startJob(dev, st, key) {
     const canceled = fmtErr(e) === 'canceled';
     job.error = job.error || (canceled ? 'Stopped.' : fmtErr(e)); setStage(job, 'error', '');
     addHistory({ label: job.label, kind: job.kind || '', name: job.name || '', status: canceled ? 'skipped' : 'error', error: job.error });
-    if (settings.eject) await ejectDisc(job);
+    // After a problem the disc stays in the drive: the person chooses Try again or Eject. Only a Stop they pressed ejects.
+    if (canceled && settings.eject) await ejectDisc(job);
     if (!canceled) notifyJob(job, 'error');
   });
 }
@@ -355,6 +356,14 @@ async function identify(job, cls) {
       list.push({ titleId: t.id, name, matched: !!r.match, named: !!(r.match || own), poster: r.match ? r.match.poster || '' : '', candidates: r.candidates.slice(0, 5) });
     }
     sug.movies = list; sug.titleIds = list.map((m) => m.titleId); sug.confident = allSure;
+    // Two titles that resolved to the same movie (an alternate cut, an extended version): never guess, ask which to rip.
+    const counts = new Map(); for (const m of list) { const k = m.name.toLowerCase(); counts.set(k, (counts.get(k) || 0) + 1); }
+    if (list.some((m) => m.name && counts.get(m.name.toLowerCase()) > 1)) {
+      const longest = [...cls.movies].sort((a, b) => b.seconds - a.seconds)[0];
+      for (const m of list) if (m.titleId !== longest.id) m.name = '';
+      sug.titleIds = [longest.id]; sug.confident = false; sug.mustAsk = true;
+      sug.reason = `${sug.reason} Two of them matched the same movie (the shorter one is probably an alternate cut or an extra), so only the longest is ticked. Choose what to rip.`;
+    }
   } else {
     const queries = [query, ownMain].filter(Boolean);
     const r = await RES.resolveMovie(META, queries);
@@ -426,10 +435,11 @@ async function runJob(job) {
   job.suggested = await identify(job, cls);
   chk(job);
 
-  let plan;
+  let plan = null, askWhy = '';
   const unsureOk = settings.auto;
-  if (job.suggested.confident || unsureOk) {
-    if (!job.suggested.titleIds.length) throw new Error('No title on this disc looks like a movie or episode. Eject it and rip it by hand.');
+  const wantAuto = !job.suggested.mustAsk && (job.suggested.confident || unsureOk);
+  if (wantAuto && !job.suggested.titleIds.length) askWhy = 'No title on this disc clearly looks like a movie or an episode, so pick which one to rip.';
+  if (wantAuto && !askWhy) {
     plan = job.suggested.kind === 'tv'
       ? { kind: 'tv', titleIds: job.suggested.titleIds, tv: job.suggested.tv }
       : job.suggested.kind === 'movies'
@@ -451,8 +461,11 @@ async function runJob(job) {
         job.autoNote = `No good match was found online, so it was named from the disc label ("${nm}"). Check the name.`;
       }
     }
-  } else {
-    setStage(job, 'needs_confirm', 'Check the details below, then start the rip.');
+    try { await buildOutputs(plan); } catch (e) { askWhy = fmtErr(e); } // a name clash or empty name: ask, don't give up
+  }
+  if (!wantAuto || askWhy) {
+    if (askWhy) { job.suggested.reason = `${job.suggested.reason || ''} ${askWhy}`.trim(); job.autoNote = ''; }
+    setStage(job, 'needs_confirm', askWhy || 'Check the details below, then start the rip.');
     plan = await new Promise((resolve, reject) => { job.waitConfirm = resolve; job.ctl.signal.addEventListener('abort', () => reject(new Error('canceled')), { once: true }); });
     job.waitConfirm = null;
   }
@@ -616,6 +629,13 @@ app.post('/api/history/clear', wrap(async (req, res) => { history = []; saveJson
 app.post('/api/skip', wrap(async (req, res) => {
   if (!current) throw new Error('No disc to skip.');
   if (isActive(current)) current.ctl.abort(); else if (current.dev) await ejectDisc(current);
+  res.json({ ok: true });
+}));
+app.post('/api/retry', wrap(async (req, res) => {
+  if (!current || current.stage !== 'error' || current.ejected) throw new Error('Nothing to try again.');
+  const { dev, key, rawLabel, label, fsType } = current;
+  current = null; seen.delete(dev); handled.set(dev, key);
+  startJob(dev, { label: rawLabel || label, type: fsType }, key);
   res.json({ ok: true });
 }));
 app.post('/api/eject', wrap(async (req, res) => {

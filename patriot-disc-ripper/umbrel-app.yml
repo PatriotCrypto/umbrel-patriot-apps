@@ -4,7 +4,7 @@ storage:
   dataRoot: data
 category: media
 name: Disc Ripper
-version: "0.4.0"
+version: "0.4.1"
 tagline: "Pop in a DVD and walk away. It rips, names it for Jellyfin and ejects."
 description: >-
   Plug a USB DVD drive into your Umbrel, put a disc in, and walk away. Disc Ripper notices the disc, works out whether it is a movie
@@ -41,7 +41,7 @@ folderAccess:
         targetPath: /media
         readOnly: false
 releaseNotes: >-
-  New: phone notifications through ntfy. Get a message when a disc finishes ripping, when Disc Ripper needs you to confirm a name, and if something goes wrong. Optional start alert too. Works with ntfy.sh or the ntfy app on your Umbrel. Set it up in Settings, then press Send test.
+  Disc Ripper no longer cancels a rip or ejects a disc on its own. If it hits a problem, such as two titles matching the same movie (a disc with an alternate cut), a name it cannot use, or a read or rip error, it keeps the disc in the drive and asks you what to do. Name problems open the normal confirm screen with the longest title ticked. Errors now offer Try again or Eject. Only the Stop button ejects a disc mid-job.
 submitter: PatriotCrypto
 submission: https://github.com/PatriotCrypto/umbrel-patriot-apps
 dependencies: []

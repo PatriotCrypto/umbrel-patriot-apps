@@ -83,7 +83,7 @@ function renderStatus() {
   const icon = $('discIcon');
   icon.classList.toggle('spin', !!j && ['reading', 'identifying', 'ripping', 'saving'].includes(j.stage));
   icon.classList.toggle('on', !!(d && d.present) || !!j);
-  $('stopBtn').hidden = true; $('ejectBtn').hidden = true; show('jobBox', false); show('discDetails', !!j);
+  $('stopBtn').hidden = true; $('ejectBtn').hidden = true; $('retryBtn').hidden = true; show('jobBox', false); show('discDetails', !!j);
   if (j) {
     const L = [`Label: ${j.label || '(none)'}`, ...(j.rawLabel && j.rawLabel !== j.label ? [`Drive label: ${j.rawLabel}`] : []), ...(j.discName && j.discName !== j.label ? [`MakeMKV name: ${j.discName}`] : []), `Looks like: ${j.kind === 'tv' ? 'TV episodes' : j.kind === 'movies' ? 'several movies' : 'a movie'}${j.suggested && j.suggested.reason ? ' (' + j.suggested.reason + ')' : ''}`, `Saved as: ${j.name || '(not decided yet)'}`, '', `Titles found (${(j.titles || []).length}):`];
     for (const t of (j.titles || [])) L.push(`  ${t.id + 1}. ${t.durText}  ${t.sizeText}${t.chapters ? '  ' + t.chapters + ' ch' : ''}`);
@@ -97,9 +97,9 @@ function renderStatus() {
   }
   const name = j.label ? j.label.replace(/_/g, ' ') : 'Disc';
   $('stTitle').textContent = j.stage === 'done' ? 'Done: ' + (j.name || name) : STAGE_TEXT[j.stage] || j.stage;
-  $('stSub').textContent = j.stage === 'error' ? j.error : (j.stage === 'done' ? j.message : (j.message || name));
+  $('stSub').textContent = j.stage === 'error' ? j.error + (j.ejected || j.error === 'Stopped.' ? '' : ' The disc is still in the drive: press Try again, or Eject.') : (j.stage === 'done' ? j.message : (j.message || name));
   const active = ['reading', 'identifying', 'ripping', 'saving', 'needs_confirm'].includes(j.stage);
-  $('stopBtn').hidden = !active; $('ejectBtn').hidden = active || j.ejected;
+  $('stopBtn').hidden = !active; $('ejectBtn').hidden = active || j.ejected; $('retryBtn').hidden = j.stage !== 'error' || j.ejected || j.error === 'Stopped.';
   if (['ripping', 'saving', 'done'].includes(j.stage) || j.outputs.length) {
     show('jobBox');
     $('pbar').classList.toggle('done', j.stage === 'done');
@@ -216,6 +216,7 @@ $('cfGo').addEventListener('click', async () => {
 });
 $('cfSkip').addEventListener('click', async () => { try { await api('/api/skip', { method: 'POST' }); poll(); } catch (ex) { note('cfErr', ex.message); } });
 $('stopBtn').addEventListener('click', async () => { if (!confirm('Stop and eject this disc?')) return; try { await api('/api/skip', { method: 'POST' }); poll(); } catch {} });
+$('retryBtn').addEventListener('click', async () => { try { await api('/api/retry', { method: 'POST' }); poll(); } catch (ex) { $('stSub').textContent = ex.message; } });
 $('ejectBtn').addEventListener('click', async () => { try { await api('/api/eject', { method: 'POST' }); poll(); } catch (ex) { $('stSub').textContent = ex.message; } });
 
 // ---------- history ----------

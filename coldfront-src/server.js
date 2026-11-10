@@ -40,7 +40,7 @@ function createApp({ dataDir, zwaveUrl, now = () => Date.now(), simSpeed = 1, au
 
   const app = express();
   app.disable('x-powered-by');
-  app.use(express.static(path.join(__dirname, 'public'), { maxAge: '5m' }));
+  app.use(express.static(path.join(__dirname, 'public'), { maxAge: 0 }));
   app.use('/api', express.json({ limit: '200kb' }));
   // Browsers cannot send application/json cross-site without a preflight, so requiring it blocks form-post CSRF.
   app.use('/api', (req, res, next) => {
@@ -181,6 +181,13 @@ function createApp({ dataDir, zwaveUrl, now = () => Date.now(), simSpeed = 1, au
   });
   app.get('/api/weather/search', async (req, res) => {
     try { res.json({ results: await weather.search(req.query.q) }); } catch (e) { bad(res, e.message, 502); }
+  });
+
+  app.post('/api/reconnect', (req, res) => {
+    if (store.data.settings.mode !== 'live' || !zwaveUrl) return bad(res, 'Reconnect only applies in Live mode', 409);
+    getLive().reconnect();
+    store.event('settings', 'Reconnecting to the Z-Wave JS server');
+    res.json({ ok: true });
   });
 
   app.put('/api/settings', (req, res) => {

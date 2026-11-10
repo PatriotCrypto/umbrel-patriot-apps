@@ -698,8 +698,15 @@
     $('#ver').textContent = 'v' + S.version;
     var a = S.adapter;
     $('#conn').innerHTML = '<p>' + (S.mode === 'demo' ? 'Demo mode: a built-in simulator is standing in for the thermostat.' : a.connected ? 'Live: connected to the Z-Wave JS server.' : 'Live: not connected. ' + esc(a.error || '')) + '</p>';
+    $('#reconnectBtn').hidden = S.mode !== 'live';
     var mt = $('#modeToggle'); mt.textContent = S.mode === 'demo' ? 'Switch to Live' : 'Switch to Demo'; mt.disabled = S.mode === 'demo' && !S.zwaveConfigured;
   }
+  function reconnect(btn) {
+    if (btn) { btn.disabled = true; btn.textContent = 'Reconnecting…'; }
+    api('POST', '/api/reconnect', {}).then(function () { toast('Reconnecting to Z-Wave…'); setTimeout(function () { refresh().then(function () { fillSettings(true); }); }, 3500); })
+      .catch(function (e) { toast(e.message); }).then(function () { setTimeout(function () { if (btn) { btn.disabled = false; btn.textContent = 'Reconnect'; } }, 4000); });
+  }
+  $('#reconnectBtn').onclick = function () { reconnect(this); };
   $('#modeToggle').onclick = function () {
     api('PUT', '/api/settings', { mode: S.mode === 'demo' ? 'live' : 'demo' }).then(function () { toast('Switched'); return refresh(); }).then(function () { fillSettings(true); }).catch(function (e) { toast(e.message); });
   };
@@ -803,7 +810,8 @@
   // ---- polling
   function renderGlobal() {
     $('#demoBadge').hidden = S.mode !== 'demo'; $('#demoBadge2').hidden = S.mode !== 'demo'; greet();
-    $('#alerts').innerHTML = S.alerts.map(function (a) { return '<div class="alert ' + esc(a.level) + '">' + esc(a.text) + '</div>'; }).join('');
+    $('#alerts').innerHTML = S.alerts.map(function (a) { return '<div class="alert ' + esc(a.level) + '">' + esc(a.text) + (a.key === 'link' && S.mode === 'live' ? ' <button type="button" class="btn sm" data-reconnect>Reconnect</button>' : '') + '</div>'; }).join('');
+    $$('#alerts [data-reconnect]').forEach(function (b) { b.onclick = function () { reconnect(b); }; });
   }
   function refresh() {
     return api('GET', '/api/state').then(function (s) {

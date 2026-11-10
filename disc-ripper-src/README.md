@@ -7,7 +7,7 @@ Plug a USB DVD drive into your Umbrel, put a disc in, and walk away. Disc Ripper
 1. Insert a disc. The app reads its label and its list of titles.
 2. It decides whether the disc is a **movie** (one long title) or a **TV season** (several episodes of similar length, ignoring "play all" and bonus clips).
 3. It looks up the real name: movies through IMDb's public search, TV shows and episode titles through [TVmaze](https://www.tvmaze.com).
-4. If it is sure, it rips right away. If not, the status page asks you to confirm the title (or switch on automatic mode in settings to always use its best guess).
+4. If it is sure, it rips right away. If not, the status page asks you to confirm the title (or switch on automatic mode in settings to always use its best guess). If anything goes wrong, it keeps the disc in the drive and asks you what to do instead of cancelling or ejecting by itself.
 5. Files are saved and the disc is ejected:
    - Movies: `Movies / Name (Year) / Name (Year).mkv`
    - TV: `TV Shows / Show (Year) / Season 01 / Show (Year) - S01E01 - Episode Title.mkv`, and numbering continues from one disc to the next (disc 2 starts where disc 1 stopped).

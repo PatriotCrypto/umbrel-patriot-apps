@@ -49,6 +49,7 @@
         <svg class="disc" id="discIcon" viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><circle cx="24" cy="24" r="20"/><circle cx="24" cy="24" r="6"/><path d="M24 4a20 20 0 0 1 14 6" stroke-linecap="round"/></svg>
         <div class="grow"><h2 id="stTitle">Starting up</h2><p class="muted" id="stSub"></p></div>
         <button class="btn small" id="stopBtn" hidden>Stop</button>
+        <button class="btn small" id="retryBtn" hidden>Try again</button>
         <button class="btn small" id="ejectBtn" hidden>Eject</button>
       </div>
       <div id="jobBox" hidden>
@@ -99,7 +100,7 @@
         <span class="hint">Classic is the old Windows 98 style, for nostalgia. This is saved in this browser.</span></div>
       <div class="rowset"><label for="sAuto" class="lab">When a disc is hard to identify</label>
         <select id="sAuto"><option value="auto">Rip it automatically with my best guess</option><option value="ask">Ask me before ripping</option></select>
-        <span class="hint">Clear matches are always ripped without asking.</span></div>
+        <span class="hint">Clear matches are always ripped without asking. If something goes wrong, Disc Ripper stops and asks you. It never cancels or ejects a disc on its own.</span></div>
       <label class="chk"><input type="checkbox" id="sEject"> Eject the disc when it's finished</label>
       <div class="rowset"><label for="sRoot" class="lab">Library location</label><select id="sRoot"></select></div>
       <div class="two"><div class="rowset"><label for="sMovies" class="lab">Movies folder</label><input id="sMovies" type="text"></div><div class="rowset"><label for="sTv" class="lab">TV shows folder</label><input id="sTv" type="text"></div></div>
