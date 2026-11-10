@@ -51,18 +51,17 @@ across songs.
 - Four looks: Studio, Analog, Legal Pad and Midnight.
 - One hidden surprise.
 
-**Releases, Spotify and Apple Music**
+**Releases and Spotify**
 
 - A calendar of scheduled and released songs. Pick a day to schedule a song.
 - A suggested next release date: a Friday, a steady gap after your latest
   song (you choose the gap), at least three weeks away, and clear of the
   Christmas and New Year weeks and Black Friday. It is common advice for
   independent releases, not inside knowledge of anyone's algorithm.
-- Add your artist links in Settings and press Sync. Songs found on the
-  services are matched to your notebook by title, marked live, and filled in
-  with links, release dates and missing cover art. Apple Music is read from
-  Apple's public lookup service. Spotify shows only your current top tracks
-  unless you add a free Spotify API key, which lets it read all of them.
+- Add your Spotify artist link in Settings and press Sync. Songs found on
+  Spotify are matched to your notebook by title, marked live, and filled in
+  with links and release dates. Without a key it sees only your current top
+  tracks; a free Spotify API key lets it read all of them.
   Sync is the only time the app goes online.
 - The five words you use most, on the Desk.
 

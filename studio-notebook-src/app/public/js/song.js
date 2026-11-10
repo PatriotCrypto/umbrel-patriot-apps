@@ -451,9 +451,9 @@ export async function songView(app, id, tabName) {
     const suggestEl = sg && song.status !== 'released' && !song.releaseDate ? h('p', { class: 'small mute' }, `Suggested: ${nice(sg.date)}. `,
       h('button', { class: 'linkbtn', type: 'button', onclick: () => { dateInput.value = sg.date; change({ releaseDate: sg.date }); flush(); toast('Release date set'); } }, 'Use this date'), ' ',
       h('a', { href: '#/calendar' }, 'Why this date')) : null;
-    const on = [['spotify', 'Spotify', /^https:\/\/open\.spotify\.com\//], ['apple', 'Apple Music', /^https:\/\/music\.apple\.com\//]].filter(([k, , re]) => re.test(song.links[k]));
+    const on = [['spotify', 'Spotify', /^https:\/\/open\.spotify\.com\//]].filter(([k, , re]) => re.test(song.links[k]));
     const liveEl = h('div', { class: 'live' }, on.length ? on.map(([k, label]) => h('a', { class: 'pill ' + k, href: song.links[k], target: '_blank', rel: 'noopener noreferrer' }, 'Live on ' + label))
-      : h('span', { class: 'small mute' }, 'Not found on Spotify or Apple Music yet. Sync from the Songs page, or paste the links below.'));
+      : h('span', { class: 'small mute' }, 'Not found on Spotify yet. Sync from the Songs page, or paste the link below.'));
     return h('div', { class: 'two' },
       h('div', null,
         h('div', { class: 'row' }, h('h2', { class: 'grow' }, 'Release checklist'), prog), listEl, addStep,

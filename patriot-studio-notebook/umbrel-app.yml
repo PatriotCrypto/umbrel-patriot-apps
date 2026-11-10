@@ -2,7 +2,7 @@ manifestVersion: 1
 id: patriot-studio-notebook
 category: files
 name: Studio Notebook
-version: "0.2.0"
+version: "0.2.1"
 tagline: Write songs, find the right word, track every release
 icon: https://raw.githubusercontent.com/PatriotCrypto/umbrel-patriot-apps/main/patriot-studio-notebook/icon.svg
 description: >-
@@ -15,7 +15,7 @@ description: >-
   Keep the story behind each song, production notes, cover art and audio takes with the lyrics. Earlier drafts are kept automatically so you can compare them or go back. A release checklist, release date and links follow each song from first idea to release day, and an ideas page catches lines, hooks and titles before they get away.
 
 
-  A release calendar shows what is scheduled and suggests a date for your next release. If you add your Spotify and Apple Music artist links, a Sync button finds your songs there, marks the ones that are live and fills in links, dates and cover art.
+  A release calendar shows what is scheduled and suggests a date for your next release. If you add your Spotify artist link, a Sync button finds your songs there, marks the ones that are live and fills in links and dates.
 
 
   Four looks, and one hidden surprise. Your writing stays on your Umbrel. The app only goes online when you press Sync. No accounts, no subscription, no telemetry.
@@ -35,4 +35,5 @@ defaultPassword: ""
 submitter: PatriotCrypto
 submission: https://github.com/PatriotCrypto/umbrel-patriot-apps
 releaseNotes: >-
-  Rhyme colours now catch far more: long words that share an ending (particular, molecular, muscular) and near rhymes are grouped, and a word repeating itself no longer counts as a rhyme. The status filter buttons on the Songs page are fixed. New: a Pre-Chorus button, your five most used words on the Desk, a release Calendar with a suggested next release date, and a Sync button that finds your songs on Spotify and Apple Music once you add your artist links in Settings.
+  Fixes the optional Spotify key sync (Spotify removed a request it relied on), so every song in your catalogue can now be matched, not just your top 10. Apple Music tracking is removed.
+  Rhyme colours now catch far more: long words that share an ending (particular, molecular, muscular) and near rhymes are grouped, and a word repeating itself no longer counts as a rhyme. The status filter buttons on the Songs page are fixed. New: a Pre-Chorus button, your five most used words on the Desk, a release Calendar with a suggested next release date, and a Sync button that finds your songs on Spotify once you add your artist link in Settings.

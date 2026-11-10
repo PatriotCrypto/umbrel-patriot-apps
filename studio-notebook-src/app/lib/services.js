@@ -1,8 +1,7 @@
 'use strict';
 /*
- * Looks up the artist's songs on Apple Music and Spotify so the notebook can show which are live.
- * Only runs when Sync is pressed. It sends nothing but the artist's public ids.
- *  - Apple Music: the public iTunes lookup service lists every song by an artist.
+ * Looks up the artist's songs on Spotify so the notebook can show which are live.
+ * Only runs when Sync is pressed. It sends nothing but the artist's public id.
  *  - Spotify: with an API key (optional, from developer.spotify.com) the whole catalogue;
  *    without one, the public artist widget, which only lists the current top tracks.
  */
@@ -14,7 +13,6 @@ async function get(url, opts = {}) {
   return res;
 }
 
-const appleArtistId = (url) => { const m = /music\.apple\.com\/[^?#]*?\/artist\/(?:[^/?#]+\/)?(?:id)?(\d{5,})/.exec(String(url)) || /^\s*(\d{5,})\s*$/.exec(String(url)); return m ? m[1] : ''; };
 const spotifyArtistId = (url) => { const m = /(?:open\.spotify\.com\/(?:intl-[a-z]+\/)?(?:embed\/)?artist\/|spotify:artist:)([A-Za-z0-9]{22})/.exec(String(url)); return m ? m[1] : ''; };
 
 /* "Homesick West Virginia (feat. X) - Single" -> "homesick west virginia" */
@@ -44,18 +42,6 @@ function sameTitle(a, b) {
   return squash(x, y) || squash(y, x);
 }
 
-function parseApple(json) {
-  return (json.results || []).filter((r) => r.wrapperType === 'track' && r.kind === 'song' && r.trackName).map((r) => ({
-    title: r.trackName, album: String(r.collectionName || '').replace(/ - (Single|EP)$/i, ''),
-    apple: String(r.trackViewUrl || '').replace(/[?&]uo=\d+/, ''), date: String(r.releaseDate || '').slice(0, 10),
-    art: String(r.artworkUrl100 || '').replace(/\/\d+x\d+bb\./, '/1000x1000bb.'),
-  })).filter((t) => /^https:\/\/music\.apple\.com\//.test(t.apple));
-}
-async function appleTracks(artistId) {
-  const res = await get(`https://itunes.apple.com/lookup?id=${artistId}&entity=song&limit=200&sort=recent`);
-  return parseApple(await res.json());
-}
-
 function parseSpotifyWidget(html) {
   const m = /<script id="__NEXT_DATA__" type="application\/json">([\s\S]*?)<\/script>/.exec(html);
   if (!m) return [];
@@ -71,13 +57,15 @@ async function spotifyApiTracks(artistId, clientId, secret) {
   const tok = await (await get('https://accounts.spotify.com/api/token', { method: 'POST', body: 'grant_type=client_credentials',
     headers: { 'Content-Type': 'application/x-www-form-urlencoded', Authorization: 'Basic ' + Buffer.from(clientId + ':' + secret).toString('base64') } })).json();
   const auth = { headers: { Authorization: 'Bearer ' + tok.access_token } };
+  const step = async (what, u) => { const r = await get(u, auth); if (!r.ok) throw new Error(what + ' answered ' + r.status); return r.json(); };
   const albums = [];
   let url = `https://api.spotify.com/v1/artists/${artistId}/albums?include_groups=album,single&limit=50`;
-  for (let page = 0; url && page < 10; page++) { const j = await (await get(url, auth)).json(); albums.push(...(j.items || [])); url = j.next; }
+  for (let page = 0; url && page < 6; page++) { const j = await step('Spotify albums', url); albums.push(...(j.items || [])); url = j.next; }
   const out = [];
-  for (let i = 0; i < albums.length; i += 20) {
-    const j = await (await get('https://api.spotify.com/v1/albums?ids=' + albums.slice(i, i + 20).map((a) => a.id).join(','), auth)).json();
-    for (const al of j.albums || []) for (const t of (al.tracks && al.tracks.items) || []) {
+  /* One request per album: Spotify removed the several-albums-at-once request in 2026. */
+  for (const al of albums.slice(0, 120)) {
+    const j = await step('Spotify album tracks', `https://api.spotify.com/v1/albums/${al.id}/tracks?limit=50`);
+    for (const t of j.items || []) {
       if (!(t.artists || []).some((a) => a.id === artistId)) continue;
       out.push({ title: t.name, spotify: 'https://open.spotify.com/track/' + t.id, date: /^\d{4}-\d\d-\d\d$/.test(al.release_date) ? al.release_date : '' });
     }
@@ -85,26 +73,22 @@ async function spotifyApiTracks(artistId, clientId, secret) {
   return out;
 }
 
-/* One entry per song title, with whatever each service knows. */
-function merge(apple, spotify) {
+/* One entry per song title. */
+function merge(spotify) {
   const out = [];
-  const find = (title) => out.find((r) => sameTitle(r.title, title));
-  for (const t of apple) { const r = find(t.title); if (r) { if (t.date && (!r.date || t.date < r.date)) r.date = t.date; } else out.push({ title: t.title, album: t.album, apple: t.apple, spotify: '', date: t.date, art: t.art }); }
   for (const t of spotify) {
-    const r = find(t.title);
+    const r = out.find((x) => sameTitle(x.title, t.title));
     if (r) { if (!r.spotify) r.spotify = t.spotify; if (!r.date && t.date) r.date = t.date; }
-    else out.push({ title: t.title, album: '', apple: '', spotify: t.spotify, date: t.date, art: '' });
+    else out.push({ title: t.title, spotify: t.spotify, date: t.date });
   }
   return out;
 }
 
-/* settings: { appleUrl, spotifyUrl, spotifyClientId, spotifyClientSecret } */
+/* settings: { spotifyUrl, spotifyClientId, spotifyClientSecret } */
 async function catalogue(settings) {
   const notes = [];
-  let apple = [], spotify = [], spotifyFull = false;
-  const aid = appleArtistId(settings.appleUrl), sid = spotifyArtistId(settings.spotifyUrl);
-  if (aid) { try { apple = await appleTracks(aid); } catch (e) { notes.push('Apple Music could not be reached: ' + e.message + '.'); } }
-  else if (settings.appleUrl) notes.push('The Apple Music link does not look like an artist page.');
+  let spotify = [], spotifyFull = false;
+  const sid = spotifyArtistId(settings.spotifyUrl);
   if (sid) {
     if (settings.spotifyClientId && settings.spotifyClientSecret) {
       try { spotify = await spotifyApiTracks(sid, settings.spotifyClientId, settings.spotifyClientSecret); spotifyFull = true; }
@@ -112,16 +96,7 @@ async function catalogue(settings) {
     }
     if (!spotifyFull) { try { spotify = await spotifyWidgetTracks(sid); } catch (e) { notes.push('Spotify could not be reached: ' + e.message + '.'); } }
   } else if (settings.spotifyUrl) notes.push('The Spotify link does not look like an artist page.');
-  return { tracks: merge(apple, spotify), notes, counts: { apple: apple.length, spotify: spotify.length }, spotifyFull, haveApple: !!aid, haveSpotify: !!sid };
+  return { tracks: merge(spotify), notes, counts: { spotify: spotify.length }, spotifyFull, haveSpotify: !!sid };
 }
 
-/* Cover art is only ever fetched from Apple's image servers. */
-async function fetchArt(url) {
-  if (!/^https:\/\/[a-z0-9-]+\.mzstatic\.com\/image\/[^\s]+\.(jpg|jpeg|png)$/i.test(url)) return null;
-  const res = await get(url);
-  const buf = Buffer.from(await res.arrayBuffer());
-  if (buf.length < 1000 || buf.length > 15 * 1024 * 1024) return null;
-  return { buf, ext: /\.png$/i.test(url) ? '.png' : '.jpg' };
-}
-
-module.exports = { catalogue, merge, sameTitle, normTitle, parseApple, parseSpotifyWidget, appleArtistId, spotifyArtistId, fetchArt };
+module.exports = { catalogue, merge, sameTitle, normTitle, parseSpotifyWidget, spotifyArtistId };

@@ -133,12 +133,12 @@ function deskView() {
 }
 
 /* ------------------------------------------------- streaming services */
-const LIVE = [['onSpotify', 'On Spotify'], ['onApple', 'On Apple Music']];
+const LIVE = [['onSpotify', 'On Spotify']];
 
 async function syncStreams(after) {
   const set = app.state.settings;
-  if (!set.appleUrl && !set.spotifyUrl) { toast('Add your artist links in Settings first', true); location.hash = '#/settings'; return; }
-  toast('Checking Spotify and Apple Music');
+  if (!set.spotifyUrl) { toast('Add your Spotify artist link in Settings first', true); location.hash = '#/settings'; return; }
+  toast('Checking Spotify');
   let r;
   try { r = await api('/api/streams/sync', { method: 'POST', body: { today: localToday() } }); } catch (e) { return fail(e); }
   await app.reload();
@@ -146,18 +146,17 @@ async function syncStreams(after) {
   const changed = r.matched.filter((m) => m.filled.length);
   const open = app.state.songs.filter((s) => !r.matched.some((m) => m.id === s.id));
   const body = h('div', { class: 'stack' },
-    h('p', null, `Found ${r.counts.apple} ${r.counts.apple === 1 ? 'song' : 'songs'} on Apple Music and ${r.counts.spotify} on Spotify. ${r.matched.length} matched songs in your notebook.`),
+    h('p', null, `Found ${r.counts.spotify} ${r.counts.spotify === 1 ? 'song' : 'songs'} on Spotify. ${r.matched.length} matched in your notebook.`),
     r.notes.map((n) => h('p', { class: 'small warn' }, n)),
     r.haveSpotify && !r.spotifyFull ? h('p', { class: 'small mute' }, 'Without a Spotify key, only your current top tracks on Spotify can be checked. Add a key in Settings to check every song, or paste a Spotify link on a song\u2019s Release tab.') : null,
-    !r.haveApple ? h('p', { class: 'small mute' }, 'Add your Apple Music artist link in Settings to check every song there and fill in release dates and cover art.') : null,
     changed.length ? h('div', null, h('h3', null, 'Updated'), h('ul', { class: 'plain' }, changed.map((m) => h('li', null, h('b', null, m.title), ': ' + m.filled.join(', '))))) : null);
   if (r.unmatched.length) {
     const rows = r.unmatched.map((t) => {
       const pick = h('select', { class: 'input' }, h('option', { value: '' }, 'Leave it'), h('option', { value: 'new' }, 'Add as a new song'), open.map((s) => h('option', { value: s.id }, 'It is: ' + s.title)));
-      return { t, pick, el: h('label', { class: 'field' }, h('span', null, `${t.title}${t.date ? ' (' + day(t.date) + ')' : ''}, on ${[t.apple && 'Apple Music', t.spotify && 'Spotify'].filter(Boolean).join(' and ')}`), pick) };
+      return { t, pick, el: h('label', { class: 'field' }, h('span', null, `${t.title}${t.date ? ' (' + day(t.date) + ')' : ''}, on Spotify`), pick) };
     });
     body.append(h('div', { class: 'stack' }, h('h3', null, 'Not matched to a song in your notebook'), rows.map((x) => x.el)));
-    const ok = await dialog({ title: 'Spotify and Apple Music', body, wide: true, buttons: [{ label: 'Close', value: false, kind: 'ghost' }, { label: 'Apply choices', value: true, kind: 'primary' }] });
+    const ok = await dialog({ title: 'Spotify', body, wide: true, buttons: [{ label: 'Close', value: false, kind: 'ghost' }, { label: 'Apply choices', value: true, kind: 'primary' }] });
     if (!ok) return;
     let n = 0;
     for (const x of rows) {
@@ -165,7 +164,7 @@ async function syncStreams(after) {
       try { await api('/api/streams/link', { method: 'POST', body: { song: x.pick.value, track: x.t, today: localToday() } }); n++; } catch (e) { fail(e); }
     }
     if (n) { await app.reload(); if (after) after(); toast(`Updated ${n} ${n === 1 ? 'song' : 'songs'}`); }
-  } else await dialog({ title: 'Spotify and Apple Music', body, wide: true });
+  } else await dialog({ title: 'Spotify', body, wide: true });
 }
 
 /* -------------------------------------------------------------- calendar */
@@ -267,7 +266,7 @@ function songsView() {
       return grid.replaceChildren(h('div', { class: 'empty' }, h('h2', null, 'No songs yet'), h('p', null, 'Every song gets its own page for lyrics, notes, takes and its release.'),
         h('div', { class: 'row' }, h('button', { class: 'btn primary', type: 'button', onclick: () => newSong() }, 'Start a song'))));
     }
-    let list = songs.filter((s) => filter === 'all' || s.status === filter || s[filter] === true || (filter === 'offline' && s.status === 'released' && !s.onSpotify && !s.onApple));
+    let list = songs.filter((s) => filter === 'all' || s.status === filter || s[filter] === true || (filter === 'offline' && s.status === 'released' && !s.onSpotify));
     const lines = new Map();
     if (hits) { for (const x of hits) lines.set(x.id, x.lines); list = list.filter((s) => lines.has(s.id)); }
     list.sort((a, b) => (a.updated < b.updated ? 1 : -1));
@@ -277,9 +276,9 @@ function songsView() {
       h('div', { class: 't' }, s.title),
       hits && lines.get(s.id) && lines.get(s.id).length ? h('div', { class: 'small mute' }, lines.get(s.id)[0]) : null,
       h('div', { class: 'meta' }, h('span', { class: 'status', dataset: { s: s.status } }, STATUS_LABEL[s.status]), h('span', null, s.releaseDate ? day(s.releaseDate) : ago(s.updated))),
-      s.onSpotify || s.onApple ? h('div', { class: 'live' }, s.onSpotify ? h('span', { class: 'pill spotify' }, 'Spotify') : null, s.onApple ? h('span', { class: 'pill apple' }, 'Apple Music') : null) : null))));
+      s.onSpotify ? h('div', { class: 'live' }, h('span', { class: 'pill spotify' }, 'Spotify')) : null))));
   }
-  el.append(h('div', { class: 'pagehead' }, h('div', { class: 'grow' }, h('h1', null, 'Songs')), h('button', { class: 'btn', type: 'button', onclick: () => syncStreams(draw) }, 'Sync Spotify and Apple Music'), h('button', { class: 'btn primary', type: 'button', onclick: () => newSong() }, 'New song')),
+  el.append(h('div', { class: 'pagehead' }, h('div', { class: 'grow' }, h('h1', null, 'Songs')), h('button', { class: 'btn', type: 'button', onclick: () => syncStreams(draw) }, 'Sync Spotify'), h('button', { class: 'btn primary', type: 'button', onclick: () => newSong() }, 'New song')),
     h('div', { class: 'row' }, search), chips, grid);
   chips.style.margin = '16px 0 24px';
   draw();
@@ -433,9 +432,8 @@ function settingsView() {
     h('section', { class: 'sect stack' }, h('h2', null, 'Writing'),
       field('Character limit for lyrics', limit, 'The sheet warns you when lyrics run past this. AI music tools often cap lyrics at around 3,000 characters. Use 0 for no limit.'),
       field('Artist name', artist)),
-    h('section', { class: 'sect stack' }, h('h2', null, 'Spotify and Apple Music'),
-      h('p', { class: 'mute' }, 'Paste the links to your artist pages. Sync then finds your songs on each service, marks the ones that are live, and fills in links, release dates and missing cover art. It only runs when you press Sync, and only your public artist ids are sent.'),
-      field('Apple Music artist link', streamInput('appleUrl', 'https://music.apple.com/us/artist/...')),
+    h('section', { class: 'sect stack' }, h('h2', null, 'Spotify'),
+      h('p', { class: 'mute' }, 'Paste the link to your artist page. Sync then finds your songs on Spotify, marks the ones that are live, and fills in links and release dates. It only runs when you press Sync, and only your public artist id is sent.'),
       field('Spotify artist link', streamInput('spotifyUrl', 'https://open.spotify.com/artist/...')),
       h('details', null, h('summary', null, 'Optional: a Spotify key, to check every song on Spotify'),
         h('div', { class: 'stack' },

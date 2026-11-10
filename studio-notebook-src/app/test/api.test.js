@@ -162,24 +162,20 @@ test('titles from the services match notebook titles', () => {
   assert.ok(services.sameTitle('Mya’s Song', "Mya's Song (feat. Someone)"));
   assert.ok(!services.sameTitle('Fireproof', 'Fire'));
   assert.ok(!services.sameTitle('Till Death', 'Till Death Do Us Part'));
-  assert.strictEqual(services.appleArtistId('https://music.apple.com/us/artist/wyley/1791234567?l=en'), '1791234567');
   assert.strictEqual(services.spotifyArtistId('https://open.spotify.com/artist/4ZXoylQFyUeNq4UJEAFObg?si=abc'), '4ZXoylQFyUeNq4UJEAFObg');
-  const apple = services.parseApple({ results: [{ wrapperType: 'artist' }, { wrapperType: 'track', kind: 'song', trackName: 'No Reason', collectionName: 'No Reason - Single',
-    trackViewUrl: 'https://music.apple.com/us/album/no-reason/1?i=2&uo=4', releaseDate: '2026-05-01T07:00:00Z', artworkUrl100: 'https://is1-ssl.mzstatic.com/image/thumb/Music/x/100x100bb.jpg' }] });
-  assert.deepStrictEqual(apple[0], { title: 'No Reason', album: 'No Reason', apple: 'https://music.apple.com/us/album/no-reason/1?i=2', date: '2026-05-01', art: 'https://is1-ssl.mzstatic.com/image/thumb/Music/x/1000x1000bb.jpg' });
-  const merged = services.merge(apple, [{ title: 'No Reason', spotify: 'https://open.spotify.com/track/abc', date: '' }, { title: 'Click', spotify: 'https://open.spotify.com/track/def', date: '' }]);
+  const merged = services.merge([{ title: 'No Reason', spotify: 'https://open.spotify.com/track/abc', date: '' }, { title: 'Click', spotify: 'https://open.spotify.com/track/def', date: '' }, { title: 'No Reason (feat. X)', spotify: 'https://open.spotify.com/track/zzz', date: '' }]);
   assert.strictEqual(merged.length, 2);
   assert.strictEqual(merged[0].spotify, 'https://open.spotify.com/track/abc');
 });
 
 test('a matched track fills in a song, and the Spotify secret stays on the server', async () => {
   const made = (await call('POST', '/api/songs', { title: 'No Reason', lyrics: 'Fire fire fire and the rain\nFire in the rain again\n[Chorus]\nthe the the' })).data;
-  const linked = (await call('POST', '/api/streams/link', { song: made.id, today: '2026-11-10', track: { title: 'No Reason', spotify: 'https://open.spotify.com/track/abc123', apple: 'https://music.apple.com/us/album/x/1?i=2', date: '2026-05-01', art: 'https://evil.example/x.jpg' } })).data;
+  const linked = (await call('POST', '/api/streams/link', { song: made.id, today: '2026-11-10', track: { title: 'No Reason', spotify: 'https://open.spotify.com/track/abc123', date: '2026-05-01' } })).data;
   assert.ok(linked.filled.includes('Spotify link') && linked.filled.includes('release date') && linked.filled.includes('status'));
   await call('PUT', '/api/settings', { spotifyClientId: 'id', spotifyClientSecret: 'hush', cadenceWeeks: 6 });
   const state = (await call('GET', '/api/state?today=2026-11-10')).data;
   const song = state.songs.find((s) => s.id === made.id);
-  assert.ok(song.onSpotify && song.onApple && song.status === 'released' && !song.cover);
+  assert.ok(song.onSpotify && song.status === 'released' && !song.cover);
   assert.strictEqual(state.settings.spotifyClientSecret, undefined);
   assert.strictEqual(state.settings.spotifyKeySaved, true);
   assert.strictEqual(state.suggest.cadenceWeeks, 6);

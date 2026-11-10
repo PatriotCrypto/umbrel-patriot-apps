@@ -148,20 +148,6 @@ function lyricsText(song) {
 
 const localDay = (v) => (/^\d{4}-\d\d-\d\d$/.test(v || '') ? v : new Date().toISOString().slice(0, 10));
 
-/* Save a song's cover from Apple's artwork servers. Failure just leaves the song without a cover. */
-async function saveArt(song, url) {
-  try {
-    const art = await services.fetchArt(url);
-    if (!art) return false;
-    const name = 'cover-' + Date.now().toString(36) + art.ext;
-    const dir = path.join(store.filesDir, song.id);
-    fs.mkdirSync(dir, { recursive: true });
-    fs.writeFileSync(path.join(dir, name), art.buf);
-    song.cover = name; song.updated = new Date().toISOString(); store.save();
-    return true;
-  } catch (e) { return false; }
-}
-
 async function api(req, res, url) {
   const parts = url.pathname.split('/').filter(Boolean).slice(1);   // after "api"
   const m = req.method;
@@ -279,7 +265,7 @@ async function api(req, res, url) {
   if (parts[0] === 'streams' && parts[1] === 'sync' && m === 'POST') {
     const body = await readJson(req);
     const set = store.db.settings;
-    if (!services.appleArtistId(set.appleUrl) && !services.spotifyArtistId(set.spotifyUrl)) throw new HttpError(400, 'Add your Apple Music or Spotify artist link in Settings first.');
+    if (!services.spotifyArtistId(set.spotifyUrl)) throw new HttpError(400, 'Add your Spotify artist link in Settings first.');
     const cat = await services.catalogue(set);
     const today = localDay(body.today);
     const matched = [], unmatched = [];
@@ -287,22 +273,20 @@ async function api(req, res, url) {
       const song = store.db.songs.find((s) => services.sameTitle(s.title, t.title));
       if (!song) { unmatched.push(t); continue; }
       const filled = store.applyTrack(song.id, t, today);
-      if (!song.cover && t.art) { if (await saveArt(song, t.art)) filled.push('cover art'); }
       matched.push({ id: song.id, title: song.title, filled });
     }
     set.lastSync = new Date().toISOString(); store.save();
-    return json(res, { matched, unmatched, notes: cat.notes, counts: cat.counts, spotifyFull: cat.spotifyFull, haveApple: cat.haveApple, haveSpotify: cat.haveSpotify });
+    return json(res, { matched, unmatched, notes: cat.notes, counts: cat.counts, spotifyFull: cat.spotifyFull, haveSpotify: cat.haveSpotify });
   }
   if (parts[0] === 'streams' && parts[1] === 'link' && m === 'POST') {
     // tie a track from the services to a song the titles did not match, or add it as a new song
     const body = await readJson(req);
     const t = body.track && typeof body.track === 'object' ? body.track : {};
-    const track = { title: String(t.title || '').slice(0, 200), album: String(t.album || ''), apple: String(t.apple || ''), spotify: String(t.spotify || ''), date: String(t.date || ''), art: String(t.art || '') };
+    const track = { title: String(t.title || '').slice(0, 200), spotify: String(t.spotify || ''), date: String(t.date || '') };
     const today = localDay(body.today);
     let song = body.song === 'new' ? store.createSong({ title: track.title || 'Untitled', status: 'released' }) : store.getSong(String(body.song || ''));
     if (!song) throw new HttpError(404, 'That song is gone.');
     const filled = store.applyTrack(song.id, track, today);
-    if (!song.cover && track.art) await saveArt(song, track.art);
     return json(res, { id: song.id, filled });
   }
   if (parts[0] === 'import' && m === 'POST') {

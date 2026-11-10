@@ -39,7 +39,8 @@ class Store {
         fs.copyFileSync(this.file, this.file + '.corrupt-' + Date.now());
       }
     }
-    this.db.settings = Object.assign({ charLimit: 3000, artist: '', checklist: DEFAULT_CHECKLIST.slice(), cadenceWeeks: 4, appleUrl: '', spotifyUrl: '', spotifyClientId: '', spotifyClientSecret: '', lastSync: '' }, this.db.settings);
+    this.db.settings = Object.assign({ charLimit: 3000, artist: '', checklist: DEFAULT_CHECKLIST.slice(), cadenceWeeks: 4, spotifyUrl: '', spotifyClientId: '', spotifyClientSecret: '', lastSync: '' }, this.db.settings);
+    delete this.db.settings.appleUrl;
     this.timer = null;
   }
 
@@ -75,7 +76,7 @@ class Store {
       words: (s.lyrics.match(/[A-Za-z][A-Za-z'’]*/g) || []).length,
       chars: s.lyrics.length, first: lines.slice(0, 2).join(' / ').slice(0, 140),
       checklistDone: s.checklist.filter((c) => c.done).length, checklistTotal: s.checklist.length,
-      takes: s.audio.length, onSpotify: /^https:\/\/open\.spotify\.com\//.test(s.links.spotify), onApple: /^https:\/\/music\.apple\.com\//.test(s.links.apple),
+      takes: s.audio.length, onSpotify: /^https:\/\/open\.spotify\.com\//.test(s.links.spotify),
     };
   }
   listSongs() { return this.db.songs.map((s) => this.summary(s)); }
@@ -239,7 +240,7 @@ class Store {
     if (typeof patch.artist === 'string') s.artist = patch.artist.slice(0, 120);
     if (Array.isArray(patch.checklist)) s.checklist = patch.checklist.map((t) => str(t, 200).trim()).filter(Boolean).slice(0, 60);
     if ([2, 3, 4, 6, 8].includes(+patch.cadenceWeeks)) s.cadenceWeeks = +patch.cadenceWeeks;
-    for (const k of ['appleUrl', 'spotifyUrl', 'spotifyClientId', 'spotifyClientSecret']) if (typeof patch[k] === 'string') s[k] = patch[k].trim().slice(0, 300);
+    for (const k of ['spotifyUrl', 'spotifyClientId', 'spotifyClientSecret']) if (typeof patch[k] === 'string') s[k] = patch[k].trim().slice(0, 300);
     this.save();
     return s;
   }
@@ -276,11 +277,10 @@ class Store {
     if (!s) return null;
     const filled = [];
     if (/^https:\/\/open\.spotify\.com\/track\/[A-Za-z0-9]+$/.test(t.spotify || '') && s.links.spotify !== t.spotify) { s.links.spotify = t.spotify; filled.push('Spotify link'); }
-    if (/^https:\/\/music\.apple\.com\/\S+$/.test(t.apple || '') && s.links.apple !== t.apple) { s.links.apple = t.apple.slice(0, 400); filled.push('Apple Music link'); }
     if (/^\d{4}-\d\d-\d\d$/.test(t.date || '') && !s.releaseDate) { s.releaseDate = t.date; filled.push('release date'); }
     if (t.album && !s.project && t.album.toLowerCase() !== s.title.toLowerCase()) { s.project = str(t.album, 120); filled.push('project'); }
     const out = !s.releaseDate || s.releaseDate <= today;
-    if ((s.links.spotify || s.links.apple) && out && s.status !== 'released') { s.status = 'released'; filled.push('status'); }
+    if (s.links.spotify && out && s.status !== 'released') { s.status = 'released'; filled.push('status'); }
     if (filled.length) { s.updated = now(); this.save(); }
     return filled;
   }
