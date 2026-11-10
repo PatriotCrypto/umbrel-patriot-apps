@@ -2,7 +2,7 @@ manifestVersion: 1
 id: patriot-studio-notebook
 category: files
 name: Studio Notebook
-version: "0.2.1"
+version: "0.2.2"
 tagline: Write songs, find the right word, track every release
 icon: https://raw.githubusercontent.com/PatriotCrypto/umbrel-patriot-apps/main/patriot-studio-notebook/icon.svg
 description: >-
@@ -35,5 +35,5 @@ defaultPassword: ""
 submitter: PatriotCrypto
 submission: https://github.com/PatriotCrypto/umbrel-patriot-apps
 releaseNotes: >-
-  Fixes the optional Spotify key sync (Spotify removed a request it relied on), so every song in your catalogue can now be matched, not just your top 10. Apple Music tracking is removed.
+  Fixes the optional Spotify key sync, so every song in your catalogue can be matched, not just your top 10: Spotify removed one request and now allows only 10 results per page. Apple Music tracking is removed.
   Rhyme colours now catch far more: long words that share an ending (particular, molecular, muscular) and near rhymes are grouped, and a word repeating itself no longer counts as a rhyme. The status filter buttons on the Songs page are fixed. New: a Pre-Chorus button, your five most used words on the Desk, a release Calendar with a suggested next release date, and a Sync button that finds your songs on Spotify once you add your artist link in Settings.

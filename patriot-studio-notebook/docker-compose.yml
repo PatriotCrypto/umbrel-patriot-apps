@@ -7,7 +7,7 @@ services:
       APP_PORT: 3983
 
   web:
-    image: ghcr.io/patriotcrypto/studio-notebook:0.2.1@sha256:834bd8a1bbbbf21a162c863971b0c55f61883ea01929bfa55daf1b573ba6f806
+    image: ghcr.io/patriotcrypto/studio-notebook:0.2.2@sha256:c1cd132ee82195a723a734c1eaaf4fa60b73a71e4fb53f5110fcf6db5cd44926
     user: "1000:1000"
     init: true
     restart: on-failure

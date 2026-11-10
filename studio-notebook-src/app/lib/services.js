@@ -57,15 +57,26 @@ async function spotifyApiTracks(artistId, clientId, secret) {
   const tok = await (await get('https://accounts.spotify.com/api/token', { method: 'POST', body: 'grant_type=client_credentials',
     headers: { 'Content-Type': 'application/x-www-form-urlencoded', Authorization: 'Basic ' + Buffer.from(clientId + ':' + secret).toString('base64') } })).json();
   const auth = { headers: { Authorization: 'Bearer ' + tok.access_token } };
-  const step = async (what, u) => { const r = await get(u, auth); if (!r.ok) throw new Error(what + ' answered ' + r.status); return r.json(); };
-  const albums = [];
-  let url = `https://api.spotify.com/v1/artists/${artistId}/albums?include_groups=album,single&limit=50`;
-  for (let page = 0; url && page < 6; page++) { const j = await step('Spotify albums', url); albums.push(...(j.items || [])); url = j.next; }
+  /* Spotify lowered page sizes for newer apps without notice (50 became 10 on artist albums),
+     so ask for small pages, follow "next", and name the request that failed. */
+  const step = async (what, u) => { try { return await (await get(u, auth)).json(); } catch (e) { throw new Error(what + ': ' + e.message); } };
+  const pages = async (what, base, max) => {
+    const items = [];
+    let url = base + (base.includes('?') ? '&' : '?') + 'limit=10';
+    for (let n = 0; url && n < max; n++) {
+      let j;
+      try { j = await step(what, url); }
+      catch (e) { if (n) throw e; j = await step(what, base); } // first page refused: try Spotify's own default size
+      items.push(...(j.items || []));
+      url = j.next;
+    }
+    return items;
+  };
+  const albums = await pages('albums', `https://api.spotify.com/v1/artists/${artistId}/albums?include_groups=album,single`, 40);
   const out = [];
   /* One request per album: Spotify removed the several-albums-at-once request in 2026. */
-  for (const al of albums.slice(0, 120)) {
-    const j = await step('Spotify album tracks', `https://api.spotify.com/v1/albums/${al.id}/tracks?limit=50`);
-    for (const t of j.items || []) {
+  for (const al of albums.slice(0, 150)) {
+    for (const t of await pages('album tracks', `https://api.spotify.com/v1/albums/${al.id}/tracks`, 10)) {
       if (!(t.artists || []).some((a) => a.id === artistId)) continue;
       out.push({ title: t.name, spotify: 'https://open.spotify.com/track/' + t.id, date: /^\d{4}-\d\d-\d\d$/.test(al.release_date) ? al.release_date : '' });
     }
