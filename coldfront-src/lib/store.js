@@ -19,6 +19,7 @@ const DEFAULTS = () => ({
     roomAware: { enabled: false, roomId: null, maxOffset: 3 },
     dashboard: null, // null = default widget layout; otherwise [{id, size:'2x3'}] in display order
     filter: { name: 'Furnace filter', lastChanged: null, intervalDays: 90, remindDaysBefore: 7 }, // set by hand
+    weather: { lat: null, lon: null, name: '' }, // optional, for the Weather widget (Open-Meteo)
     ntfy: { enabled: false, server: 'https://ntfy.sh', topic: '', token: '', triggers: DEFAULT_TRIGGERS() },
   },
   notifyState: {}, // what has already been announced, so a restart does not repeat it

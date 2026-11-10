@@ -5,6 +5,7 @@ const express = require('express');
 const { Store } = require('./lib/store');
 const { Engine } = require('./lib/engine');
 const { ZWaveAdapter } = require('./lib/zwave');
+const { Weather } = require('./lib/weather');
 const { SimAdapter, seedDemoHistory } = require('./lib/sim');
 const { summarize } = require('./lib/insights');
 const { validateSchedule, wallSchedule, DAYS, clampPair, dateKey } = require('./lib/schedule');
@@ -172,6 +173,16 @@ function createApp({ dataDir, zwaveUrl, now = () => Date.now(), simSpeed = 1, au
     } catch (e) { bad(res, e.message); }
   });
 
+  const weather = new Weather();
+  app.get('/api/weather', async (req, res) => {
+    const w = store.data.settings.weather;
+    if (!w || w.lat == null) return res.json({ configured: false });
+    try { res.json({ configured: true, ...(await weather.get(w)) }); } catch (e) { res.json({ configured: true, error: e.message }); }
+  });
+  app.get('/api/weather/search', async (req, res) => {
+    try { res.json({ results: await weather.search(req.query.q) }); } catch (e) { bad(res, e.message, 502); }
+  });
+
   app.put('/api/settings', (req, res) => {
     const b = req.body || {};
     const s = store.data.settings;
@@ -197,6 +208,14 @@ function createApp({ dataDir, zwaveUrl, now = () => Date.now(), simSpeed = 1, au
       if (typeof n.token === 'string' && n.token.trim()) s.ntfy.token = n.token.trim().slice(0, 200);
       if (n.clearToken) s.ntfy.token = '';
       if (n.triggers && typeof n.triggers === 'object') for (const k of Object.keys(TRIGGERS)) if (k in n.triggers) s.ntfy.triggers[k] = !!n.triggers[k];
+    }
+    if (b.weather !== undefined) {
+      if (b.weather === null) s.weather = { lat: null, lon: null, name: '' };
+      else {
+        const lat = num(b.weather.lat), lon = num(b.weather.lon);
+        if (lat == null || lon == null || Number.isNaN(lat) || Number.isNaN(lon) || Math.abs(lat) > 90 || Math.abs(lon) > 180) return bad(res, 'weather location must be a latitude and longitude');
+        s.weather = { lat: Math.round(lat * 1000) / 1000, lon: Math.round(lon * 1000) / 1000, name: String(b.weather.name || '').trim().slice(0, 60) };
+      }
     }
     if (b.name !== undefined) s.name = String(b.name).trim().slice(0, 30);
     if (b.dashboard !== undefined) {

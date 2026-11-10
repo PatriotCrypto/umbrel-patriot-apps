@@ -7,7 +7,7 @@
 <title>Cold Front</title>
 <link rel="icon" href="icon.svg" type="image/svg+xml">
 <link rel="stylesheet" href="style.css">
-<script>(function(){var t="light";try{var v=localStorage.getItem("cf.theme");if(v==="dark"||v==="light")t=v}catch(e){}document.documentElement.setAttribute("data-theme",t)})()</script>
+<script>(function(){var t="light";try{var v=localStorage.getItem("cf.theme");if(/^(light|dark|umbrel|aurora|dusk|graphite)$/.test(v))t=v}catch(e){}document.documentElement.setAttribute("data-theme",t)})()</script>
 </head>
 <body>
 <button id="themeBtn" class="themebtn" aria-label="Switch between light and dark" title="Light / dark"><svg class="sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M2 12h2M20 12h2M4.900 4.900l1.400 1.400M17.700 17.700l1.400 1.400M19.100 4.900l-1.400 1.400M6.300 17.700l-1.400 1.400"/></svg><svg class="moon" viewBox="0 0 24 24"><path d="M20 14.500A8 8 0 0 1 9.500 4 8 8 0 1 0 20 14.500z"/></svg></button>
@@ -83,6 +83,13 @@
       <div class="chartbox"><canvas id="chart"></canvas></div>
       <div class="legend" id="chartLegend"></div>
     </div>
+<div class="card">
+      <h3>Humidity</h3>
+      <div id="humNow" class="humnow"></div>
+      <div class="chartbox short"><canvas id="humchart"></canvas></div>
+      <div class="legend" id="humLegend"></div>
+      <div id="humStats" class="hint"></div>
+    </div>
 <div class="card"><h3>What I noticed</h3><ul id="findings" class="findings"></ul></div>
 <div class="card"><h3>Rooms, last 24 h</h3><div id="roomStats"></div></div>
 </div>
@@ -114,6 +121,11 @@
       </details>
     </div>
 <div class="card">
+      <h3>Appearance</h3>
+      <p class="hint">Pick a look. The sun/moon button at the top switches between Daylight and your favourite dark theme.</p>
+      <div id="themeList" class="themes"></div>
+    </div>
+<div class="card">
       <h3>Filter reminder</h3>
       <p class="hint">You set the dates by hand. Cold Front counts the days and reminds you.</p>
       <div class="grid2">
@@ -123,6 +135,13 @@
         <label>Remind me (days before) <input id="fLead" type="number" min="0" max="60"></label>
       </div>
       <div class="row gap wrap"><button id="saveFilter" class="btn primary">Save filter</button><button id="filterToday" class="btn">Changed today</button><span id="filterMsg" class="hint"></span></div>
+    </div>
+<div class="card">
+      <h3>Weather</h3>
+      <p class="hint">Optional. Shows outdoor weather in a dashboard widget. Cold Front asks Open-Meteo (free, no account) for your town's forecast and sends only the coordinates of the place you pick, nothing else.</p>
+      <div class="row gap wrap"><input id="wxQuery" type="text" maxlength="60" placeholder="Town or city, e.g. Sunman" autocomplete="off" style="flex:1;min-width:160px"><button id="wxSearch" class="btn" type="button">Search</button></div>
+      <div id="wxResults" class="wxresults"></div>
+      <div class="row gap wrap"><span id="wxCurrent" class="hint"></span><button id="wxClear" class="btn" type="button">Clear</button></div>
     </div>
 <div class="card">
       <h3>Notifications (ntfy)</h3>

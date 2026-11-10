@@ -14,11 +14,20 @@
     dark: { heat: '#ffb347', cool: '#5fd0ff', ink: '#ffffff', mute: 'rgba(255,255,255,.62)', faint: 'rgba(255,255,255,.38)', grid: 'rgba(255,255,255,.08)', grid2: 'rgba(255,255,255,.05)', lane: 'rgba(255,255,255,.07)', dialTrack: 'rgba(255,255,255,.12)', dialBand: 'rgba(255,255,255,.3)', fillTop: 'rgba(255,255,255,.22)', fillBot: 'rgba(255,255,255,0)', halo: 'rgba(255,255,255,.3)', hover: 'rgba(255,255,255,.4)', pillFg: '#08203f', tipBg: 'rgba(10,24,50,.96)', tipEdge: 'rgba(255,255,255,.2)', tipText: '#ffffff', base: 'rgba(255,255,255,.12)' },
     light: { heat: '#e07a00', cool: '#1388d4', ink: '#0f2440', mute: 'rgba(15,36,64,.66)', faint: 'rgba(15,36,64,.42)', grid: 'rgba(15,36,64,.09)', grid2: 'rgba(15,36,64,.05)', lane: 'rgba(15,36,64,.08)', dialTrack: 'rgba(15,36,64,.10)', dialBand: 'rgba(31,111,255,.22)', fillTop: 'rgba(31,111,255,.20)', fillBot: 'rgba(31,111,255,0)', halo: 'rgba(31,111,255,.25)', hover: 'rgba(15,36,64,.4)', pillFg: '#ffffff', tipBg: 'rgba(255,255,255,.97)', tipEdge: 'rgba(15,36,64,.18)', tipText: '#0f2440', base: 'rgba(15,36,64,.14)' }
   };
+  ['umbrel', 'aurora', 'dusk', 'graphite'].forEach(function (k) { THEMES[k] = THEMES.dark; });
+  var THEME_LIST = [
+    { id: 'light', name: 'Daylight', a: '#7cc4ff', b: '#ffd3a1', c: '#c3b3ff', bg: '#e6f1ff' },
+    { id: 'dark', name: 'Midnight', a: '#2f6bff', b: '#27b9ff', c: '#7a4dff', bg: '#07112a' },
+    { id: 'umbrel', name: 'Umbrel', a: '#6a4dff', b: '#c04dff', c: '#3d9bff', bg: '#120c2e' },
+    { id: 'aurora', name: 'Aurora', a: '#14e0b0', b: '#3d7bff', c: '#a64dff', bg: '#04201f' },
+    { id: 'dusk', name: 'Dusk', a: '#ff6a3d', b: '#ff3d8b', c: '#8a3dff', bg: '#26101f' },
+    { id: 'graphite', name: 'Graphite', a: '#5b6478', b: '#3d63d9', c: '#7a7a8c', bg: '#121217' }
+  ];
   var COL = {};
   function applyTheme(t) {
     if (!THEMES[t]) t = 'light';
     document.documentElement.setAttribute('data-theme', t);
-    var m = document.querySelector('meta[name=theme-color]'); if (m) m.setAttribute('content', t === 'light' ? '#eaf4ff' : '#060d1c');
+    var m = document.querySelector('meta[name=theme-color]'); if (m) m.setAttribute('content', (THEME_LIST.filter(function (x) { return x.id === t; })[0] || THEME_LIST[1]).bg);
     Object.keys(THEMES[t]).forEach(function (k) { COL[k] = THEMES[t][k]; });
     COL.text = COL.ink;
   }
@@ -81,8 +90,24 @@
     var opc = t && t.opState === 'heating' ? COL.heat : t && t.opState === 'cooling' ? COL.cool : COL.mute;
     h += '<text x="150" y="112" text-anchor="middle" font-size="15" font-weight="600" fill="' + opc + '">' + op + '</text>';
     h += '<text x="150" y="162" text-anchor="middle" font-size="58" font-weight="700" fill="' + COL.ink + '" letter-spacing="-2">' + fmtT(t && t.temp) + '°</text>';
-    h += '<text x="150" y="188" text-anchor="middle" font-size="14" fill="' + COL.mute + '">' + (t && t.humidity != null ? Math.round(t.humidity) + '% humidity' : 'indoor') + '</text>';
+    h += '<text x="150" y="188" text-anchor="middle" font-size="14" fill="' + COL.mute + '">' + (t && t.humidity != null ? Math.round(t.humidity) + '% humidity' + (function () { var L = humLevel(t.humidity); return L ? ' <tspan fill="' + L.c + '" font-weight="650">\u25CF ' + L.label + '</tspan>' : ''; })() : 'indoor') + '</text>';
     return '<svg viewBox="22 18 256 202" role="img" aria-label="Indoor temperature">' + h + '</svg>';
+  }
+  // Humidity: 30-50% is the comfortable range; inside your Settings floor/ceiling but outside that is "Fair"; beyond them is a problem.
+  var WX = { data: null, at: 0, busy: false, loaded: false };
+  function loadWeather(force) {
+    if (WX.busy || (!force && Date.now() - WX.at < 5 * 60000)) return;
+    WX.busy = true; WX.at = Date.now();
+    api('GET', '/api/weather').then(function (w) { WX.data = w; WX.loaded = true; }).catch(function () { WX.loaded = true; }).then(function () { WX.busy = false; if (typeof updateWidgets === 'function') updateWidgets(); });
+  }
+  var HUMC = { good: '#34c98a', fair: '#f0b429', bad: '#ef5b5b' };
+  function humLevel(h) {
+    if (h == null) return null;
+    var lim = (S && S.settings && S.settings.humidity) || { min: 25, max: 60 };
+    if (h < lim.min) return { k: 'dry', label: 'Too dry', c: HUMC.bad, tip: 'Below your ' + lim.min + '% floor. Dry air feels cold and irritates skin and throat.' };
+    if (h > lim.max) return { k: 'wet', label: 'Too humid', c: HUMC.bad, tip: 'Above your ' + lim.max + '% ceiling. Mold and dust mites thrive here.' };
+    if (h >= 30 && h <= 50) return { k: 'good', label: 'Good', c: HUMC.good, tip: 'Comfortable range (30 to 50%).' };
+    return { k: 'fair', label: h < 30 ? 'A bit dry' : 'A bit humid', c: HUMC.fair, tip: 'Acceptable, but outside the ideal 30 to 50% range.' };
   }
   function sendHold(u) {
     clearTimeout(pendTimer);
@@ -192,6 +217,30 @@
           '<p class="hint" style="margin:4px 0 0;font-size:.78rem">' + d.cycles + ' cycle' + (d.cycles === 1 ? '' : 's') + (d.cost != null ? ' · about $' + d.cost.toFixed(2) : '') + '</p>';
       }
     },
+    weather: {
+      title: 'Weather', sizes: ['2x1', '2x2', '1x1'],
+      init: function (b) { b.innerHTML = '<div class="wx"></div>'; },
+      update: function (b, i) {
+        var el = $('.wx', b);
+        loadWeather();
+        var w = WX.data;
+        if (!w) { el.innerHTML = '<p class="hint">' + (WX.loaded ? 'Weather is off.' : 'Loading…') + '</p>'; return; }
+        if (!w.configured) { el.innerHTML = '<p class="hint">Pick your location in Settings → Weather to see the outdoor weather here.</p>'; return; }
+        if (w.error && !w.now) { el.innerHTML = '<p class="hint">Weather is not reachable right now.</p>'; return; }
+        var n = w.now, wide = !!(i && /^[2-4]x/.test(i.size)), tall = !!(i && /^[2-4]x[2-4]$/.test(i.size));
+        el.classList.toggle('wide', !!wide);
+        var h = '<div class="wxl"><div class="wxtop"><span class="wxi" aria-hidden="true">' + n.icon + '</span><div><b class="big sm">' + Math.round(n.temp) + '°</b><span class="k">' + esc(n.label) + '</span></div></div>';
+        if (!wide || tall) h += '<p class="hint" style="margin:6px 0 0;font-size:.8rem">Feels ' + Math.round(n.feels) + '° · wind ' + Math.round(n.wind) + ' mph · ' + Math.round(n.humidity) + '% humidity</p>';
+        if (tall && w.name) h += '<p class="hint" style="margin:4px 0 0;font-size:.74rem">' + esc(w.name) + (w.stale ? ' · offline, showing the last reading' : '') + '</p>';
+        h += '</div>';
+        var d = (w.days || []).slice(0, wide ? 4 : 0);
+        if (d.length) h += '<div class="wxdays">' + d.map(function (x, k) {
+          var nm = k === 0 ? 'Today' : new Date(x.date + 'T12:00:00').toLocaleDateString([], { weekday: 'short' });
+          return '<div><span class="k">' + nm + '</span><span class="wxi sm" aria-hidden="true">' + x.icon + '</span><span class="hl"><b>' + Math.round(x.hi) + '°</b> <span class="lo">' + Math.round(x.lo) + '°</span></span>' + (tall && x.pop >= 20 ? '<span class="pop">' + x.pop + '% rain</span>' : '') + '</div>';
+        }).join('') + '</div>';
+        el.innerHTML = h;
+      }
+    },
     filter: {
       title: 'Filter', sizes: ['1x1', '1x2', '2x1'],
       init: function (b) { b.innerHTML = '<div class="fil"></div>'; },
@@ -224,7 +273,7 @@
       init: function (b) { b.innerHTML = '<div class="roomstrip"></div>'; },
       update: function (b) {
         $('.roomstrip', b).innerHTML = S.sensors.map(function (r) {
-          return '<div class="room' + (r.include ? '' : ' off') + '"><div class="n">' + esc(r.name) + '</div><div class="t">' + fmtT(r.temp) + '°' + (r.humidity != null ? '<span class="h">' + Math.round(r.humidity) + '%</span>' : '') + '</div></div>';
+          return '<div class="room' + (r.include ? '' : ' off') + '"><div class="n">' + esc(r.name) + '</div><div class="t">' + fmtT(r.temp) + '°' + (r.humidity != null ? '<span class="h" style="color:' + humLevel(r.humidity).c + '" title="' + esc(humLevel(r.humidity).label) + '">' + Math.round(r.humidity) + '%</span>' : '') + '</div></div>';
         }).join('') || '<p class="hint">No room sensors yet. Any Z-Wave temperature sensor shows up here on its own once paired.</p>';
       }
     },
@@ -300,7 +349,7 @@
       card.className = 'widget w' + dims[0] + ' h' + dims[1]; card.dataset.id = e.id;
       card.innerHTML = '<div class="whead"><h4>' + esc(W.title) + '</h4><span class="wextra"></span></div><div class="wbody"></div>' + (editing ? editBar(e) : '');
       dash.appendChild(card);
-      var i = inst[e.id] = { card: card, body: $('.wbody', card), extra: $('.wextra', card) };
+      var i = inst[e.id] = { card: card, body: $('.wbody', card), extra: $('.wextra', card), size: e.size };
       W.init(i.body, i);
       if (editing) wireEdit(card, e);
     });
@@ -553,6 +602,60 @@
   }
 
   // ---- insights tab
+  var lastHist = null;
+  var HUMLINES = ['#5ac8fa', '#f0a24b', '#b48cf0', '#7ad7a8'];
+  function humSeries() {
+    var h = lastHist; if (!h || !h.samples) return [];
+    var out = [];
+    var th = h.samples.filter(function (p) { return p.hum != null; });
+    if (th.length) out.push({ name: 'Thermostat', color: COL.ink, pts: th.map(function (p) { return { t: p.t, v: p.hum }; }) });
+    ((INS && INS.rooms) || []).forEach(function (r, i) {
+      var pts = [];
+      h.samples.forEach(function (p) { var v = p.rooms && p.rooms[r.id] && p.rooms[r.id].h; if (v != null) pts.push({ t: p.t, v: v }); });
+      if (pts.length) out.push({ name: r.name, color: HUMLINES[i % HUMLINES.length], pts: pts });
+    });
+    return out;
+  }
+  function drawHumidity() {
+    var canvas = $('#humchart'); if (!canvas) return;
+    var series = humSeries(), lim = (S && S.settings && S.settings.humidity) || { min: 25, max: 60 };
+    var cur = series.length ? series[0].pts[series[0].pts.length - 1].v : null, L = humLevel(cur);
+    $('#humNow').innerHTML = L ? '<b style="color:' + L.c + '">\u25CF ' + esc(L.label) + '</b> <span>' + Math.round(cur) + '% now. ' + esc(L.tip) + '</span>' : '<span class="hint">No humidity readings yet.</span>';
+    $('#humLegend').innerHTML = series.map(function (s) { return '<span class="k" style="--c:' + s.color + '">' + esc(s.name) + '</span>'; }).join('') + (series.length ? '<span class="k" style="--c:' + HUMC.good + '">Ideal 30 to 50%</span>' : '');
+    $('#humStats').textContent = series.length ? series.map(function (s) {
+      var vs = s.pts.filter(function (p) { return p.t >= Date.now() - range * 3600000; }).map(function (p) { return p.v; }); if (!vs.length) return '';
+      var avg = vs.reduce(function (a, b) { return a + b; }, 0) / vs.length;
+      return s.name + ': average ' + Math.round(avg) + '%, low ' + Math.round(Math.min.apply(null, vs)) + '%, high ' + Math.round(Math.max.apply(null, vs)) + '%.';
+    }).filter(Boolean).join(' ') : '';
+    var W = canvas.clientWidth, H = canvas.clientHeight; if (!W || !H) return;
+    var dpr = window.devicePixelRatio || 1; canvas.width = Math.round(W * dpr); canvas.height = Math.round(H * dpr);
+    var x = canvas.getContext('2d'); x.setTransform(dpr, 0, 0, dpr, 0, 0); x.clearRect(0, 0, W, H);
+    if (!series.length) { x.fillStyle = COL.mute; x.font = '14px ' + FONT; x.fillText('No data yet', 12, 24); return; }
+    var t1 = Math.max.apply(null, series.map(function (s) { return s.pts[s.pts.length - 1].t; })), t0 = t1 - range * 3600000;
+    var vals = [lim.min, lim.max, 30, 50];
+    series.forEach(function (s) { s.pts.forEach(function (p) { if (p.t >= t0) vals.push(p.v); }); });
+    var mn = Math.max(0, Math.floor((Math.min.apply(null, vals) - 3) / 10) * 10), mx = Math.min(100, Math.ceil((Math.max.apply(null, vals) + 3) / 10) * 10);
+    var Lf = 44, R = 16, T = 12, B = 28, pw = W - Lf - R, ph = H - T - B; if (pw < 60 || ph < 40) return;
+    function X(t) { return Lf + (t - t0) / (t1 - t0) * pw; }
+    function Y(v) { return T + (mx - v) / (mx - mn) * ph; }
+    x.font = '11px ' + FONT;
+    x.fillStyle = HUMC.good; x.globalAlpha = .13; x.fillRect(Lf, Y(50), pw, Y(30) - Y(50)); x.globalAlpha = 1;
+    for (var v = mn; v <= mx + 1e-6; v += 10) {
+      var gy = Math.round(Y(v)) + .5; x.strokeStyle = COL.grid; x.lineWidth = 1; x.beginPath(); x.moveTo(Lf, gy); x.lineTo(W - R, gy); x.stroke();
+      x.fillStyle = COL.mute; x.textAlign = 'right'; x.fillText(v + '%', Lf - 8, gy + 4);
+    }
+    [lim.min, lim.max].forEach(function (v) { x.strokeStyle = HUMC.bad; x.globalAlpha = .6; x.lineWidth = 1.5; x.setLineDash([5, 5]); x.beginPath(); x.moveTo(Lf, Y(v)); x.lineTo(W - R, Y(v)); x.stroke(); x.setLineDash([]); x.globalAlpha = 1; });
+    x.textAlign = 'center';
+    xticks(t0, t1, range).forEach(function (k) {
+      var px = X(k.t), w = x.measureText(k.l).width;
+      x.fillStyle = COL.mute; x.fillText(k.l, Math.max(Lf + w / 2, Math.min(W - R - w / 2, px)), H - 8);
+    });
+    series.forEach(function (s) {
+      var pts = s.pts.filter(function (p) { return p.t >= t0; }); if (pts.length < 2) return;
+      x.strokeStyle = s.color; x.lineWidth = 2.4; x.lineJoin = 'round'; x.lineCap = 'round'; x.beginPath();
+      pts.forEach(function (p, i) { if (i) x.lineTo(X(p.t), Y(p.v)); else x.moveTo(X(p.t), Y(p.v)); }); x.stroke();
+    });
+  }
   var insChart = null;
   function loadInsights() {
     Promise.all([api('GET', '/api/history?hours=' + range), api('GET', '/api/insights'), api('GET', '/api/events')]).then(function (a) {
@@ -560,7 +663,7 @@
       insChart = insChart || makeChart($('#chart'), $('#chartLegend'));
       insChart.setMode(S && S.thermostat && S.thermostat.mode); insChart.set(a[0], range);
       $$('#rangeSeg button').forEach(function (b) { b.classList.toggle('on', +b.dataset.h === range); });
-      drawBars(a[1].daily);
+      drawBars(a[1].daily); lastHist = a[0]; drawHumidity();
       $('#findings').innerHTML = (a[1].findings.length ? a[1].findings : ['Nothing unusual. Cold Front will flag short cycling, wall changes, humidity and sensor gaps here.']).map(function (f) { return '<li>' + esc(f) + '</li>'; }).join('');
       var tt = a[1].totals; $('#totals').textContent = (!tt.heatMin && !tt.coolMin) ? 'The system has not run in this window yet, or the thermostat has only just been added. Totals build up as it heats and cools.' : 'Heating ' + Math.round(tt.heatMin / 60 * 10) / 10 + ' h, cooling ' + Math.round(tt.coolMin / 60 * 10) / 10 + ' h' + (tt.cost != null ? ', about $' + tt.cost.toFixed(2) + ' heating' : '') + '.';
       $('#roomStats').innerHTML = a[1].rooms.length ? a[1].rooms.map(function (r) {
@@ -583,6 +686,7 @@
     if (!S || (settingsLoaded && !force)) return;
     settingsLoaded = true;
     var s = S.settings, l = s.limits;
+    renderWxSetting();
     $('#setName').value = s.name || ''; $('#setEnforce').checked = s.enforce; $('#setWall').value = s.wallChange;
     $('#setRA').checked = s.roomAware.enabled; $('#setMax').value = s.roomAware.maxOffset;
     $('#setRoom').innerHTML = S.sensors.map(function (r) { return '<option value="' + esc(r.nodeId) + '"' + (String(s.roomAware.roomId) === String(r.nodeId) ? ' selected' : '') + '>' + esc(r.name) + '</option>'; }).join('') || '<option value="">(no sensors yet)</option>';
@@ -609,6 +713,26 @@
     if (S.sensors.length && body.roomAware.enabled && !body.roomAware.roomId) return toast('Pick a room for room-aware');
     api('PUT', '/api/settings', body).then(function () { $('#settingsMsg').textContent = 'Saved'; setTimeout(function () { $('#settingsMsg').textContent = ''; }, 2500); return refresh(); }).catch(function (e) { toast(e.message); });
   };
+  function renderWxSetting() {
+    var w = S && S.settings && S.settings.weather;
+    $('#wxCurrent').textContent = w && w.lat != null ? 'Using ' + (w.name || (w.lat + ', ' + w.lon)) : 'No location set.';
+    $('#wxClear').style.display = w && w.lat != null ? '' : 'none';
+  }
+  $('#wxSearch').onclick = function () {
+    var q = $('#wxQuery').value.trim(); if (q.length < 2) { toast('Type a town or city'); return; }
+    $('#wxResults').innerHTML = '<p class="hint">Searching…</p>';
+    api('GET', '/api/weather/search?q=' + encodeURIComponent(q)).then(function (r) {
+      $('#wxResults').innerHTML = r.results.length ? r.results.map(function (x, i) { return '<button class="btn wxpick" data-i="' + i + '">' + esc(x.name) + '</button>'; }).join('') : '<p class="hint">No match. Try the town name alone.</p>';
+      $$('#wxResults .wxpick').forEach(function (btn) {
+        btn.onclick = function () {
+          var x = r.results[+btn.dataset.i];
+          api('PUT', '/api/settings', { weather: { lat: x.lat, lon: x.lon, name: x.name } }).then(function (r2) { S.settings = r2.settings; $('#wxResults').innerHTML = ''; renderWxSetting(); loadWeather(true); toast('Weather location saved'); }).catch(function (e) { toast(e.message); });
+        };
+      });
+    }).catch(function (e) { $('#wxResults').innerHTML = ''; toast(e.message); });
+  };
+  $('#wxQuery').onkeydown = function (e) { if (e.key === 'Enter') { e.preventDefault(); $('#wxSearch').click(); } };
+  $('#wxClear').onclick = function () { api('PUT', '/api/settings', { weather: null }).then(function (r) { S.settings = r.settings; renderWxSetting(); WX.data = { configured: false }; updateWidgets(); toast('Weather location cleared'); }).catch(function (e) { toast(e.message); }); };
   $('#saveFilter').onclick = function () {
     api('PUT', '/api/settings', { filter: { name: $('#fName').value, lastChanged: $('#fLast').value || null, intervalDays: +$('#fEvery').value, remindDaysBefore: +$('#fLead').value } })
       .then(function () { $('#filterMsg').textContent = 'Saved'; setTimeout(function () { $('#filterMsg').textContent = ''; }, 2500); return refresh(); }).catch(function (e) { toast(e.message); });
@@ -654,15 +778,27 @@
 
 
   // ---- light / dark toggle
-  $('#themeBtn').onclick = function () {
-    var t = document.documentElement.getAttribute('data-theme') === 'light' ? 'dark' : 'light';
+  function setTheme(t) {
     applyTheme(t);
-    try { localStorage.setItem('cf.theme', t); } catch (e) { /* storage blocked */ }
+    try { localStorage.setItem('cf.theme', t); if (t !== 'light') localStorage.setItem('cf.dark', t); } catch (e) { /* storage blocked */ }
     updateWidgets();
     if (inst.chart && inst.chart.chart) inst.chart.chart.draw();
     if (insChart) insChart.draw();
-    drawBars(lastDaily);
+    drawHumidity();
+    renderThemePicker();
+  }
+  function renderThemePicker() {
+    var cur = document.documentElement.getAttribute('data-theme');
+    $('#themeList').innerHTML = THEME_LIST.map(function (t) {
+      return '<button type="button" class="themeopt' + (t.id === cur ? ' on' : '') + '" data-t="' + t.id + '" aria-pressed="' + (t.id === cur) + '"><span class="sw" style="background:' + t.bg + '"><i style="background:' + t.a + '"></i><i style="background:' + t.b + '"></i><i style="background:' + t.c + '"></i><em></em></span>' + t.name + '</button>';
+    }).join('');
+    $$('#themeList .themeopt').forEach(function (b) { b.onclick = function () { setTheme(b.dataset.t); }; });
+  }
+  $('#themeBtn').onclick = function () {
+    var dark = 'dark'; try { dark = localStorage.getItem('cf.dark') || 'dark'; } catch (e) { /* storage blocked */ }
+    setTheme(document.documentElement.getAttribute('data-theme') === 'light' ? dark : 'light');
   };
+  renderThemePicker();
 
   // ---- polling
   function renderGlobal() {
@@ -681,5 +817,5 @@
   showTab('dashboard');
   refresh().then(loadExtras); setInterval(refresh, 5000); setInterval(loadExtras, 60000);
   setInterval(function () { if (activeTab === 'dashboard' && inst.chart && inst.chart.fetch) inst.chart.fetch(); }, 30000);
-  window.addEventListener('resize', function () { if (activeTab === 'insights') { if (insChart) insChart.draw(); drawBars(lastDaily); } });
+  window.addEventListener('resize', function () { if (activeTab === 'insights') { if (insChart) insChart.draw(); drawBars(lastDaily); drawHumidity(); } });
 })();

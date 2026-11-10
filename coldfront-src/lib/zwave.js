@@ -221,7 +221,16 @@ class ZWaveAdapter extends EventEmitter {
     node.values.set(keyOf(cc, 0, prop, pk), { ...v, value });
     node.lastSeen = Date.now();
     this.emit('update');
-    setTimeout(() => { this._send('node.poll_value', { nodeId: node.nodeId, valueId: v.id }, 15000).catch(() => {}); }, 6000);
+    // Ask the thermostat what it really holds and trust that over our local echo. zwave-js sends no
+    // "value updated" event when the device still holds the old value, so apply the poll result ourselves.
+    const confirm = () => this._send('node.poll_value', { nodeId: node.nodeId, valueId: v.id }, 15000).then((r) => {
+      if (r && r.value !== undefined && r.value !== null) {
+        const cur = node.values.get(keyOf(cc, 0, prop, pk));
+        if (cur && cur.value !== r.value) { node.values.set(keyOf(cc, 0, prop, pk), { ...cur, value: r.value }); this.emit('update'); }
+      }
+    }).catch(() => {});
+    setTimeout(confirm, 6000);
+    setTimeout(confirm, 25000);
   }
 
   async setSetpoints({ heat, cool }) {

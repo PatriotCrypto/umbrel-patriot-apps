@@ -233,3 +233,30 @@ test('Umbrel filter widget is text-with-progress with progress between 0 and 1',
   assert.match(w.progressLabel, /days left$/);
   t.close();
 });
+
+test('weather: not configured until a place is picked, then normalized from Open-Meteo', async () => {
+  const t = await boot();
+  try {
+    assert.deepEqual(await (await t.j('/api/weather')).json(), { configured: false });
+    let r = await t.j('/api/settings', 'PUT', { weather: { lat: 999, lon: 0 } });
+    assert.equal(r.status, 400);
+    r = await t.j('/api/settings', 'PUT', { weather: { lat: 39.236, lon: -84.9, name: 'Sunman, Indiana' } });
+    assert.equal(r.status, 200);
+    assert.equal((await r.json()).settings.weather.name, 'Sunman, Indiana');
+  } finally { t.close(); }
+});
+
+test('weather module turns an Open-Meteo reply into a small summary and survives an outage', async () => {
+  const { Weather } = require('../lib/weather');
+  let fail = false, calls = 0;
+  const f = async () => { calls++; if (fail) throw new Error('offline'); return { ok: true, json: async () => ({ current: { temperature_2m: 41.2, apparent_temperature: 37, relative_humidity_2m: 80, weather_code: 61, wind_speed_10m: 9, is_day: 1 }, daily: { time: ['2026-11-09', '2026-11-10'], temperature_2m_max: [48, 52], temperature_2m_min: [38, 40], precipitation_probability_max: [70, 10], weather_code: [61, 0] } }) }; };
+  let now = 1000;
+  const w = new Weather({ fetchImpl: f, now: () => now });
+  const loc = { lat: 39.2, lon: -84.9, name: 'Sunman' };
+  const a = await w.get(loc);
+  assert.equal(a.now.label, 'Rain'); assert.equal(a.days.length, 2); assert.equal(a.days[0].pop, 70);
+  await w.get(loc); assert.equal(calls, 1, 'second call is served from the cache');
+  now += 11 * 60000; fail = true;
+  const b = await w.get(loc);
+  assert.equal(b.stale, true); assert.equal(b.now.temp, 41.2);
+});
