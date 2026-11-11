@@ -140,21 +140,28 @@ function houseView({ day, rooms, names, skip, settings, snap, now, history }) {
   }
   const first = history.samples.length ? history.samples[0].t : null;
 
-  // advisor: shift the Home range by how far the whole house sits from the thermostat's own reading
+  // Balance advisor. The thermostat only knows its own spot on the wall. If the rest of the house runs cooler or warmer than that
+  // spot, aim the thermostat off by the difference ("trim") so the average room lands in the range. The trim is a fixed number
+  // worked out from the difference itself, so applying it twice changes nothing.
   let advice = null;
+  const trimNow = Math.max(-3, Math.min(3, Number(settings.comfort?.trim) || 0));
   const roomCount = rowsNow.filter((r) => r.counted).length;
+  const enough = houseSeries.length >= 72; // six hours of samples
   if (roomCount > 0 && avg24 != null && thermo24 != null) {
-    const diff = r1(avg24 - thermo24);
-    const shift = Math.round(diff);
-    const sug = { heat: home.heat - shift, cool: home.cool - shift };
-    const lim = settings.limits;
-    sug.heat = Math.min(lim.heatMax, Math.max(lim.heatMin, sug.heat));
-    sug.cool = Math.min(lim.coolMax, Math.max(lim.coolMin, sug.cool));
+    const diff = r1(avg24 - thermo24); // + = the house runs warmer than the thermostat reads
+    const trim = enough ? Math.max(-3, Math.min(3, -Math.round(diff))) : trimNow;
     const mid = (home.heat + home.cool) / 2;
+    const feel = { heat: r1(home.heat + trimNow + diff), cool: r1(home.cool + trimNow + diff) }; // what the average room gets today
     let text;
-    if (shift === 0) text = `The whole house averages ${avg24}°, within about a degree of the thermostat (${thermo24}°). Your ${home.heat}-${home.cool}° range is already a good middle ground.`;
-    else text = `The thermostat reads ${Math.abs(diff)}° ${diff > 0 ? 'cooler' : 'warmer'} than the house average (${avg24}° against ${thermo24}°). To land the average room near ${mid}°, set the range to ${sug.heat}-${sug.cool}°.`;
-    advice = { diff, houseAvg: avg24, thermoAvg: thermo24, mid, suggest: sug, current: { heat: home.heat, cool: home.cool }, needed: shift !== 0 && (sug.heat !== home.heat || sug.cool !== home.cool), text };
+    if (!enough) text = `Still learning: the rooms need about six hours of readings before a suggestion is worth trusting. So far the house averages ${avg24}° against ${thermo24}° at the thermostat.`;
+    else if (Math.abs(diff) < 0.5) text = `The house average (${avg24}°) matches the thermostat (${thermo24}°). No adjustment needed: your ${home.heat}-${home.cool}° range is what the rooms actually get.`;
+    else {
+      text = `Over the last day the rooms averaged ${Math.abs(diff)}° ${diff > 0 ? 'warmer' : 'cooler'} than the thermostat reads (${avg24}° against ${thermo24}°).`;
+      if (trim === trimNow) text += ` The balance adjustment of ${trim > 0 ? '+' : ''}${trim}° already covers that.`;
+      else text += ` Right now your ${home.heat}-${home.cool}° range feels like about ${feel.heat}-${feel.cool}° in the average room. A balance adjustment of ${trim > 0 ? '+' : ''}${trim}° fixes that: you keep ${home.heat}-${home.cool}° as your range and the thermostat aims ${Math.abs(trim)}° ${trim > 0 ? 'higher' : 'lower'} to deliver it.`;
+    }
+    if (roomCount < 3 && enough) text += ` Based on ${roomCount} room sensor${roomCount === 1 ? '' : 's'}; it gets more accurate as you add more.`;
+    advice = { diff, houseAvg: avg24, thermoAvg: thermo24, mid, trim, trimNow, needed: enough && trim !== trimNow, learning: !enough, rooms: roomCount, feel, text };
   }
 
   return {

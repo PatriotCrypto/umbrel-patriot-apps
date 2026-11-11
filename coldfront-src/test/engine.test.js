@@ -260,22 +260,78 @@ test('a wall change in range mode holds for 4 hours, not forever', async () => {
 
 test('keep-Auto puts a thermostat that drifted to Heat back to Auto, a few tries then stops', async () => {
   const { engine, adapter, clock } = setup({ keepAuto: true });
-  adapter.th.mode = 'heat';
+  adapter.th.mode = 'heat'; adapter.th.temp = 72; // in range, nothing needed
   adapter.setMode = async function (m) { this.modes = (this.modes || []).concat(m); /* thermostat ignores it */ };
   for (let i = 0; i < 6; i++) { await engine.tick(); clock.advance(11 * 60000); }
-  assert.equal(adapter.modes.length, 3);
-  assert.ok(engine.alerts(adapter.snapshot(), clock.now()).some((a) => a.key === 'modeauto'));
+  assert.deepEqual(adapter.modes, ['auto', 'auto', 'auto']);
 });
 
 test('keep-Auto respects a mode picked in the app, and leaves Off alone', async () => {
   const { engine, adapter, clock } = setup({ keepAuto: true });
-  adapter.th.mode = 'heat';
+  adapter.th.mode = 'heat'; adapter.th.temp = 72;
   engine.noteModeChoice('heat');
   await engine.tick();
   assert.equal(adapter.modes, undefined);
-  adapter.th.mode = 'off'; engine.modeUserUntil = 0;
+  adapter.th.mode = 'off'; engine.noteModeChoice('auto');
   clock.advance(60000); await engine.tick();
   assert.equal(adapter.modes, undefined);
+});
+
+const RANGE = { plan: 'range', keepAuto: true, comfort: { home: { heat: 68, cool: 72 }, away: { heat: 62, cool: 80 }, trim: 0 } };
+
+test('changeover assist: Auto that will not cool a hot house gets switched to Cool, and stays there once it worked', async () => {
+  const { engine, adapter, clock } = setup(RANGE);
+  adapter.th.mode = 'auto'; adapter.th.temp = 75;
+  await engine.tick();
+  assert.equal(adapter.modes, undefined); // give Auto ten minutes first
+  assert.match(engine.state().why.text, /Auto but not cooling/);
+  clock.advance(11 * 60000); await engine.tick();
+  assert.deepEqual(adapter.modes, ['cool']);
+  assert.equal(engine.state().assist, 'cool');
+  adapter.th.opState = 'cooling'; adapter.th.temp = 71; // AC ran, house back in range
+  clock.advance(11 * 60000); await engine.tick();
+  clock.advance(11 * 60000); await engine.tick();
+  assert.deepEqual(adapter.modes, ['cool', 'auto']); // do not rest in Cool: back to Auto, which is safe if the Umbrel goes offline
+  adapter.th.opState = 'idle'; adapter.th.temp = 66; // night gets cold and Auto does nothing again
+  clock.advance(11 * 60000); await engine.tick();
+  clock.advance(4 * 60000); await engine.tick();
+  assert.deepEqual(adapter.modes, ['cool', 'auto', 'heat']);
+  adapter.th.opState = 'heating'; adapter.th.temp = 70;
+  clock.advance(11 * 60000); await engine.tick();
+  clock.advance(11 * 60000); await engine.tick();
+  assert.deepEqual(adapter.modes, ['cool', 'auto', 'heat']); // Heat is a safe place to rest
+});
+
+test('changeover assist: a thermostat stuck in Heat (no Auto support) is switched to Cool within minutes when the house is hot', async () => {
+  const { engine, adapter, clock } = setup(RANGE);
+  adapter.th.mode = 'heat'; adapter.th.modes = ['off', 'heat', 'cool']; adapter.th.temp = 75;
+  await engine.tick();
+  clock.advance(3 * 60000); await engine.tick();
+  assert.deepEqual(adapter.modes, ['cool']);
+});
+
+test('no assist while the thermostat is already cooling or waiting on its compressor timer', async () => {
+  const { engine, adapter, clock } = setup(RANGE);
+  adapter.th.mode = 'auto'; adapter.th.temp = 75; adapter.th.opDetail = 'pending-cool';
+  await engine.tick(); clock.advance(15 * 60000); await engine.tick();
+  assert.equal(adapter.modes, undefined);
+  assert.match(engine.state().why.text, /waiting a few minutes/);
+});
+
+test('balance trim shifts what is sent to the thermostat, not the range you chose', async () => {
+  const { engine, adapter } = setup({ ...RANGE, comfort: { ...RANGE.comfort, trim: 1 } });
+  adapter.th.temp = 70;
+  await engine.tick();
+  assert.deepEqual(adapter.writes, [{ heat: 69, cool: 73 }]);
+});
+
+test('out-of-range alert appears after 30 minutes well past a limit', async () => {
+  const { engine, adapter, clock } = setup({ ...RANGE, keepAuto: false });
+  adapter.th.temp = 75;
+  await engine.tick();
+  assert.ok(!engine.alerts(adapter.snapshot(), clock.now()).some((a) => a.key === 'range'));
+  clock.advance(31 * 60000); await engine.tick();
+  assert.ok(engine.alerts(adapter.snapshot(), clock.now()).some((a) => a.key === 'range'));
 });
 
 test('a bedroom sensor that sleeps for a few hours is not flagged, a day of silence is', () => {
@@ -292,4 +348,17 @@ test('room-aware "avg" nudges toward the whole-house average', async () => {
   adapter.sensors = [{ nodeId: 7, name: 'A', temp: 64, humidity: 40, battery: 90, lastSeen: clock.now() }, { nodeId: 8, name: 'B', temp: 66, humidity: 40, battery: 90, lastSeen: clock.now() }];
   await engine.tick();
   assert.ok(engine.last.desired.heat > 68);
+});
+
+test('Heat picked in the app is single-temperature mode: it stays put and is not switched to Cool or Auto', async () => {
+  const { engine, adapter, clock, store } = setup(RANGE);
+  adapter.th.mode = 'heat'; adapter.th.temp = 76;
+  engine.noteModeChoice('heat');
+  for (let i = 0; i < 4; i++) { await engine.tick(); clock.advance(11 * 60000); }
+  assert.equal(adapter.modes, undefined);
+  assert.equal(store.data.settings.modePref, 'heat');
+  assert.equal(engine.state().single, 'heat');
+  assert.equal(engine.state().why, null);
+  engine.noteModeChoice('auto');
+  assert.equal(engine.state().single, null);
 });

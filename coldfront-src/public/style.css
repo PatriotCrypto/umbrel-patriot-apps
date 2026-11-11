@@ -489,3 +489,11 @@ h1{text-shadow:0 2px 24px rgba(0,0,0,.18)}[data-theme=light] h1{text-shadow:none
 [data-theme=light] .plan2 button,[data-theme=light] .rangebox{background:rgba(255,255,255,.5)}
 [data-theme=light] .rm-track{background:rgba(0,0,0,.1)}
 @media(max-width:560px){.plan2,.rangegrid{grid-template-columns:1fr}.kpi .kv{font-size:1.6rem}.kpis{grid-template-columns:repeat(2,minmax(0,1fr))}.adv-r{width:100%;justify-content:space-between}}
+
+/* ---- 0.5.1 */
+.modewarn{align-items:flex-start;line-height:1.4}
+.modewarn.ok{background:rgba(74,201,140,.16)}.modewarn.info{background:rgba(77,163,255,.14)}.modewarn.warn{background:rgba(240,162,75,.18)}
+.modewarn button[hidden]{display:none}
+.devline{margin-top:10px;font-size:.76rem;color:var(--mute);text-align:center;line-height:1.4}
+.adv-pair span:last-child{font-size:.72rem}
+.stepgroup.single{grid-template-columns:1fr!important}.stepper[hidden]{display:none!important}

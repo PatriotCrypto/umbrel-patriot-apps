@@ -4,6 +4,12 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#0b0b16">
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Cold Front">
+<link rel="apple-touch-icon" href="icon-180.png">
 <title>Cold Front</title>
 <link rel="icon" href="icon.svg" type="image/svg+xml">
 <link rel="stylesheet" href="style.css">
@@ -103,7 +109,7 @@
     <div class="card span4"><h3>Rooms</h3><div id="roomMap"></div></div>
     <div class="card span6"><h3>Humidity</h3><div id="humNow" class="humnow"></div><div class="chartbox short"><canvas id="humchart"></canvas></div><div class="legend" id="humLegend"></div><div id="humStats" class="hint"></div></div>
     <div class="card span6"><h3>Daily runtime</h3><div class="chartbox short"><canvas id="bars"></canvas></div><div class="legend"><span class="k heat">Heating</span><span class="k cool">Cooling</span></div><div id="totals" class="hint"></div></div>
-    <div class="card span4"><h3>Nerd stats</h3><div id="nerd" class="nerd"></div></div>
+    <div class="card span4"><h3>System stats</h3><div id="nerd" class="nerd"></div></div>
     <div class="card span4"><h3>What I noticed</h3><ul id="findings" class="findings"></ul></div>
     <div class="card span4"><h3>Log</h3>
       <form id="noteForm" class="row gap"><input id="noteIn" type="text" maxlength="300" placeholder="Add a note…" autocomplete="off"><button class="btn">Add</button></form>

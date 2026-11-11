@@ -76,7 +76,13 @@
   setInterval(greet, 60000);
 
   // ---- thermostat helpers
-  function pair() { return pending || (S && S.desired ? { heat: S.desired.heat, cool: S.desired.cool } : (S && S.thermostat ? { heat: S.thermostat.heat, cool: S.thermostat.cool } : null)); }
+  function pair() {
+    if (pending) return pending;
+    // range mode: the steppers are your range itself (Home, or Away while away), not whatever was last sent to the thermostat
+    if (S && S.settings && ranged() && S.thermostat && (!S.desired || S.desired.source !== 'hold')) { var c = S.away ? S.away : S.settings.comfort.home; return { heat: c.heat, cool: c.cool }; }
+    return pairRaw();
+  }
+  function pairRaw() { return (S && S.desired ? { heat: S.desired.heat, cool: S.desired.cool } : (S && S.thermostat ? { heat: S.thermostat.heat, cool: S.thermostat.cool } : null)); }
   function dialSvg() {
     var t = S.thermostat, p = pair();
     var cx = 150, cy = 136, r = 108, a0 = 135, sweep = 270, lo = 50, hi = 90;
@@ -115,8 +121,8 @@
     if (!pending) return;
     var p = pending, key = S.away ? 'away' : 'home', body = { comfort: {} };
     body.comfort[key] = { heat: p.heat, cool: p.cool };
-    pendSaving = true; updateWidgets();
-    api('PUT', '/api/settings', body).then(function (r) { S.settings = r.settings; pending = null; pendSaving = false; toast('Saved'); return refresh(); })
+    pendSaving = true;
+    api('PUT', '/api/settings', body).then(function (r) { S.settings = r.settings; if (S.away && body.comfort.away) { S.away.heat = p.heat; S.away.cool = p.cool; } if (pending === p) pending = null; pendSaving = false; return refresh(); })
       .catch(function (e) { pending = null; pendSaving = false; toast(e.message); refresh(); });
   }
   function cancelPending() { clearTimeout(pendTimer); pending = null; updateWidgets(); }
@@ -146,6 +152,7 @@
           '<div class="holdbar" hidden><span class="hbq">How long should this last?</span><button data-hold="next">Until next period</button><button data-hold="2">2 hours</button><button data-hold="8">8 hours</button><button data-hold="0">Until I cancel</button><button data-hold="x" class="hbx">Cancel</button></div>' +
           '<div class="savebar" hidden><span></span><button data-sv="x">Undo</button></div>' +
           '<div class="modewarn" hidden><span></span><button type="button">Switch to Auto</button></div>' +
+          '<div class="devline"></div>' +
           '<div class="holdinfo" hidden></div></div></div>';
         $$('[data-step]', b).forEach(function (btn) {
           btn.onclick = function () {
@@ -174,22 +181,27 @@
         if (!S.adapter.connected) st = 'Waiting for the Z-Wave server…';
         else if (!t) st = 'No thermostat paired yet';
         else if (S.away) st = 'Away' + (S.away.until ? ' until ' + fmtClock(S.away.until) : '');
-        else if (d && ranged() && d.source === 'schedule') st = 'Keeps the house between ' + d.heat + '° and ' + d.cool + '°';
+        else if (d && ranged() && d.source === 'schedule') st = 'Keeps the house between ' + p.heat + '° and ' + p.cool + '°';
         else if (d && d.source === 'hold') st = 'Hold · ' + d.heat + '–' + d.cool + '°';
         else if (d) st = d.label + (S.next ? ' · next: ' + S.next.name + ' at ' + fmtClock(S.next.at) : '');
         if (S.away && t) st = 'Away · keeps ' + (S.away.heat) + '–' + (S.away.cool) + '°' + (S.away.until ? ' until ' + fmtClock(S.away.until) : '');
         if (d && d.adjust) st += ' · room-adjusted ' + (d.adjust > 0 ? '+' : '') + d.adjust + '°';
         $('.status', b).textContent = st;
         var rg = ranged();
-        $('.heatc .lbl', b).textContent = rg ? 'Low' : 'Heat to'; $('.coolc .lbl', b).textContent = rg ? 'High' : 'Cool to';
+        var single = S.single && !PEND.mode ? S.single : (PEND.mode && (PEND.mode.v === 'heat' || PEND.mode.v === 'cool') ? PEND.mode.v : null);
+        $('.stepgroup', b).classList.toggle('single', !!single);
+        $('.heatc', b).hidden = single === 'cool'; $('.coolc', b).hidden = single === 'heat';
+        $('.heatc .lbl', b).textContent = rg && !single ? 'Low' : 'Heat to'; $('.coolc .lbl', b).textContent = rg && !single ? 'High' : 'Cool to';
+        if (single && t && !S.away && d && d.source !== 'hold') $('.status', b).textContent = (single === 'heat' ? 'Heats the house to ' + p.heat : 'Cools the house to ' + p.cool) + '°';
         $('.holdbar', b).hidden = !pending || rg;
         var sv = $('.savebar', b);
-        sv.hidden = !(pending && rg);
+        sv.hidden = true; // range changes save quietly in the background
         $('span', sv).textContent = pendSaving ? 'Saving…' : 'Saving ' + (pending ? pending.heat + '–' + pending.cool + '°' : '') + ' for ' + (S.away ? 'Away' : 'Home') + '…';
-        var mw = $('.modewarn', b);
-        var wrongMode = !!t && (t.mode === 'heat' || t.mode === 'cool') && !PEND.mode;
-        mw.hidden = !wrongMode;
-        if (wrongMode) $('span', mw).textContent = 'Thermostat is in ' + (t.mode === 'heat' ? 'Heat' : 'Cool') + ' mode, so it will only ' + t.mode + '. Auto holds both the low and the high.';
+        var mw = $('.modewarn', b), why = S.why;
+        mw.hidden = !why || !!pending;
+        if (why) { mw.className = 'modewarn ' + why.level; $('span', mw).textContent = why.text; $('button', mw).hidden = why.fix !== 'auto' || !!PEND.mode; }
+        var ML = { heat: 'Heat', cool: 'Cool', auto: 'Auto', off: 'Off', aux: 'Emergency heat' }, trim = (S.settings.comfort && S.settings.comfort.trim) || 0;
+        $('.devline', b).textContent = t ? 'Thermostat: ' + (ML[t.mode] || 'mode unknown') + ' · set ' + fmtT(t.heat) + '° / ' + fmtT(t.cool) + '°' + (rg && trim && !S.away ? ' (balance ' + (trim > 0 ? '+' : '') + trim + '°)' : '') + ' · heard ' + ago(Math.max(0, Math.round((S.now - t.lastSeen) / 60000))) : '';
         var hi = $('.holdinfo', b);
         if (S.hold && !pending) {
           hi.hidden = false;
@@ -428,8 +440,9 @@
     $('#schedCard').hidden = rg; $('#wallCard').hidden = rg;
     $('#rg-home-heat').textContent = c.home.heat + '°'; $('#rg-home-cool').textContent = c.home.cool + '°';
     $('#rg-away-heat').textContent = c.away.heat + '°'; $('#rg-away-cool').textContent = c.away.cool + '°';
+    var tr = c.trim || 0;
     $('#planHint').textContent = rg
-      ? 'Home: the heat comes on below ' + c.home.heat + '° and the AC above ' + c.home.cool + '°. Between the two nothing runs. Tap Away on the dashboard when nobody is home and it uses the Away range instead. Changes apply right away.'
+      ? (tr ? 'Room balance is on: the thermostat aims ' + Math.abs(tr) + '° ' + (tr > 0 ? 'higher' : 'lower') + ' than these numbers so the average room lands inside them (change it under Insights). ' : '') + 'Home: the heat comes on below ' + c.home.heat + '° and the AC above ' + c.home.cool + '°. Between the two nothing runs. Tap Away on the dashboard when nobody is home and it uses the Away range instead. Changes apply right away.'
       : 'Cold Front follows the weekly schedule below. A hold or Away overrides it.';
   }
   $$('#planPick button').forEach(function (b) {
@@ -445,7 +458,7 @@
       else { v = Math.min(lim.coolMax, Math.max(lim.coolMin, v)); o.cool = v; if (o.heat > v - gap) o.heat = Math.max(lim.heatMin, v - gap); }
       renderPlan();
       clearTimeout(rgSave);
-      rgSave = setTimeout(function () { api('PUT', '/api/settings', { comfort: S.settings.comfort }).then(function (r) { S.settings = r.settings; renderPlan(); toast('Saved'); return refresh(); }).catch(function (e) { toast(e.message); refresh(); }); }, 700);
+      rgSave = setTimeout(function () { api('PUT', '/api/settings', { comfort: S.settings.comfort }).then(function (r) { S.settings = r.settings; renderPlan(); return refresh(); }).catch(function (e) { toast(e.message); refresh(); }); }, 700);
     };
   });
   function renderSchedule(wall) {
@@ -728,7 +741,7 @@
     var h = ins.house; if (!h) return;
     var n = h.now, d = h.day, e = h.equipment, t = S && S.thermostat, L = humLevel(n.humidity);
     var k = '';
-    k += tile('Indoor now', n.thermostat != null ? fmtT(n.thermostat) + '°' : '--', t ? esc(t.opState === 'idle' ? 'Idle' : t.opState) + ' · ' + esc(t.mode) : '');
+    k += tile('Indoor now', n.thermostat != null ? fmtT(n.thermostat) + '°' : '--', t ? esc(({ idle: 'Idle', heating: 'Heating', cooling: 'Cooling', fan: 'Fan' })[t.opState] || 'Idle') + ' · ' + esc(({ heat: 'Heat', cool: 'Cool', auto: 'Auto', off: 'Off', aux: 'Emergency heat' })[t.mode] || 'mode unknown') : '');
     k += tile('House average', n.average != null ? fmtT(n.average) + '°' : '--', n.counted + (n.counted === 1 ? ' reading' : ' readings') + ' counted');
     k += tile('Spread', n.spread != null ? fmtT(n.spread) + '°' : '--', n.warmest && n.coolest ? esc(n.coolest.name) + ' ' + fmtT(n.coolest.temp) + '° to ' + esc(n.warmest.name) + ' ' + fmtT(n.warmest.temp) + '°' : 'add room sensors', n.spread != null ? deltaColor(n.spread / 2) : null);
     k += tile('Humidity', n.humidity != null ? Math.round(n.humidity) + '%' : '--', L ? esc(L.label) : '', L ? L.c : null);
@@ -738,12 +751,16 @@
     if (w && w.temp != null) k += tile('Outside', Math.round(w.temp) + '°', n.thermostat != null ? (Math.round(n.thermostat - w.temp) >= 0 ? '+' : '') + Math.round(n.thermostat - w.temp) + '° inside vs out' : esc(w.label || ''));
     $('#kpis').innerHTML = k;
 
-    var a = h.advice;
+    var a = h.advice, hm = S.settings.comfort.home;
+    var sg = function (n) { return (n > 0 ? '+' : '') + n + '°'; };
     $('#advisor').innerHTML = a
-      ? '<div class="adv-l"><span class="kl">Balance advisor</span><p>' + esc(a.text) + '</p></div>' + (a.needed && S.settings.plan !== 'schedule' ? '<div class="adv-r"><div class="adv-pair"><span>Now ' + a.current.heat + '–' + a.current.cool + '°</span><b>' + a.suggest.heat + '–' + a.suggest.cool + '°</b></div><button class="btn primary" id="advApply">Apply</button></div>' : '')
-      : '<div class="adv-l"><span class="kl">Balance advisor</span><p>With one or more room sensors reporting, this compares every room to the thermostat and suggests the low and high that keep the whole house equally comfortable. Four more sensors will make it much sharper.</p></div>';
-    var ap = $('#advApply');
-    if (ap) ap.onclick = function () { ap.disabled = true; api('PUT', '/api/settings', { comfort: { home: a.suggest } }).then(function (r) { S.settings = r.settings; toast('Home range set to ' + a.suggest.heat + '–' + a.suggest.cool + '°'); return refresh(); }).then(loadInsights).catch(function (er) { toast(er.message); ap.disabled = false; }); };
+      ? '<div class="adv-l"><span class="kl">Balance advisor</span><p>' + esc(a.text) + '</p></div>' +
+        (S.settings.plan !== 'schedule' && (a.needed || a.trimNow) ? '<div class="adv-r"><div class="adv-pair"><span>Balance adjustment</span><b>' + sg(a.needed ? a.trim : a.trimNow) + '</b><span>' + (a.needed ? (a.trimNow ? 'now ' + sg(a.trimNow) : 'not applied') : 'applied') + '</span></div>' +
+          (a.needed ? '<button class="btn primary" data-trim="' + a.trim + '">Apply</button>' : '<button class="btn" data-trim="0">Remove</button>') + '</div>' : '')
+      : '<div class="adv-l"><span class="kl">Balance advisor</span><p>Once a room sensor has been reporting for a few hours, this compares the rooms to the thermostat and offers one adjustment that keeps the whole house inside your range. More sensors make it sharper.</p></div>';
+    $$('#advisor [data-trim]').forEach(function (ap) {
+      ap.onclick = function () { ap.disabled = true; var v = +ap.dataset.trim; api('PUT', '/api/settings', { comfort: { trim: v } }).then(function (r) { S.settings = r.settings; toast(v ? 'Balance adjustment ' + sg(v) + ' applied. Your range stays ' + hm.heat + '–' + hm.cool + '°.' : 'Balance adjustment removed'); return refresh(); }).then(loadInsights).catch(function (er) { toast(er.message); ap.disabled = false; }); };
+    });
 
     var stats = {}; (ins.rooms || []).forEach(function (r) { stats[r.id] = r; });
     var rows = '';

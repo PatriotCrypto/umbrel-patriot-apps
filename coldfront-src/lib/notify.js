@@ -9,7 +9,8 @@ const TRIGGERS = {
   linkRestored: 'Z-Wave connection is back',
   thermostatLost: 'Thermostat stopped reporting (15 min)',
   thermostatRestored: 'Thermostat is reporting again',
-  sensorOffline: 'A room sensor went quiet (3 h)',
+  sensorOffline: 'A room sensor went quiet (14 h)',
+  outOfRange: 'House has been outside your comfort range for 30 minutes',
   batteryLow: 'A sensor battery is at 20% or less',
   freeze: 'House is below 45°F',
   hot: 'House is above 90°F',
@@ -30,6 +31,7 @@ function triggerForAlert(key) {
   if (key === 'hot') return 'hot';
   if (key === 'noheat') return 'noHeat';
   if (key === 'write') return 'writeFail';
+  if (key === 'range') return 'outOfRange';
   if (key.startsWith('leak')) return 'leak';
   if (key.startsWith('lbat')) return 'batteryLow';
   if (key.startsWith('loff')) return 'sensorOffline';
@@ -38,8 +40,8 @@ function triggerForAlert(key) {
   if (key.startsWith('off')) return 'sensorOffline';
   return null;
 }
-const PRIORITY = { leak: 5, leakClear: 3, freeze: 5, hot: 4, noHeat: 4, linkLost: 4, thermostatLost: 4, writeFail: 3, filterOverdue: 3 };
-const TAGS = { leak: 'rotating_light,droplet', leakClear: 'white_check_mark', freeze: 'cold_face', hot: 'hot_face', noHeat: 'warning', linkLost: 'electric_plug', linkRestored: 'white_check_mark', thermostatLost: 'electric_plug', thermostatRestored: 'white_check_mark', filterDue: 'wrench', filterOverdue: 'wrench', batteryLow: 'battery', sensorOffline: 'electric_plug', humidity: 'droplet', wallChange: 'thermometer', writeFail: 'warning' };
+const PRIORITY = { outOfRange: 4, leak: 5, leakClear: 3, freeze: 5, hot: 4, noHeat: 4, linkLost: 4, thermostatLost: 4, writeFail: 3, filterOverdue: 3 };
+const TAGS = { outOfRange: 'thermometer', leak: 'rotating_light,droplet', leakClear: 'white_check_mark', freeze: 'cold_face', hot: 'hot_face', noHeat: 'warning', linkLost: 'electric_plug', linkRestored: 'white_check_mark', thermostatLost: 'electric_plug', thermostatRestored: 'white_check_mark', filterDue: 'wrench', filterOverdue: 'wrench', batteryLow: 'battery', sensorOffline: 'electric_plug', humidity: 'droplet', wallChange: 'thermometer', writeFail: 'warning' };
 const COOLDOWN_MS = 30 * 60000; // the same alert will not send twice inside this window, which stops flapping
 const SIGNAL_DEBOUNCE_MS = 2 * 60000; // a link must stay down this long before we call it lost
 

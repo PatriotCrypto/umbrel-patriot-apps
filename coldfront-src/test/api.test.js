@@ -281,6 +281,8 @@ test('comfort range, plan, keepAuto and the screen-lock code save and validate',
   assert.equal(s.keepAuto, false);
   assert.equal((await t.j('/api/settings', 'PUT', { pin: 'abcd' })).status, 400);
   assert.equal((await t.j('/api/settings', 'PUT', { plan: 'nope' })).status, 400);
+  assert.equal((await t.j('/api/settings', 'PUT', { comfort: { trim: 9 } })).status, 400);
+  assert.equal((await (await t.j('/api/settings', 'PUT', { comfort: { trim: -1 } })).json()).settings.comfort.trim, -1);
   assert.equal((await t.j('/api/settings', 'PUT', { comfort: { home: { heat: 'x', cool: 70 } } })).status, 400);
   const bk = await (await t.j('/api/backup')).json();
   assert.equal(bk.data.settings.pin, '');

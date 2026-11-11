@@ -5,9 +5,11 @@ const { EventEmitter } = require('node:events');
 const crypto = require('node:crypto');
 
 const CC = { BINARY_SENSOR: 48, SENSOR: 49, MODE: 64, OPSTATE: 66, SETPOINT: 67, FAN: 68, NOTIFICATION: 113, BATTERY: 128 };
-const MODE_NAME = { 0: 'off', 1: 'heat', 2: 'cool', 3: 'auto' };
+const MODE_NAME = { 0: 'off', 1: 'heat', 2: 'cool', 3: 'auto', 4: 'aux' }; // 4 = auxiliary / emergency heat
 const MODE_NUM = { off: 0, heat: 1, cool: 2, auto: 3 };
-const OP_NAME = { 0: 'idle', 1: 'heating', 2: 'cooling', 3: 'fan' };
+// Operating state. Besides the basic four, thermostats report "pending" while a compressor-protection timer runs, and stage 2 / aux.
+const OP_NAME = { 0: 'idle', 1: 'heating', 2: 'cooling', 3: 'fan', 4: 'idle', 5: 'idle', 6: 'fan', 7: 'heating', 8: 'heating', 9: 'cooling', 10: 'heating', 11: 'heating' };
+const OP_DETAIL = { 4: 'pending-heat', 5: 'pending-cool', 7: 'aux-heat', 8: 'stage2-heat', 9: 'stage2-cool', 10: 'aux-heat', 11: 'aux-heat' };
 const FAN_NAME = { 0: 'auto', 1: 'on' };
 const FAN_NUM = { auto: 0, on: 1 };
 
@@ -68,6 +70,14 @@ class ZWaveAdapter extends EventEmitter {
     } finally { this._polling = false; }
   }
 
+  /** Ask the thermostat for fresh values now (rate limited), e.g. when what it reports does not add up. */
+  pollNow() {
+    const now = Date.now();
+    if (now - (this._lastPollNow || 0) < 60000) return;
+    this._lastPollNow = now;
+    this._pollThermostat().catch(() => {});
+  }
+
   /** Drop the connection and start over (the Reconnect button). */
   reconnect() { this.stop(); this._backoff = 2000; this.error = 'Reconnecting'; this.start(); }
 
@@ -124,7 +134,7 @@ class ZWaveAdapter extends EventEmitter {
   _ingestNode(n) {
     const node = { nodeId: n.nodeId, name: n.name || '', location: n.location || '', values: new Map(), lastSeen: n.lastSeen ? Date.parse(n.lastSeen) || Date.now() : null };
     for (const v of n.values || []) {
-      node.values.set(keyOf(v.commandClass, v.endpoint, v.property, v.propertyKey), { value: v.value, unit: v.metadata?.unit, id: { commandClass: v.commandClass, endpoint: v.endpoint || 0, property: v.property, ...(v.propertyKey !== undefined ? { propertyKey: v.propertyKey } : {}) } });
+      node.values.set(keyOf(v.commandClass, v.endpoint, v.property, v.propertyKey), { value: v.value, unit: v.metadata?.unit, states: v.metadata?.states, id: { commandClass: v.commandClass, endpoint: v.endpoint || 0, property: v.property, ...(v.propertyKey !== undefined ? { propertyKey: v.propertyKey } : {}) } });
     }
     this.nodes.set(node.nodeId, node);
   }
@@ -147,7 +157,7 @@ class ZWaveAdapter extends EventEmitter {
       if (!node) { node = { nodeId: e.nodeId, name: '', location: '', values: new Map(), lastSeen: null }; this.nodes.set(e.nodeId, node); }
       const k = keyOf(a.commandClass, a.endpoint, a.property, a.propertyKey);
       const prev = node.values.get(k);
-      node.values.set(k, { value: a.newValue, unit: a.metadata?.unit || prev?.unit, id: prev?.id || { commandClass: a.commandClass, endpoint: a.endpoint || 0, property: a.property, ...(a.propertyKey !== undefined ? { propertyKey: a.propertyKey } : {}) } });
+      node.values.set(k, { value: a.newValue, unit: a.metadata?.unit || prev?.unit, states: prev?.states, id: prev?.id || { commandClass: a.commandClass, endpoint: a.endpoint || 0, property: a.property, ...(a.propertyKey !== undefined ? { propertyKey: a.propertyKey } : {}) } });
       node.lastSeen = Date.now();
       this.emit('update');
     } else if (e.event === 'node removed') {
@@ -203,7 +213,9 @@ class ZWaveAdapter extends EventEmitter {
         temp: temp && typeof temp.value === 'number' ? toF(temp.value, temp.unit) : null,
         humidity: hum && typeof hum.value === 'number' ? hum.value : null,
         mode: MODE_NAME[mode?.value] || null,
+        modes: mode?.states ? Object.keys(mode.states).map((k) => MODE_NAME[k]).filter(Boolean) : null, // what this thermostat says it supports
         opState: OP_NAME[op?.value] || 'idle',
+        opDetail: OP_DETAIL[op?.value] || null,
         fan: FAN_NAME[fan?.value] || null,
         heat: sp1 && typeof sp1.value === 'number' ? toF(sp1.value, sp1.unit) : null,
         cool: sp2 && typeof sp2.value === 'number' ? toF(sp2.value, sp2.unit) : null,

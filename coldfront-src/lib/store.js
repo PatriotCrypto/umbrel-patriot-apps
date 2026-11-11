@@ -18,8 +18,9 @@ const DEFAULTS = () => ({
     costPerHour: 0, // furnace running cost in dollars per hour, 0 = hide cost
     roomAware: { enabled: false, roomId: null, maxOffset: 3 }, // roomId may be 'avg' = the average of the thermostat and all included rooms
     plan: 'range', // 'range' = keep the house between a Home low/high (Away has its own), 'schedule' = weekly periods
-    comfort: { home: { heat: 68, cool: 72 }, away: { heat: 62, cool: 80 } },
+    comfort: { home: { heat: 68, cool: 72 }, away: { heat: 62, cool: 80 }, trim: 0 }, // trim: degrees added to the Home setpoints sent to the thermostat (room balance)
     keepAuto: true, // a low/high range only works in the thermostat's Auto mode, so put it back if it drifts to Heat or Cool
+    modePref: null, // 'heat' / 'cool' / 'off' picked in the app = single-temperature mode; 'auto' or null = Cold Front looks after the mode
     pin: '', // the thermostat's screen-lock code, kept here only so it is not forgotten
     dashboard: null, // null = default widget layout; otherwise [{id, size:'2x3'}] in display order
     filter: { name: 'Furnace filter', lastChanged: null, intervalDays: 90, remindDaysBefore: 7 }, // set by hand

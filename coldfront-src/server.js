@@ -203,14 +203,15 @@ function createApp({ dataDir, zwaveUrl, now = () => Date.now(), simSpeed = 1, au
     }
     if (b.humidity) { const mn = num(b.humidity.min), mx = num(b.humidity.max); if (mn != null && mx != null && mn < mx && mn >= 0 && mx <= 100) s.humidity = { min: mn, max: mx }; else return bad(res, 'humidity range invalid'); }
     if (b.enforce !== undefined) s.enforce = !!b.enforce;
-    if (b.keepAuto !== undefined) { s.keepAuto = !!b.keepAuto; engine.modeTries = 0; engine.modeTriedAt = 0; }
+    if (b.keepAuto !== undefined) { s.keepAuto = !!b.keepAuto; engine.resetModeCare(); }
     if (b.plan !== undefined) {
       if (!['range', 'schedule'].includes(b.plan)) return bad(res, 'plan must be range or schedule');
       s.plan = b.plan;
       engine._userChanged();
     }
     if (b.comfort) {
-      const out = { home: { ...s.comfort.home }, away: { ...s.comfort.away } };
+      const out = { home: { ...s.comfort.home }, away: { ...s.comfort.away }, trim: Number(s.comfort.trim) || 0 };
+      if (b.comfort.trim !== undefined) { const tr = num(b.comfort.trim); if (tr == null || Number.isNaN(tr) || Math.abs(tr) > 3) return bad(res, 'balance trim must be between -3 and 3'); out.trim = Math.round(tr); }
       for (const k of ['home', 'away']) {
         const c = b.comfort[k];
         if (c === undefined) continue;
@@ -221,6 +222,7 @@ function createApp({ dataDir, zwaveUrl, now = () => Date.now(), simSpeed = 1, au
         out[k] = { heat: c2.heat, cool: c2.cool };
       }
       s.comfort = out;
+      if (store.data.away) { store.data.away.heat = out.away.heat; store.data.away.cool = out.away.cool; } // editing the Away range while away takes effect now
       engine._userChanged();
     }
     if (b.pin !== undefined) {

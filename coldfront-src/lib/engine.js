@@ -60,7 +60,8 @@ class Engine {
   /** The base plan: the weekly schedule, or in range mode one flat Home period every day. */
   _plan() {
     if (!this.ranged) return this.store.data.schedule;
-    const h = this.settings.comfort.home;
+    const c = this.settings.comfort, trim = Math.max(-3, Math.min(3, Number(c.trim) || 0));
+    const h = { heat: c.home.heat + trim, cool: c.home.cool + trim }; // trim = room balance: aim the thermostat a little off so the rooms land in the range
     const days = {};
     for (const d of ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat']) days[d] = [{ id: `${d}0`, name: 'Home', time: '00:00', heat: h.heat, cool: h.cool }];
     return { days };
@@ -126,11 +127,12 @@ class Engine {
 
     this._track(t, snap, nowMs);
     this._expireHold(nowMs);
-    await this._keepAuto(t, nowMs);
 
     const d = this.desired(snap);
     this.last.desired = d;
     if (!d || t.heat == null || t.cool == null) { this.last.status = 'waiting'; return; }
+    await this._manageMode(t, d, nowMs);
+    this._range(t, d, nowMs);
     const obs = { heat: t.heat, cool: t.cool };
 
     const differs = this.expected && (Math.abs(obs.heat - this.expected.heat) >= 0.5 || Math.abs(obs.cool - this.expected.cool) >= 0.5);
@@ -179,13 +181,48 @@ class Engine {
     } else this.last.status = 'ok';
   }
 
-  /** A low/high range only works in Auto. If the thermostat drifted to Heat or Cool, put it back (a few tries, then stop and say so). */
-  async _keepAuto(t, nowMs) {
-    if (!this.settings.keepAuto || !this.settings.enforce || !this.adapter.setMode) return;
-    if (t.mode === 'auto' || t.mode === 'off' || t.mode == null) { if (t.mode === 'auto') this.modeTries = 0; return; }
-    if (nowMs < (this.modeUserUntil || 0)) return; // you chose this mode in the app
-    if ((this.modeTries || 0) >= 3 || nowMs - (this.modeTriedAt || 0) < 10 * 60000) return;
-    this.modeTries = (this.modeTries || 0) + 1;
+  /**
+   * Keep the thermostat in a mode that can serve the range. Auto is first choice. If the thermostat will not take Auto, or sits
+   * in Auto without running while the house is past a limit, switch it to Cool or Heat ourselves ("changeover assist").
+   */
+  async _manageMode(t, d, nowMs) {
+    const s = this.settings;
+    if (!s.keepAuto || !s.enforce || !this.adapter.setMode) return;
+    if (!['auto', 'heat', 'cool'].includes(t.mode) || t.temp == null) return; // Off and emergency heat are a person's choice
+    if (this.userMode) return; // you chose Heat or Cool in the app: single-temperature mode, left alone until you pick Auto
+    const canAuto = !t.modes || t.modes.includes('auto');
+    const need = t.temp >= d.cool + 1 ? 'cool' : t.temp <= d.heat - 1 ? 'heat' : null;
+    if (need !== (this.need ? this.need.kind : null)) this.need = need ? { kind: need, since: nowMs } : null;
+    const serving = !need || (need === 'cool' ? (t.opState === 'cooling' || t.opDetail === 'pending-cool') : (t.opState === 'heating' || t.opDetail === 'pending-heat'));
+    const gap = nowMs - (this.modeTriedAt || 0) >= 10 * 60000;
+    if (need && !serving) this.adapter.pollNow?.(); // make sure we are not acting on a stale report
+
+    if (need && !serving && t.mode !== need && nowMs - this.need.since >= (t.mode === 'auto' ? (this.autoBroken ? 3 : 10) : 2) * 60000 && gap) {
+      this.modeTriedAt = nowMs;
+      if (t.mode === 'auto') this.autoBroken = true; // Auto had its chance and did nothing
+      try {
+        await this.adapter.setMode(need);
+        this.assist = { kind: need, since: nowMs };
+        this.log('mode', `House is ${t.temp}°, ${need === 'cool' ? `above the ${d.cool}° high` : `below the ${d.heat}° low`}, and the thermostat was not ${need}ing in ${t.mode === 'auto' ? 'Auto' : t.mode === 'heat' ? 'Heat' : 'Cool'} mode. Switched it to ${need === 'cool' ? 'Cool' : 'Heat'}.`);
+      } catch (e) { this.log('error', `Could not switch the thermostat to ${need}: ${e.message}`); }
+      return;
+    }
+    if (this.assist) {
+      if (t.mode !== this.assist.kind) this.assist = null; // changed elsewhere
+      else {
+        const done = this.assist.kind === 'cool' ? t.temp <= d.cool - 0.5 : t.temp >= d.heat + 0.5;
+        if (!done || nowMs - this.assist.since < 10 * 60000) return;
+        this.assist = null;
+      }
+    }
+    if (t.mode === 'auto') { this.modeTries = 0; return; }
+    if (!canAuto) this.autoBroken = true;
+    if ((this.modeTries || 0) >= 3) this.autoBroken = true;
+    if (!gap) return;
+    // Auto let us down before. Heat is a safe place to rest (the house cannot freeze if the Umbrel goes offline); Cool is not, so
+    // even then go back to Auto after a cooling assist, as long as the thermostat accepts it.
+    if (this.autoBroken && !(t.mode === 'cool' && canAuto && (this.modeTries || 0) < 3)) return;
+    if (!this.autoBroken) this.modeTries = (this.modeTries || 0) + 1;
     this.modeTriedAt = nowMs;
     try {
       await this.adapter.setMode('auto');
@@ -194,7 +231,35 @@ class Engine {
   }
 
   /** The person picked a mode in the app: respect it for a while. */
-  noteModeChoice(mode) { this.modeUserUntil = this.now() + (mode === 'auto' ? 0 : 6 * 3600000); this.modeTries = 0; this.modeTriedAt = 0; }
+  noteModeChoice(mode) { this.settings.modePref = mode; this.store.touch(); this.resetModeCare(); }
+  /** Heat or Cool picked on purpose in the app (not Auto, and not something Cold Front switched to itself). */
+  get userMode() { const m = this.settings.modePref; return m === 'heat' || m === 'cool' || m === 'off' ? m : null; }
+  resetModeCare() { this.modeTries = 0; this.modeTriedAt = 0; this.autoBroken = false; this.assist = null; this.need = null; }
+
+  /** One plain sentence on what the thermostat is doing about the range right now, or null when all is as expected. */
+  explain(t, d, nowMs) {
+    if (!t || !d || t.temp == null) return null;
+    const M = { heat: 'Heat', cool: 'Cool', auto: 'Auto', off: 'Off', aux: 'Emergency heat' };
+    if (t.mode === 'off') return { level: 'warn', text: 'The thermostat is Off, so nothing will run.' };
+    const care = this.settings.keepAuto && this.settings.enforce && !this.userMode;
+    const side = t.temp >= d.cool + 1 ? 'cool' : t.temp <= d.heat - 1 ? 'heat' : null;
+    if (!side) {
+      if (this.assist) return { level: 'info', text: `Cold Front put the thermostat in ${M[this.assist.kind]} because Auto was not ${this.assist.kind}ing. It goes back once the house is in range.` };
+      if (!care && !this.userMode && (t.mode === 'heat' || t.mode === 'cool') && this.settings.enforce) return { level: 'info', text: `The thermostat is in ${M[t.mode]} mode, so it will only ${t.mode}.`, fix: 'auto' };
+      return null;
+    }
+    if (this.userMode && this.userMode === t.mode && t.mode !== side) return null; // single-temperature mode: the other side is off on purpose
+    const cool = side === 'cool';
+    const limit = cool ? `${d.cool}° high` : `${d.heat}° low`;
+    const where = `${t.temp}° is ${cool ? 'above' : 'below'} your ${limit}`;
+    if (t.opState === (cool ? 'cooling' : 'heating')) return { level: 'ok', text: `${cool ? 'Cooling' : 'Heating'} now: ${where}.` };
+    if (t.opDetail === (cool ? 'pending-cool' : 'pending-heat')) return { level: 'info', text: `${where}. The thermostat is waiting a few minutes to protect the ${cool ? 'AC compressor' : 'equipment'}, then it starts.` };
+    const dev = cool ? t.cool : t.heat, want = cool ? d.cool : d.heat;
+    if (dev != null && Math.abs(dev - want) >= 0.5) return { level: 'warn', text: `${where}, but the thermostat still has ${dev}° as its ${cool ? 'high' : 'low'}. ${this.settings.enforce ? 'Sending the new setting again.' : 'Cold Front is set to observe only.'}` };
+    if (t.mode !== 'auto' && t.mode !== side) return { level: 'warn', text: `${where}, but the thermostat is in ${M[t.mode] || t.mode} mode and cannot ${side}. ${care ? `Cold Front is switching it to ${M[side]}.` : `Switch it to Auto or ${M[side]}.`}`, fix: care ? null : 'auto' };
+    if (t.mode === 'auto') return { level: 'warn', text: `${where}. The thermostat is in Auto but not ${side}ing yet. ${care ? `If it has not started in 10 minutes, Cold Front switches it to ${M[side]}.` : ''}`.trim() };
+    return { level: 'warn', text: `${where}. The thermostat is in ${M[t.mode]} mode at ${dev}° but reports idle. Look at its screen for "Wait", then check the ${cool ? 'AC breaker and outdoor unit' : 'furnace'}.` };
+  }
 
   _nearBoundary(nowMs) {
     const sched = this.store.data.schedule;
@@ -204,6 +269,13 @@ class Engine {
     const lp = localParts(now, this.settings.tz);
     if (a.day === ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'][lp.day] && lp.minutes - toMin(a.period.time) <= GRACE_MS / 60000) return true;
     return false;
+  }
+
+  /** Track how long the house has been well outside the range (for the alert). */
+  _range(t, d, nowMs) {
+    const side = t.temp == null ? null : t.temp >= d.cool + 2 ? 'high' : t.temp <= d.heat - 2 ? 'low' : null;
+    if (!side) this.outSince = null;
+    else if (!this.outSince || this.outSince.side !== side) this.outSince = { side, at: nowMs, limit: side === 'high' ? d.cool : d.heat };
   }
 
   _expireHold(nowMs) {
@@ -249,8 +321,7 @@ class Engine {
       if (t.temp != null && t.temp < 45) out.push({ level: 'bad', key: 'freeze', text: `Indoor temperature is ${t.temp}°F. Pipes can freeze below about 40°F.` });
       if (t.temp != null && t.temp > 90) out.push({ level: 'bad', key: 'hot', text: `Indoor temperature is ${t.temp}°F.` });
       if (this.coldSince && nowMs - this.coldSince > 45 * 60000) out.push({ level: 'bad', key: 'noheat', text: 'The house is more than 3°F under the heat setpoint and the furnace is not running. Check the furnace.' });
-      const keeping = this.settings.keepAuto && this.settings.enforce && nowMs >= (this.modeUserUntil || 0) && (this.modeTries || 0) < 3;
-      if ((t.mode === 'heat' || t.mode === 'cool') && !keeping) out.push({ level: 'warn', key: 'modeauto', text: `The thermostat is in ${t.mode === 'heat' ? 'Heat' : 'Cool'} mode, so it will only ${t.mode === 'heat' ? 'heat' : 'cool'}. Switch it to Auto to hold both a low and a high.` });
+      if (this.outSince && nowMs - this.outSince.at >= 30 * 60000 && snap.kind !== 'sim') out.push({ level: 'warn', key: 'range', text: `The house has been ${this.outSince.side === 'high' ? 'above' : 'below'} your ${this.outSince.limit}° ${this.outSince.side} for ${Math.round((nowMs - this.outSince.at) / 60000)} minutes (now ${t.temp}°).` });
       if (st === 'write-failed') out.push({ level: 'warn', key: 'write', text: `Could not change the thermostat: ${this.lastError}` });
     }
     const h = this.settings.humidity;
@@ -276,7 +347,7 @@ class Engine {
     const nowMs = this.now();
     const snap = this.last.snap;
     const s = this.store.data;
-    const d = this.last.desired;
+    const d = snap && snap.connected && snap.thermostat ? this.desired(snap) : this.last.desired; // fresh, so a change shows at once
     const next = this.ranged ? null : nextBoundary(s.schedule, new Date(nowMs), this.settings.tz);
     const sensors = (snap?.sensors || []).map((r) => ({ ...r, name: s.rooms[r.nodeId]?.name || r.name || `Sensor ${r.nodeId}`, include: s.rooms[r.nodeId]?.include !== false }));
     return {
@@ -290,6 +361,9 @@ class Engine {
       desired: d,
       next: next ? { at: next.at.toISOString(), name: next.period.name, heat: next.period.heat, cool: next.period.cool } : null,
       hold: s.hold, away: s.away,
+      why: this.explain(snap?.thermostat, d, nowMs),
+      assist: this.assist ? this.assist.kind : null,
+      single: this.userMode && snap?.thermostat && snap.thermostat.mode === this.userMode && this.userMode !== 'off' ? this.userMode : null,
       alerts: this.alerts(snap, nowMs),
     };
   }

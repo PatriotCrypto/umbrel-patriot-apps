@@ -2,7 +2,7 @@ manifestVersion: 1
 id: patriot-coldfront
 category: automation
 name: Cold Front
-version: "0.5.0"
+version: "0.5.1"
 tagline: Local thermostat control, schedules and insights
 description: >-
   Cold Front takes over a Z-Wave thermostat (built for the Honeywell T6 Pro Z-Wave) with no cloud and no accounts.
@@ -24,7 +24,7 @@ gallery: []
 path: ""
 defaultUsername: ""
 defaultPassword: ""
-releaseNotes: "Comfort range (stay between a low and a high, with Away), thermostat kept in Auto, hold-length confirmation, screen lock code in Settings, softer sleeping-sensor warning, and a new Insights Command Center with a whole-house balance advisor."
+releaseNotes: "Single-temperature mode when you pick Heat or Cool, quiet background saving, changeover assist when Auto does not run, a plain explanation of what the thermostat is doing, a balance adjustment that no longer moves your range, out-of-range alert, and Add to Home Screen support."
 submitter: Patriot
 submission: https://github.com/PatriotCrypto/umbrel-patriot-apps
 icon: https://raw.githubusercontent.com/PatriotCrypto/umbrel-patriot-apps/main/patriot-coldfront/icon.svg
