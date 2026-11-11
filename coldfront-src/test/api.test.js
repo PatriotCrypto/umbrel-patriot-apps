@@ -22,6 +22,8 @@ async function boot() {
 
 test('state comes back in demo mode with rooms and a desired setpoint', async () => {
   const t = await boot();
+  t.h.store.data.settings.plan = 'schedule';
+  await t.h.engine.tick();
   const s = await (await t.j('/api/state')).json();
   assert.equal(s.mode, 'demo');
   assert.ok(s.thermostat.temp > 50);
@@ -267,4 +269,30 @@ test('reconnect is refused in demo mode', async () => {
     const r = await t.j('/api/reconnect', 'POST', {});
     assert.equal(r.status, 409);
   } finally { t.close(); }
+});
+
+test('comfort range, plan, keepAuto and the screen-lock code save and validate', async () => {
+  const t = await boot();
+  let r = await t.j('/api/settings', 'PUT', { comfort: { home: { heat: 67, cool: 73 } }, pin: '3445', keepAuto: false });
+  assert.equal(r.status, 200);
+  const s = (await r.json()).settings;
+  assert.deepEqual(s.comfort.home, { heat: 67, cool: 73 });
+  assert.equal(s.pin, '3445');
+  assert.equal(s.keepAuto, false);
+  assert.equal((await t.j('/api/settings', 'PUT', { pin: 'abcd' })).status, 400);
+  assert.equal((await t.j('/api/settings', 'PUT', { plan: 'nope' })).status, 400);
+  assert.equal((await t.j('/api/settings', 'PUT', { comfort: { home: { heat: 'x', cool: 70 } } })).status, 400);
+  const bk = await (await t.j('/api/backup')).json();
+  assert.equal(bk.data.settings.pin, '');
+  t.close();
+});
+
+test('insights include the whole-house view and an advisor', async () => {
+  const t = await boot();
+  const i = await (await t.j('/api/insights')).json();
+  assert.ok(i.house.now.average != null);
+  assert.ok(i.house.rooms.length >= 1);
+  assert.ok(i.house.advice && typeof i.house.advice.text === 'string');
+  assert.ok(i.house.equipment.duty >= 0);
+  t.close();
 });

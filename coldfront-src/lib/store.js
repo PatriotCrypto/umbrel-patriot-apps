@@ -16,7 +16,11 @@ const DEFAULTS = () => ({
     limits: { heatMin: 55, heatMax: 78, coolMin: 70, coolMax: 85, minGap: 3 },
     humidity: { min: 25, max: 60 },
     costPerHour: 0, // furnace running cost in dollars per hour, 0 = hide cost
-    roomAware: { enabled: false, roomId: null, maxOffset: 3 },
+    roomAware: { enabled: false, roomId: null, maxOffset: 3 }, // roomId may be 'avg' = the average of the thermostat and all included rooms
+    plan: 'range', // 'range' = keep the house between a Home low/high (Away has its own), 'schedule' = weekly periods
+    comfort: { home: { heat: 68, cool: 72 }, away: { heat: 62, cool: 80 } },
+    keepAuto: true, // a low/high range only works in the thermostat's Auto mode, so put it back if it drifts to Heat or Cool
+    pin: '', // the thermostat's screen-lock code, kept here only so it is not forgotten
     dashboard: null, // null = default widget layout; otherwise [{id, size:'2x3'}] in display order
     filter: { name: 'Furnace filter', lastChanged: null, intervalDays: 90, remindDaysBefore: 7 }, // set by hand
     weather: { lat: null, lon: null, name: '' }, // optional, for the Weather widget (Open-Meteo)
@@ -54,12 +58,25 @@ class Store {
       const raw = JSON.parse(fs.readFileSync(this.file, 'utf8'));
       this.data = merge(DEFAULTS(), raw);
       if (raw.schedule) this.data.schedule = raw.schedule;
+      if (!raw.settings || raw.settings.plan === undefined) this._migratePlan(raw);
     } catch (e) { if (e.code !== 'ENOENT') console.error('coldfront.json unreadable, starting fresh:', e.message); }
     try {
       const h = JSON.parse(fs.readFileSync(this.histFile, 'utf8'));
       this.history = { samples: Array.isArray(h.samples) ? h.samples : [], runs: Array.isArray(h.runs) ? h.runs : [] };
     } catch (e) { if (e.code !== 'ENOENT') console.error('history.json unreadable, starting fresh:', e.message); }
     return this;
+  }
+
+  /** Installs from before 0.5.0 had only a schedule. One flat schedule becomes a Home range; a real one is kept. */
+  _migratePlan(raw) {
+    if (!raw.schedule || !raw.schedule.days) return;
+    const keys = new Set();
+    for (const list of Object.values(raw.schedule.days)) for (const p of list) keys.add(`${p.heat}/${p.cool}`);
+    if (keys.size <= 1 && keys.size === 1) {
+      const [h, c] = [...keys][0].split('/').map(Number);
+      this.data.settings.plan = 'range';
+      this.data.settings.comfort.home = { heat: h, cool: c };
+    } else if (keys.size > 1) this.data.settings.plan = 'schedule';
   }
 
   _atomic(file, obj) {

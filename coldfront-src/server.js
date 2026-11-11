@@ -146,6 +146,7 @@ function createApp({ dataDir, zwaveUrl, now = () => Date.now(), simSpeed = 1, au
     const m = req.body?.mode;
     if (!['off', 'heat', 'cool', 'auto'].includes(m)) return bad(res, 'mode must be off, heat, cool or auto');
     res.json({ ok: true, pending: true });
+    engine.noteModeChoice(m);
     engine.adapter.setMode(m).then(() => store.event('mode', `Mode set to ${m}`), (e) => store.event('error', `Could not set mode ${m}: ${e.message}`));
   });
 
@@ -202,6 +203,31 @@ function createApp({ dataDir, zwaveUrl, now = () => Date.now(), simSpeed = 1, au
     }
     if (b.humidity) { const mn = num(b.humidity.min), mx = num(b.humidity.max); if (mn != null && mx != null && mn < mx && mn >= 0 && mx <= 100) s.humidity = { min: mn, max: mx }; else return bad(res, 'humidity range invalid'); }
     if (b.enforce !== undefined) s.enforce = !!b.enforce;
+    if (b.keepAuto !== undefined) { s.keepAuto = !!b.keepAuto; engine.modeTries = 0; engine.modeTriedAt = 0; }
+    if (b.plan !== undefined) {
+      if (!['range', 'schedule'].includes(b.plan)) return bad(res, 'plan must be range or schedule');
+      s.plan = b.plan;
+      engine._userChanged();
+    }
+    if (b.comfort) {
+      const out = { home: { ...s.comfort.home }, away: { ...s.comfort.away } };
+      for (const k of ['home', 'away']) {
+        const c = b.comfort[k];
+        if (c === undefined) continue;
+        const heat = num(c?.heat), cool = num(c?.cool);
+        if (heat == null || cool == null || Number.isNaN(heat) || Number.isNaN(cool)) return bad(res, `${k} low and high must be numbers`);
+        if (!(heat >= 40 && heat <= 90 && cool >= 60 && cool <= 95)) return bad(res, `${k} low and high are out of range`);
+        const c2 = clampPair(Math.round(heat), Math.round(cool), s.limits);
+        out[k] = { heat: c2.heat, cool: c2.cool };
+      }
+      s.comfort = out;
+      engine._userChanged();
+    }
+    if (b.pin !== undefined) {
+      const p = String(b.pin).trim();
+      if (p && !/^\d{3,8}$/.test(p)) return bad(res, 'The screen lock code is 3 to 8 digits');
+      s.pin = p;
+    }
     if (b.wallChange !== undefined) { if (!['hold', 'revert'].includes(b.wallChange)) return bad(res, 'wallChange must be hold or revert'); s.wallChange = b.wallChange; }
     if (b.costPerHour !== undefined) { const c = num(b.costPerHour); if (c == null || Number.isNaN(c) || c < 0 || c > 50) return bad(res, 'costPerHour invalid'); s.costPerHour = c; }
     if (b.tz !== undefined) { try { new Intl.DateTimeFormat('en-US', { timeZone: b.tz }); s.tz = b.tz; } catch { return bad(res, 'unknown time zone'); } }
@@ -255,6 +281,7 @@ function createApp({ dataDir, zwaveUrl, now = () => Date.now(), simSpeed = 1, au
     store.event('settings', 'Settings updated');
     if (switched) useAdapter();
     res.json({ settings: publicSettings() });
+    if (b.plan !== undefined || b.comfort || b.keepAuto !== undefined) engine.tick().catch(() => {});
   });
 
   // Demo only: flip the pretend basement water sensor so alerts and notifications can be tried before real hardware exists.
@@ -290,7 +317,7 @@ function createApp({ dataDir, zwaveUrl, now = () => Date.now(), simSpeed = 1, au
   };
 
   app.get('/api/insights', (req, res) => {
-    res.json(summarize({ history: engine.hist, events: store.data.events, rooms: store.data.rooms, ...roomMeta(), settings: store.data.settings, now: now() }));
+    res.json(summarize({ history: engine.hist, events: store.data.events, rooms: store.data.rooms, ...roomMeta(), settings: store.data.settings, snap: engine.last?.snap, now: now() }));
   });
 
   app.get('/api/events', (req, res) => res.json({ events: store.data.events.slice(-200).reverse() }));
@@ -304,7 +331,7 @@ function createApp({ dataDir, zwaveUrl, now = () => Date.now(), simSpeed = 1, au
 
   app.get('/api/backup', (req, res) => {
     res.setHeader('Content-Disposition', 'attachment; filename="coldfront-backup.json"');
-    const data = JSON.parse(JSON.stringify(store.data)); data.settings.ntfy.token = ''; res.json({ app: 'coldfront', version: 1, data });
+    const data = JSON.parse(JSON.stringify(store.data)); data.settings.ntfy.token = ''; data.settings.pin = ''; res.json({ app: 'coldfront', version: 1, data });
   });
 
   app.post('/api/restore', (req, res) => {
@@ -313,9 +340,11 @@ function createApp({ dataDir, zwaveUrl, now = () => Date.now(), simSpeed = 1, au
     try {
       const sch = validateSchedule(b.data.schedule);
       const keepToken = store.data.settings.ntfy.token;
+      const keepPin = store.data.settings.pin;
       store.data = require('./lib/store').merge(require('./lib/store').DEFAULTS(), { ...b.data, schedule: sch, hold: null, away: null });
       store.data.schedule = sch;
       store.data.settings.ntfy.token = keepToken;
+      store.data.settings.pin = keepPin;
       store.save();
       useAdapter();
       res.json({ ok: true });

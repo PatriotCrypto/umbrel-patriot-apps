@@ -50,16 +50,45 @@ class Engine {
   desired(snap) {
     const s = this.store.data;
     const now = new Date(this.now());
-    const d = resolve({ schedule: s.schedule, hold: s.hold, away: s.away, now, tz: this.settings.tz, limits: this.settings.limits });
+    const d = resolve({ schedule: this._plan(), hold: s.hold, away: s.away, now, tz: this.settings.tz, limits: this.settings.limits });
     if (!d) return null;
     return this._roomAdjust(d, snap, now.getTime());
+  }
+
+  get ranged() { return this.settings.plan !== 'schedule'; }
+
+  /** The base plan: the weekly schedule, or in range mode one flat Home period every day. */
+  _plan() {
+    if (!this.ranged) return this.store.data.schedule;
+    const h = this.settings.comfort.home;
+    const days = {};
+    for (const d of ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat']) days[d] = [{ id: `${d}0`, name: 'Home', time: '00:00', heat: h.heat, cool: h.cool }];
+    return { days };
+  }
+
+  /** Average of the thermostat and every included room that reported lately. */
+  houseAverage(snap, nowMs) {
+    const vals = [];
+    if (snap?.thermostat?.temp != null) vals.push(snap.thermostat.temp);
+    for (const r of snap?.sensors || []) {
+      if (this.store.data.rooms[r.nodeId]?.include === false) continue;
+      if (r.temp != null && nowMs - r.lastSeen <= 6 * 3600000) vals.push(r.temp);
+    }
+    return vals.length ? vals.reduce((a, b) => a + b, 0) / vals.length : null;
   }
 
   _roomAdjust(d, snap, nowMs) {
     const ra = this.settings.roomAware;
     if (!ra.enabled || !ra.roomId || d.source === 'away') return { ...d, adjust: 0 };
-    const room = snap?.sensors?.find((r) => String(r.nodeId) === String(ra.roomId));
-    if (!room || room.temp == null || nowMs - room.lastSeen > 30 * 60000) return { ...d, adjust: 0 };
+    let temp;
+    if (ra.roomId === 'avg') temp = this.houseAverage(snap, nowMs);
+    else {
+      const room = snap?.sensors?.find((r) => String(r.nodeId) === String(ra.roomId));
+      if (!room || room.temp == null || nowMs - room.lastSeen > 30 * 60000) return { ...d, adjust: 0 };
+      temp = room.temp;
+    }
+    if (temp == null) return { ...d, adjust: 0 };
+    const room = { temp };
     if (nowMs - this.offset.at >= 10 * 60000) {
       const max = Math.max(0, Math.min(5, ra.maxOffset));
       this.offset = {
@@ -97,6 +126,7 @@ class Engine {
 
     this._track(t, snap, nowMs);
     this._expireHold(nowMs);
+    await this._keepAuto(t, nowMs);
 
     const d = this.desired(snap);
     this.last.desired = d;
@@ -117,10 +147,11 @@ class Engine {
         this.log('external', `Setpoints changed outside Cold Front: heat ${this.expected.heat}→${obs.heat}, cool ${this.expected.cool}→${obs.cool}`);
         this.expected = obs;
         if (this.settings.wallChange === 'hold' && this.settings.enforce) {
-          const next = nextBoundary(this.store.data.schedule, new Date(nowMs), this.settings.tz);
-          this.store.data.hold = { heat: obs.heat, cool: obs.cool, until: next ? next.at.toISOString() : null, source: 'wall', since: nowMs };
+          const next = this.ranged ? null : nextBoundary(this.store.data.schedule, new Date(nowMs), this.settings.tz);
+          const until = next ? next.at : new Date(nowMs + 4 * 3600000); // no schedule to wait for: 4 hours
+          this.store.data.hold = { heat: obs.heat, cool: obs.cool, until: until.toISOString(), source: 'wall', since: nowMs };
           this.store.touch();
-          this.log('hold', `Holding ${obs.heat}/${obs.cool} until the next period`);
+          this.log('hold', `Holding ${obs.heat}/${obs.cool} ${next ? 'until the next period' : 'for 4 hours'}`);
           this.last.desired = this.desired(snap);
           this.last.status = 'ok';
           return;
@@ -147,6 +178,23 @@ class Engine {
       }
     } else this.last.status = 'ok';
   }
+
+  /** A low/high range only works in Auto. If the thermostat drifted to Heat or Cool, put it back (a few tries, then stop and say so). */
+  async _keepAuto(t, nowMs) {
+    if (!this.settings.keepAuto || !this.settings.enforce || !this.adapter.setMode) return;
+    if (t.mode === 'auto' || t.mode === 'off' || t.mode == null) { if (t.mode === 'auto') this.modeTries = 0; return; }
+    if (nowMs < (this.modeUserUntil || 0)) return; // you chose this mode in the app
+    if ((this.modeTries || 0) >= 3 || nowMs - (this.modeTriedAt || 0) < 10 * 60000) return;
+    this.modeTries = (this.modeTries || 0) + 1;
+    this.modeTriedAt = nowMs;
+    try {
+      await this.adapter.setMode('auto');
+      this.log('mode', `Thermostat was in ${t.mode}; switched to Auto so it can hold ${this.ranged ? 'the low/high range' : 'both setpoints'}`);
+    } catch (e) { this.log('error', `Could not switch the thermostat to Auto: ${e.message}`); }
+  }
+
+  /** The person picked a mode in the app: respect it for a while. */
+  noteModeChoice(mode) { this.modeUserUntil = this.now() + (mode === 'auto' ? 0 : 6 * 3600000); this.modeTries = 0; this.modeTriedAt = 0; }
 
   _nearBoundary(nowMs) {
     const sched = this.store.data.schedule;
@@ -201,6 +249,8 @@ class Engine {
       if (t.temp != null && t.temp < 45) out.push({ level: 'bad', key: 'freeze', text: `Indoor temperature is ${t.temp}°F. Pipes can freeze below about 40°F.` });
       if (t.temp != null && t.temp > 90) out.push({ level: 'bad', key: 'hot', text: `Indoor temperature is ${t.temp}°F.` });
       if (this.coldSince && nowMs - this.coldSince > 45 * 60000) out.push({ level: 'bad', key: 'noheat', text: 'The house is more than 3°F under the heat setpoint and the furnace is not running. Check the furnace.' });
+      const keeping = this.settings.keepAuto && this.settings.enforce && nowMs >= (this.modeUserUntil || 0) && (this.modeTries || 0) < 3;
+      if ((t.mode === 'heat' || t.mode === 'cool') && !keeping) out.push({ level: 'warn', key: 'modeauto', text: `The thermostat is in ${t.mode === 'heat' ? 'Heat' : 'Cool'} mode, so it will only ${t.mode === 'heat' ? 'heat' : 'cool'}. Switch it to Auto to hold both a low and a high.` });
       if (st === 'write-failed') out.push({ level: 'warn', key: 'write', text: `Could not change the thermostat: ${this.lastError}` });
     }
     const h = this.settings.humidity;
@@ -209,7 +259,8 @@ class Engine {
       if (r.humidity != null && r.humidity > h.max) out.push({ level: 'warn', key: `hum${r.nodeId}`, text: `${name} humidity is ${r.humidity}%.` });
       if (r.humidity != null && r.humidity < h.min) out.push({ level: 'info', key: `dry${r.nodeId}`, text: `${name} humidity is ${r.humidity}%, which is dry.` });
       if (r.battery != null && r.battery <= 20) out.push({ level: 'warn', key: `bat${r.nodeId}`, text: `${name} battery is at ${r.battery}%.` });
-      if (snap.kind !== 'sim' && nowMs - r.lastSeen > 3 * 3600000) out.push({ level: 'warn', key: `off${r.nodeId}`, text: `${name} has not reported in over 3 hours.` });
+      // battery sensors sleep and only report a change in temperature, so a quiet room can go many hours legitimately
+      if (snap.kind !== 'sim' && nowMs - r.lastSeen > 14 * 3600000) out.push({ level: 'info', key: `off${r.nodeId}`, text: `${name} has not checked in for ${Math.round((nowMs - r.lastSeen) / 3600000)} hours${r.battery != null ? ` (battery ${r.battery}%)` : ''}. It may be asleep, out of range, or need a battery.` });
     }
     for (const l of snap?.leaks || []) {
       const name = this.store.data.rooms[l.nodeId]?.name || l.name || `Water sensor ${l.nodeId}`;
@@ -226,7 +277,7 @@ class Engine {
     const snap = this.last.snap;
     const s = this.store.data;
     const d = this.last.desired;
-    const next = nextBoundary(s.schedule, new Date(nowMs), this.settings.tz);
+    const next = this.ranged ? null : nextBoundary(s.schedule, new Date(nowMs), this.settings.tz);
     const sensors = (snap?.sensors || []).map((r) => ({ ...r, name: s.rooms[r.nodeId]?.name || r.name || `Sensor ${r.nodeId}`, include: s.rooms[r.nodeId]?.include !== false }));
     return {
       now: nowMs,
@@ -248,6 +299,7 @@ class Engine {
     const s = this.store.data;
     const c = clampPair(heat, cool, this.settings.limits);
     let at = null;
+    if (until === 'next' && this.ranged) until = 4;
     if (until === 'next') { const n = nextBoundary(s.schedule, new Date(this.now()), this.settings.tz); at = n ? n.at.toISOString() : null; }
     else if (typeof until === 'number' && until > 0) at = new Date(this.now() + Math.min(until, 24 * 14) * 3600000).toISOString();
     if (s.away) { s.away = null; this.log('away', 'Away mode off (a hold was set)'); } // away outranks a hold, so setting a hold means you are home
@@ -269,7 +321,8 @@ class Engine {
   setAway({ on, heat, cool, hours }) {
     const s = this.store.data;
     if (!on) { if (s.away) this.log('away', 'Away mode off'); s.away = null; this._userChanged(); this.store.touch(); return null; }
-    const c = clampPair(heat ?? this.settings.limits.heatMin + 4, cool ?? this.settings.limits.coolMax - 2, this.settings.limits);
+    const aw = this.settings.comfort.away;
+    const c = clampPair(heat ?? aw.heat, cool ?? aw.cool, this.settings.limits);
     s.away = { heat: c.heat, cool: c.cool, until: hours ? new Date(this.now() + hours * 3600000).toISOString() : null, since: this.now() };
     this.log('away', `Away mode on: ${c.heat}/${c.cool}`);
     this._userChanged();

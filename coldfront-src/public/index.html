@@ -37,7 +37,25 @@
 
   <section id="tab-schedule" class="tab cols">
 <div class="col">
-<div class="card">
+<div class="card" id="planCard">
+      <h3>How should the house be kept?</h3>
+      <div class="plan2" id="planPick">
+        <button type="button" data-plan="range"><b>Comfort range</b><span>Stay between a low and a high, all day, every day. Tap Away when nobody is home.</span></button>
+        <button type="button" data-plan="schedule"><b>Weekly schedule</b><span>Different temperatures at different times of day.</span></button>
+      </div>
+      <div class="rangegrid" id="rangeEditor">
+        <div class="rangebox"><h4>Home</h4>
+          <div class="rpair"><span class="lbl">Low (heat below)</span><div class="mini"><button type="button" data-rg="home.heat" data-d="-1">−</button><b id="rg-home-heat">--</b><button type="button" data-rg="home.heat" data-d="1">+</button></div></div>
+          <div class="rpair"><span class="lbl">High (cool above)</span><div class="mini"><button type="button" data-rg="home.cool" data-d="-1">−</button><b id="rg-home-cool">--</b><button type="button" data-rg="home.cool" data-d="1">+</button></div></div>
+        </div>
+        <div class="rangebox"><h4>Away</h4>
+          <div class="rpair"><span class="lbl">Low (heat below)</span><div class="mini"><button type="button" data-rg="away.heat" data-d="-1">−</button><b id="rg-away-heat">--</b><button type="button" data-rg="away.heat" data-d="1">+</button></div></div>
+          <div class="rpair"><span class="lbl">High (cool above)</span><div class="mini"><button type="button" data-rg="away.cool" data-d="-1">−</button><b id="rg-away-cool">--</b><button type="button" data-rg="away.cool" data-d="1">+</button></div></div>
+        </div>
+      </div>
+      <p class="hint" id="planHint"></p>
+    </div>
+<div class="card" id="schedCard">
       <div class="row spread"><h3>Weekly schedule</h3><button id="saveSched" class="btn primary">Save</button></div>
       <div id="dayTabs" class="daytabs"></div>
       <div id="periods"></div>
@@ -50,7 +68,7 @@
     </div>
 </div>
 <div class="col">
-<div class="card">
+<div class="card" id="wallCard">
       <h3>Wall fallback</h3>
       <p class="hint">Key this into the thermostat itself so the house still follows a schedule if Umbrel is ever off. The T6 Pro holds four periods a day.</p>
       <div id="wall"></div>
@@ -76,31 +94,22 @@
 </div>
   </section>
 
-  <section id="tab-insights" class="tab cols">
-<div class="col">
-<div class="card">
-      <div class="row spread"><h3>Temperature</h3><div class="seg small" id="rangeSeg"><button data-h="24">24 h</button><button data-h="72">3 d</button><button data-h="168">7 d</button></div></div>
-      <div class="chartbox"><canvas id="chart"></canvas></div>
-      <div class="legend" id="chartLegend"></div>
-    </div>
-<div class="card">
-      <h3>Humidity</h3>
-      <div id="humNow" class="humnow"></div>
-      <div class="chartbox short"><canvas id="humchart"></canvas></div>
-      <div class="legend" id="humLegend"></div>
-      <div id="humStats" class="hint"></div>
-    </div>
-<div class="card"><h3>What I noticed</h3><ul id="findings" class="findings"></ul></div>
-<div class="card"><h3>Rooms, last 24 h</h3><div id="roomStats"></div></div>
-</div>
-<div class="col">
-<div class="card"><h3>Daily runtime</h3><div class="chartbox short"><canvas id="bars"></canvas></div><div class="legend"><span class="k heat">Heating</span><span class="k cool">Cooling</span></div><div id="totals" class="hint"></div></div>
-<div class="card">
-      <h3>Log</h3>
+  <section id="tab-insights" class="tab cc">
+  <div class="cc-head"><div><h2>Command Center</h2><p class="hint" id="ccSub">Every sensor, the whole house, and what to do about it.</p></div><div class="seg small" id="rangeSeg"><button data-h="24">24 h</button><button data-h="72">3 d</button><button data-h="168">7 d</button></div></div>
+  <div class="kpis" id="kpis"></div>
+  <div class="card advisor" id="advisor"></div>
+  <div class="ccgrid">
+    <div class="card span8"><h3>Temperature</h3><div class="chartbox"><canvas id="chart"></canvas></div><div class="legend" id="chartLegend"></div></div>
+    <div class="card span4"><h3>Rooms</h3><div id="roomMap"></div></div>
+    <div class="card span6"><h3>Humidity</h3><div id="humNow" class="humnow"></div><div class="chartbox short"><canvas id="humchart"></canvas></div><div class="legend" id="humLegend"></div><div id="humStats" class="hint"></div></div>
+    <div class="card span6"><h3>Daily runtime</h3><div class="chartbox short"><canvas id="bars"></canvas></div><div class="legend"><span class="k heat">Heating</span><span class="k cool">Cooling</span></div><div id="totals" class="hint"></div></div>
+    <div class="card span4"><h3>Nerd stats</h3><div id="nerd" class="nerd"></div></div>
+    <div class="card span4"><h3>What I noticed</h3><ul id="findings" class="findings"></ul></div>
+    <div class="card span4"><h3>Log</h3>
       <form id="noteForm" class="row gap"><input id="noteIn" type="text" maxlength="300" placeholder="Add a note…" autocomplete="off"><button class="btn">Add</button></form>
       <ul id="events" class="events"></ul>
     </div>
-</div>
+  </div>
   </section>
 
   <section id="tab-settings" class="tab cols">
@@ -124,6 +133,11 @@
       <h3>Appearance</h3>
       <p class="hint">Pick a look. The sun/moon button at the top switches between Daylight and your favourite dark theme.</p>
       <div id="themeList" class="themes"></div>
+    </div>
+<div class="card">
+      <h3>Thermostat screen lock</h3>
+      <p class="hint">If you locked the thermostat's screen so nobody changes it, keep the code here so you do not forget it. It stays on this Umbrel only and is left out of backups.</p>
+      <div class="row gap wrap"><input id="pinVal" type="password" inputmode="numeric" autocomplete="off" maxlength="8" placeholder="Not set" style="width:9em"><button id="pinShow" type="button" class="btn">Show</button><button id="pinSave" type="button" class="btn primary">Save code</button><span id="pinMsg" class="hint"></span></div>
     </div>
 <div class="card">
       <h3>Filter reminder</h3>
@@ -162,9 +176,10 @@
 <div class="card">
       <h3>Control</h3>
       <label>Your name (shown in the Dashboard greeting) <input id="setName" type="text" maxlength="30" placeholder="Optional" autocomplete="off"></label>
-      <label class="check"><input type="checkbox" id="setEnforce"> Cold Front sets the thermostat to follow the schedule</label>
+      <label class="check"><input type="checkbox" id="setEnforce"> Cold Front sets the thermostat to follow your comfort range or schedule</label>
+      <label class="check"><input type="checkbox" id="setKeepAuto"> Keep the thermostat in Auto (needed to hold both a low and a high)</label>
       <label>If someone changes it at the wall
-        <select id="setWall"><option value="hold">Hold that setting until the next period</option><option value="revert">Put the schedule back</option></select>
+        <select id="setWall"><option value="hold">Hold that setting (4 hours, or until the next period)</option><option value="revert">Put my range or schedule back</option></select>
       </label>
       <label class="check"><input type="checkbox" id="setRA"> Room-aware: nudge the setpoint toward a chosen room</label>
       <div class="row gap wrap"><select id="setRoom"></select><label class="inline">Max nudge <input id="setMax" type="number" min="0" max="5" step="1" style="width:5.5em"> °F</label></div>
@@ -195,7 +210,7 @@
 
 <nav class="tabs dock" aria-label="Sections">
   <button data-tab="dashboard" class="active" title="Dashboard"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="8" height="8" rx="2.500"/><rect x="13" y="3" width="8" height="5" rx="2"/><rect x="13" y="10" width="8" height="11" rx="2.500"/><rect x="3" y="13" width="8" height="8" rx="2.500"/></svg><span>Dashboard</span></button>
-  <button data-tab="schedule" title="Schedule"><svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="16" rx="3"/><path d="M3 10h18M8 3v4M16 3v4"/></svg><span>Schedule</span></button>
+  <button data-tab="schedule" title="Schedule"><svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="16" rx="3"/><path d="M3 10h18M8 3v4M16 3v4"/></svg><span>Comfort</span></button>
   <button data-tab="rooms" title="Rooms"><svg viewBox="0 0 24 24"><path d="M4 20V9l8-6 8 6v11a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1z"/><path d="M10 21v-6h4v6"/></svg><span>Rooms</span></button>
   <button data-tab="insights" title="Insights"><svg viewBox="0 0 24 24"><path d="M4 20V4M4 20h16"/><path d="M8 15l4-5 3 3 5-7"/></svg><span>Insights</span></button>
   <button data-tab="settings" title="Settings"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 2.500v3M12 18.500v3M2.500 12h3M18.500 12h3M5.300 5.300l2.100 2.100M16.600 16.600l2.100 2.100M18.700 5.300l-2.100 2.100M7.400 16.600l-2.100 2.100"/></svg><span>Settings</span></button>

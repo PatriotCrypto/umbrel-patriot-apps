@@ -4,7 +4,7 @@ const { dateKey } = require('./schedule');
 const avg = (a) => (a.length ? a.reduce((x, y) => x + y, 0) / a.length : null);
 const r1 = (v) => (v == null ? null : Math.round(v * 10) / 10);
 
-function summarize({ history, events, rooms, names = {}, skip = [], settings, now = Date.now(), days = 14 }) {
+function summarize({ history, events, rooms, names = {}, skip = [], settings, snap = null, now = Date.now(), days = 14 }) {
   const tz = settings.tz;
   const since = now - days * 86400000;
   const byDay = new Map();
@@ -82,8 +82,89 @@ function summarize({ history, events, rooms, names = {}, skip = [], settings, no
     if (mean > 60 && today > mean * 1.6) findings.push(`Heating ran ${Math.round(today)} min today against a recent average of ${Math.round(mean)} min.`);
   }
 
+  const house = houseView({ day, rooms, names, skip, settings, snap, now, history });
+
   const total = daily.reduce((a, d) => ({ heatMin: a.heatMin + d.heatMin, coolMin: a.coolMin + d.coolMin }), { heatMin: 0, coolMin: 0 });
-  return { daily, rooms: roomList, findings, totals: { ...total, cost: settings.costPerHour > 0 ? Math.round((total.heatMin / 60) * settings.costPerHour * 100) / 100 : null } };
+  return { daily, rooms: roomList, findings, house, totals: { ...total, cost: settings.costPerHour > 0 ? Math.round((total.heatMin / 60) * settings.costPerHour * 100) / 100 : null } };
+}
+
+/** The "command center" numbers: every room against the whole-house average, and what setting would balance them. */
+function houseView({ day, rooms, names, skip, settings, snap, now, history }) {
+  const skipped = (id) => skip.includes(String(id)) || skip.includes(Number(id));
+  const included = (id) => rooms[id]?.include !== false;
+  const nameOf = (id, fallback) => rooms[id]?.name || fallback || names[id] || `Sensor ${id}`;
+  const t = snap?.thermostat || null;
+
+  // right now
+  const list = [];
+  for (const r of snap?.sensors || []) {
+    if (skipped(r.nodeId)) continue;
+    list.push({ id: String(r.nodeId), name: nameOf(r.nodeId, r.name), temp: r.temp ?? null, humidity: r.humidity ?? null, battery: r.battery ?? null, lastSeen: r.lastSeen || null, include: included(r.nodeId), ageMin: r.lastSeen ? Math.round((now - r.lastSeen) / 60000) : null });
+  }
+  const fresh = (r) => r.temp != null && r.include && r.ageMin != null && r.ageMin <= 360;
+  const pts = [];
+  if (t && t.temp != null) pts.push(t.temp);
+  for (const r of list) if (fresh(r)) pts.push(r.temp);
+  const avgNow = avg(pts);
+  const rowsNow = list.map((r) => ({ ...r, delta: avgNow != null && r.temp != null ? r1(r.temp - avgNow) : null, counted: fresh(r) }));
+  const spread = pts.length > 1 ? r1(Math.max(...pts) - Math.min(...pts)) : null;
+  const warm = rowsNow.filter((r) => r.counted && r.temp != null).sort((a, b) => b.temp - a.temp);
+
+  // last 24 h, sample by sample
+  const houseSeries = [];
+  const thermoSeries = [];
+  for (const smp of day) {
+    if (smp.in == null) continue;
+    const v = [smp.in];
+    for (const [id, r] of Object.entries(smp.rooms || {})) if (!skipped(id) && included(id) && r.t != null) v.push(r.t);
+    houseSeries.push(avg(v));
+    thermoSeries.push(smp.in);
+  }
+  const avg24 = r1(avg(houseSeries));
+  const thermo24 = r1(avg(thermoSeries));
+  const home = settings.comfort?.home || { heat: 68, cool: 72 };
+  const lo = settings.plan === 'schedule' ? null : home.heat, hi = settings.plan === 'schedule' ? null : home.cool;
+  const inBand = (v) => lo == null || (v >= lo - 0.5 && v <= hi + 0.5);
+  const comfortPct = thermoSeries.length ? Math.round((thermoSeries.filter(inBand).length / thermoSeries.length) * 100) : null;
+  const houseComfortPct = houseSeries.length ? Math.round((houseSeries.filter(inBand).length / houseSeries.length) * 100) : null;
+
+  // equipment, last 24 h
+  const dayStart = now - 86400000;
+  let heatMin = 0, coolMin = 0, runs = 0, runMin = 0;
+  for (const r of history.runs) {
+    const end = r.end || now;
+    if (end < dayStart || r.kind === 'fan') continue;
+    const m = (end - Math.max(r.start, dayStart)) / 60000;
+    if (r.kind === 'heating') heatMin += m; else coolMin += m;
+    runs += 1; runMin += m;
+  }
+  const first = history.samples.length ? history.samples[0].t : null;
+
+  // advisor: shift the Home range by how far the whole house sits from the thermostat's own reading
+  let advice = null;
+  const roomCount = rowsNow.filter((r) => r.counted).length;
+  if (roomCount > 0 && avg24 != null && thermo24 != null) {
+    const diff = r1(avg24 - thermo24);
+    const shift = Math.round(diff);
+    const sug = { heat: home.heat - shift, cool: home.cool - shift };
+    const lim = settings.limits;
+    sug.heat = Math.min(lim.heatMax, Math.max(lim.heatMin, sug.heat));
+    sug.cool = Math.min(lim.coolMax, Math.max(lim.coolMin, sug.cool));
+    const mid = (home.heat + home.cool) / 2;
+    let text;
+    if (shift === 0) text = `The whole house averages ${avg24}°, within about a degree of the thermostat (${thermo24}°). Your ${home.heat}-${home.cool}° range is already a good middle ground.`;
+    else text = `The thermostat reads ${Math.abs(diff)}° ${diff > 0 ? 'cooler' : 'warmer'} than the house average (${avg24}° against ${thermo24}°). To land the average room near ${mid}°, set the range to ${sug.heat}-${sug.cool}°.`;
+    advice = { diff, houseAvg: avg24, thermoAvg: thermo24, mid, suggest: sug, current: { heat: home.heat, cool: home.cool }, needed: shift !== 0 && (sug.heat !== home.heat || sug.cool !== home.cool), text };
+  }
+
+  return {
+    now: { thermostat: t?.temp ?? null, humidity: t?.humidity ?? null, average: r1(avgNow), spread, counted: pts.length, warmest: warm[0] ? { name: warm[0].name, temp: warm[0].temp } : null, coolest: warm.length > 1 ? { name: warm[warm.length - 1].name, temp: warm[warm.length - 1].temp } : null },
+    rooms: rowsNow,
+    day: { avgHouse: avg24, avgThermostat: thermo24, min: thermoSeries.length ? r1(Math.min(...thermoSeries)) : null, max: thermoSeries.length ? r1(Math.max(...thermoSeries)) : null, comfortPct, houseComfortPct, band: lo == null ? null : { lo, hi } },
+    equipment: { heatMin: Math.round(heatMin), coolMin: Math.round(coolMin), cycles: runs, avgRunMin: runs ? r1(runMin / runs) : null, duty: r1((runMin / 1440) * 100) },
+    data: { samples: history.samples.length, since: first, hours: first ? Math.round((now - first) / 3600000) : 0, rooms: list.length },
+    advice,
+  };
 }
 
 module.exports = { summarize };

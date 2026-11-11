@@ -7,7 +7,7 @@
   var curDay = 'mon';
   var DAYS = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'];
   var LBL = { sun: 'Sun', mon: 'Mon', tue: 'Tue', wed: 'Wed', thu: 'Thu', fri: 'Fri', sat: 'Sat' };
-  var pending = null, pendTimer = null, range = 24, activeTab = 'dashboard', schedDirty = false, settingsLoaded = false;
+  var pending = null, pendSaving = false, pendTimer = null, range = 24, activeTab = 'dashboard', schedDirty = false, settingsLoaded = false;
   var INS = null, EVT = null;
   var FONT = '-apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", Inter, Roboto, sans-serif';
   var THEMES = {
@@ -48,7 +48,7 @@
   function hrs1(min) { return (Math.round(min / 6) / 10) + ' h'; }
 
   // ---- tabs
-  var TITLES = { dashboard: 'Dashboard', schedule: 'Schedule', rooms: 'Rooms', insights: 'Insights', settings: 'Settings' };
+  var TITLES = { dashboard: 'Dashboard', schedule: 'Comfort', rooms: 'Rooms', insights: 'Insights', settings: 'Settings' };
   $$('.tabs button').forEach(function (b) { b.onclick = function () { showTab(b.dataset.tab); }; });
   function showTab(t) {
     if (t !== 'dashboard' && editing) stopEdit();
@@ -109,11 +109,27 @@
     if (h >= 30 && h <= 50) return { k: 'good', label: 'Good', c: HUMC.good, tip: 'Comfortable range (30 to 50%).' };
     return { k: 'fair', label: h < 30 ? 'A bit dry' : 'A bit humid', c: HUMC.fair, tip: 'Acceptable, but outside the ideal 30 to 50% range.' };
   }
+  function ranged() { return !S || !S.settings || S.settings.plan !== 'schedule'; }
+  function saveRange() {
+    clearTimeout(pendTimer);
+    if (!pending) return;
+    var p = pending, key = S.away ? 'away' : 'home', body = { comfort: {} };
+    body.comfort[key] = { heat: p.heat, cool: p.cool };
+    pendSaving = true; updateWidgets();
+    api('PUT', '/api/settings', body).then(function (r) { S.settings = r.settings; pending = null; pendSaving = false; toast('Saved'); return refresh(); })
+      .catch(function (e) { pending = null; pendSaving = false; toast(e.message); refresh(); });
+  }
+  function cancelPending() { clearTimeout(pendTimer); pending = null; updateWidgets(); }
   function sendHold(u) {
     clearTimeout(pendTimer);
     if (!pending) return;
     var p = pending, until = u === 'next' ? 'next' : (+u > 0 ? +u : null);
     api('POST', '/api/setpoints', { heat: p.heat, cool: p.cool, until: until }).then(function () { pending = null; toast('Hold set'); return refresh(); }).catch(function (e) { pending = null; toast(e.message); refresh(); });
+  }
+  function setModeAuto(btn) {
+    if (btn) btn.disabled = true;
+    PEND.mode = { v: 'auto', at: Date.now() };
+    api('POST', '/api/mode', { mode: 'auto' }).then(function () { toast('Auto sent to thermostat'); setTimeout(refresh, 4000); setTimeout(refresh, 12000); }).catch(function (e) { delete PEND.mode; toast(e.message); }).then(function () { if (btn) btn.disabled = false; });
   }
   function markFilter() {
     api('POST', '/api/filter/changed', {}).then(function () { toast('Filter marked changed'); settingsLoaded = false; return refresh(); }).then(function () { if (activeTab === 'settings') fillSettings(true); }).catch(function (e) { toast(e.message); });
@@ -127,7 +143,9 @@
         b.innerHTML = '<div class="tstat"><div class="dial"></div><div class="tctl"><div class="status"></div><div class="stepgroup">' +
           '<div class="stepper heatc"><span class="lbl">Heat to</span><button data-step="heat" data-d="-1" aria-label="Heat down">−</button><b class="hv">--</b><button data-step="heat" data-d="1" aria-label="Heat up">+</button></div>' +
           '<div class="stepper coolc"><span class="lbl">Cool to</span><button data-step="cool" data-d="-1" aria-label="Cool down">−</button><b class="cv">--</b><button data-step="cool" data-d="1" aria-label="Cool up">+</button></div></div>' +
-          '<div class="holdbar" hidden><span>Hold for</span><button data-hold="next">Until next period</button><button data-hold="2">2 h</button><button data-hold="8">8 h</button><button data-hold="0">Until I cancel</button></div>' +
+          '<div class="holdbar" hidden><span class="hbq">How long should this last?</span><button data-hold="next">Until next period</button><button data-hold="2">2 hours</button><button data-hold="8">8 hours</button><button data-hold="0">Until I cancel</button><button data-hold="x" class="hbx">Cancel</button></div>' +
+          '<div class="savebar" hidden><span></span><button data-sv="x">Undo</button></div>' +
+          '<div class="modewarn" hidden><span></span><button type="button">Switch to Auto</button></div>' +
           '<div class="holdinfo" hidden></div></div></div>';
         $$('[data-step]', b).forEach(function (btn) {
           btn.onclick = function () {
@@ -139,10 +157,13 @@
             else { p.cool = Math.min(lim.coolMax, Math.max(lim.coolMin, p.cool)); if (p.heat > p.cool - gap) p.heat = Math.max(lim.heatMin, p.cool - gap); }
             pending = p; updateWidgets();
             clearTimeout(pendTimer);
-            pendTimer = setTimeout(function () { sendHold('next'); }, 1600);
+            // range mode: just save the new low/high shortly after the last tap. Schedule mode: wait until you pick how long.
+            if (ranged()) pendTimer = setTimeout(saveRange, 900);
           };
         });
-        $$('[data-hold]', b).forEach(function (btn) { btn.onclick = function () { sendHold(btn.dataset.hold === '0' ? null : btn.dataset.hold); }; });
+        $$('[data-hold]', b).forEach(function (btn) { btn.onclick = function () { if (btn.dataset.hold === 'x') return cancelPending(); sendHold(btn.dataset.hold === '0' ? null : btn.dataset.hold); }; });
+        $('.savebar button', b).onclick = cancelPending;
+        $('.modewarn button', b).onclick = function () { setModeAuto(this); };
       },
       update: function (b) {
         var t = S.thermostat, d = S.desired, p = pair();
@@ -153,14 +174,26 @@
         if (!S.adapter.connected) st = 'Waiting for the Z-Wave server…';
         else if (!t) st = 'No thermostat paired yet';
         else if (S.away) st = 'Away' + (S.away.until ? ' until ' + fmtClock(S.away.until) : '');
+        else if (d && ranged() && d.source === 'schedule') st = 'Keeps the house between ' + d.heat + '° and ' + d.cool + '°';
+        else if (d && d.source === 'hold') st = 'Hold · ' + d.heat + '–' + d.cool + '°';
         else if (d) st = d.label + (S.next ? ' · next: ' + S.next.name + ' at ' + fmtClock(S.next.at) : '');
+        if (S.away && t) st = 'Away · keeps ' + (S.away.heat) + '–' + (S.away.cool) + '°' + (S.away.until ? ' until ' + fmtClock(S.away.until) : '');
         if (d && d.adjust) st += ' · room-adjusted ' + (d.adjust > 0 ? '+' : '') + d.adjust + '°';
         $('.status', b).textContent = st;
-        $('.holdbar', b).hidden = !pending;
+        var rg = ranged();
+        $('.heatc .lbl', b).textContent = rg ? 'Low' : 'Heat to'; $('.coolc .lbl', b).textContent = rg ? 'High' : 'Cool to';
+        $('.holdbar', b).hidden = !pending || rg;
+        var sv = $('.savebar', b);
+        sv.hidden = !(pending && rg);
+        $('span', sv).textContent = pendSaving ? 'Saving…' : 'Saving ' + (pending ? pending.heat + '–' + pending.cool + '°' : '') + ' for ' + (S.away ? 'Away' : 'Home') + '…';
+        var mw = $('.modewarn', b);
+        var wrongMode = !!t && (t.mode === 'heat' || t.mode === 'cool') && !PEND.mode;
+        mw.hidden = !wrongMode;
+        if (wrongMode) $('span', mw).textContent = 'Thermostat is in ' + (t.mode === 'heat' ? 'Heat' : 'Cool') + ' mode, so it will only ' + t.mode + '. Auto holds both the low and the high.';
         var hi = $('.holdinfo', b);
         if (S.hold && !pending) {
           hi.hidden = false;
-          hi.innerHTML = '<span>Hold ' + S.hold.heat + '/' + S.hold.cool + (S.hold.until ? ' until ' + esc(fmtClock(S.hold.until)) : ' until cancelled') + '</span><button class="btn">Resume schedule</button>';
+          hi.innerHTML = '<span>Hold ' + S.hold.heat + '/' + S.hold.cool + (S.hold.until ? ' until ' + esc(fmtClock(S.hold.until)) : ' until cancelled') + '</span><button class="btn">' + (ranged() ? 'Back to my range' : 'Resume schedule') + '</button>';
           $('button', hi).onclick = function () { api('DELETE', '/api/hold').then(refresh).catch(function (e) { toast(e.message); }); };
         } else hi.hidden = true;
       }
@@ -382,8 +415,39 @@
 
   // ---- schedule
   function loadSchedule() {
+    renderPlan();
     return api('GET', '/api/schedule').then(function (r) { sched = r.schedule; schedDirty = false; renderSchedule(r.wall); });
   }
+  // ---- comfort range (the simple way)
+  var rgSave = null;
+  function renderPlan() {
+    if (!S || !S.settings) return;
+    var st = S.settings, rg = st.plan !== 'schedule', c = st.comfort;
+    $$('#planPick button').forEach(function (b) { b.classList.toggle('on', b.dataset.plan === (rg ? 'range' : 'schedule')); });
+    $('#rangeEditor').hidden = !rg;
+    $('#schedCard').hidden = rg; $('#wallCard').hidden = rg;
+    $('#rg-home-heat').textContent = c.home.heat + '°'; $('#rg-home-cool').textContent = c.home.cool + '°';
+    $('#rg-away-heat').textContent = c.away.heat + '°'; $('#rg-away-cool').textContent = c.away.cool + '°';
+    $('#planHint').textContent = rg
+      ? 'Home: the heat comes on below ' + c.home.heat + '° and the AC above ' + c.home.cool + '°. Between the two nothing runs. Tap Away on the dashboard when nobody is home and it uses the Away range instead. Changes apply right away.'
+      : 'Cold Front follows the weekly schedule below. A hold or Away overrides it.';
+  }
+  $$('#planPick button').forEach(function (b) {
+    b.onclick = function () {
+      api('PUT', '/api/settings', { plan: b.dataset.plan }).then(function (r) { S.settings = r.settings; renderPlan(); toast(b.dataset.plan === 'range' ? 'Using your comfort range' : 'Using the weekly schedule'); return refresh(); }).catch(function (e) { toast(e.message); });
+    };
+  });
+  $$('#rangeEditor [data-rg]').forEach(function (b) {
+    b.onclick = function () {
+      var k = b.dataset.rg.split('.'), c = S.settings.comfort, lim = S.settings.limits, gap = lim.minGap;
+      var v = c[k[0]][k[1]] + (+b.dataset.d), o = c[k[0]];
+      if (k[1] === 'heat') { v = Math.min(lim.heatMax, Math.max(lim.heatMin, v)); o.heat = v; if (o.cool < v + gap) o.cool = Math.min(lim.coolMax, v + gap); }
+      else { v = Math.min(lim.coolMax, Math.max(lim.coolMin, v)); o.cool = v; if (o.heat > v - gap) o.heat = Math.max(lim.heatMin, v - gap); }
+      renderPlan();
+      clearTimeout(rgSave);
+      rgSave = setTimeout(function () { api('PUT', '/api/settings', { comfort: S.settings.comfort }).then(function (r) { S.settings = r.settings; renderPlan(); toast('Saved'); return refresh(); }).catch(function (e) { toast(e.message); refresh(); }); }, 700);
+    };
+  });
   function renderSchedule(wall) {
     $('#dayTabs').innerHTML = DAYS.map(function (d) { return '<button data-d="' + d + '" class="' + (d === curDay ? 'on' : '') + '">' + LBL[d] + '</button>'; }).join('');
     $$('#dayTabs button').forEach(function (b) { b.onclick = function () { curDay = b.dataset.d; renderSchedule(); }; });
@@ -656,6 +720,58 @@
       pts.forEach(function (p, i) { if (i) x.lineTo(X(p.t), Y(p.v)); else x.moveTo(X(p.t), Y(p.v)); }); x.stroke();
     });
   }
+  // ---- command center
+  function ago(min) { if (min == null) return 'never'; if (min < 2) return 'just now'; if (min < 90) return min + ' min ago'; if (min < 2880) return Math.round(min / 60) + ' h ago'; return Math.round(min / 1440) + ' d ago'; }
+  function deltaColor(d) { var a = Math.abs(d); return a <= 1 ? HUMC.good : a <= 2.5 ? HUMC.fair : HUMC.bad; }
+  function tile(label, val, sub, color) { return '<div class="kpi"><span class="kl">' + esc(label) + '</span><b class="kv"' + (color ? ' style="color:' + color + '"' : '') + '>' + val + '</b><span class="ks">' + sub + '</span></div>'; }
+  function renderCommand(ins) {
+    var h = ins.house; if (!h) return;
+    var n = h.now, d = h.day, e = h.equipment, t = S && S.thermostat, L = humLevel(n.humidity);
+    var k = '';
+    k += tile('Indoor now', n.thermostat != null ? fmtT(n.thermostat) + '°' : '--', t ? esc(t.opState === 'idle' ? 'Idle' : t.opState) + ' · ' + esc(t.mode) : '');
+    k += tile('House average', n.average != null ? fmtT(n.average) + '°' : '--', n.counted + (n.counted === 1 ? ' reading' : ' readings') + ' counted');
+    k += tile('Spread', n.spread != null ? fmtT(n.spread) + '°' : '--', n.warmest && n.coolest ? esc(n.coolest.name) + ' ' + fmtT(n.coolest.temp) + '° to ' + esc(n.warmest.name) + ' ' + fmtT(n.warmest.temp) + '°' : 'add room sensors', n.spread != null ? deltaColor(n.spread / 2) : null);
+    k += tile('Humidity', n.humidity != null ? Math.round(n.humidity) + '%' : '--', L ? esc(L.label) : '', L ? L.c : null);
+    k += tile('Equipment, 24 h', e.duty + '%', 'duty cycle · ' + hrs1(e.heatMin + e.coolMin) + ' · ' + e.cycles + (e.cycles === 1 ? ' cycle' : ' cycles'));
+    k += tile('In comfort, 24 h', d.comfortPct != null && d.band ? d.comfortPct + '%' : '--', d.band ? 'between ' + d.band.lo + '° and ' + d.band.hi + '°' + (d.houseComfortPct != null && h.data.rooms ? ' · house ' + d.houseComfortPct + '%' : '') : 'schedule mode', d.comfortPct != null && d.band ? (d.comfortPct >= 80 ? HUMC.good : d.comfortPct >= 50 ? HUMC.fair : HUMC.bad) : null);
+    var w = WX && WX.data && WX.data.now;
+    if (w && w.temp != null) k += tile('Outside', Math.round(w.temp) + '°', n.thermostat != null ? (Math.round(n.thermostat - w.temp) >= 0 ? '+' : '') + Math.round(n.thermostat - w.temp) + '° inside vs out' : esc(w.label || ''));
+    $('#kpis').innerHTML = k;
+
+    var a = h.advice;
+    $('#advisor').innerHTML = a
+      ? '<div class="adv-l"><span class="kl">Balance advisor</span><p>' + esc(a.text) + '</p></div>' + (a.needed && S.settings.plan !== 'schedule' ? '<div class="adv-r"><div class="adv-pair"><span>Now ' + a.current.heat + '–' + a.current.cool + '°</span><b>' + a.suggest.heat + '–' + a.suggest.cool + '°</b></div><button class="btn primary" id="advApply">Apply</button></div>' : '')
+      : '<div class="adv-l"><span class="kl">Balance advisor</span><p>With one or more room sensors reporting, this compares every room to the thermostat and suggests the low and high that keep the whole house equally comfortable. Four more sensors will make it much sharper.</p></div>';
+    var ap = $('#advApply');
+    if (ap) ap.onclick = function () { ap.disabled = true; api('PUT', '/api/settings', { comfort: { home: a.suggest } }).then(function (r) { S.settings = r.settings; toast('Home range set to ' + a.suggest.heat + '–' + a.suggest.cool + '°'); return refresh(); }).then(loadInsights).catch(function (er) { toast(er.message); ap.disabled = false; }); };
+
+    var stats = {}; (ins.rooms || []).forEach(function (r) { stats[r.id] = r; });
+    var rows = '';
+    if (n.thermostat != null) rows += '<div class="rm"><div class="rm-top"><b>Thermostat</b><span class="rm-t">' + fmtT(n.thermostat) + '°</span></div><div class="rm-sub">' + (n.humidity != null ? Math.round(n.humidity) + '% humidity · ' : '') + 'the wall unit</div></div>';
+    h.rooms.forEach(function (r) {
+      var st = stats[r.id], dl = r.delta, off = r.ageMin != null && r.ageMin > 14 * 60;
+      var track = dl != null ? '<div class="rm-track"><i style="left:' + Math.max(2, Math.min(98, 50 + dl * 12)) + '%;background:' + deltaColor(dl) + '"></i></div>' : '';
+      rows += '<div class="rm' + (r.counted ? '' : ' dim') + '"><div class="rm-top"><b>' + esc(r.name) + '</b><span class="rm-t">' + (r.temp != null ? fmtT(r.temp) + '°' : '--') + (dl != null ? ' <em style="color:' + deltaColor(dl) + '">' + (dl > 0 ? '+' : '') + fmtT(dl) + '</em>' : '') + '</span></div>' + track +
+        '<div class="rm-sub">' + (r.humidity != null ? Math.round(r.humidity) + '% · ' : '') + (st && st.minTemp != null ? '24 h ' + fmtT(st.minTemp) + '–' + fmtT(st.maxTemp) + '° · ' : '') + (r.battery != null ? 'battery ' + r.battery + '% · ' : '') + '<span' + (off ? ' class="warnt"' : '') + '>heard ' + ago(r.ageMin) + '</span>' + (r.include ? '' : ' · not counted') + '</div></div>';
+    });
+    if (!h.rooms.length) rows += '<p class="hint">No room sensors reporting yet. New sensors show up here on their own once they are paired; name them on the Rooms tab.</p>';
+    else rows += '<p class="hint rm-foot">The dot shows each room against the house average (centre). Green is within 1°.</p>';
+    $('#roomMap').innerHTML = rows;
+
+    var dd = h.data;
+    $('#nerd').innerHTML = [
+      ['Thermostat avg, 24 h', d.avgThermostat != null ? fmtT(d.avgThermostat) + '°' : '--'],
+      ['House avg, 24 h', d.avgHouse != null ? fmtT(d.avgHouse) + '°' : '--'],
+      ['Low / high, 24 h', d.min != null ? fmtT(d.min) + '° / ' + fmtT(d.max) + '°' : '--'],
+      ['Heat runtime', hrs1(e.heatMin)], ['Cool runtime', hrs1(e.coolMin)],
+      ['Cycles', e.cycles + (e.avgRunMin != null ? ' · avg ' + Math.round(e.avgRunMin) + ' min' : '')],
+      ['Duty cycle', e.duty + '%'],
+      ['Sensors', dd.rooms + ' room' + (dd.rooms === 1 ? '' : 's') + ' + thermostat'],
+      ['Samples stored', dd.samples + ' (every 5 min)'],
+      ['Data window', dd.hours >= 48 ? Math.round(dd.hours / 24) + ' days' : dd.hours + ' h']
+    ].map(function (r) { return '<div class="nr"><span>' + esc(r[0]) + '</span><b>' + esc(r[1]) + '</b></div>'; }).join('');
+    $('#ccSub').textContent = n.counted > 1 ? 'Averaging the thermostat and ' + (n.counted - 1) + ' room sensor' + (n.counted === 2 ? '' : 's') + '.' : 'Every sensor, the whole house, and what to do about it.';
+  }
   var insChart = null;
   function loadInsights() {
     Promise.all([api('GET', '/api/history?hours=' + range), api('GET', '/api/insights'), api('GET', '/api/events')]).then(function (a) {
@@ -666,9 +782,7 @@
       drawBars(a[1].daily); lastHist = a[0]; drawHumidity();
       $('#findings').innerHTML = (a[1].findings.length ? a[1].findings : ['Nothing unusual. Cold Front will flag short cycling, wall changes, humidity and sensor gaps here.']).map(function (f) { return '<li>' + esc(f) + '</li>'; }).join('');
       var tt = a[1].totals; $('#totals').textContent = (!tt.heatMin && !tt.coolMin) ? 'The system has not run in this window yet, or the thermostat has only just been added. Totals build up as it heats and cools.' : 'Heating ' + Math.round(tt.heatMin / 60 * 10) / 10 + ' h, cooling ' + Math.round(tt.coolMin / 60 * 10) / 10 + ' h' + (tt.cost != null ? ', about $' + tt.cost.toFixed(2) + ' heating' : '') + '.';
-      $('#roomStats').innerHTML = a[1].rooms.length ? a[1].rooms.map(function (r) {
-        return '<div class="rstat"><b>' + esc(r.name) + '</b><span>avg ' + fmtT(r.avgTemp) + '°</span><span>' + fmtT(r.minTemp) + '–' + fmtT(r.maxTemp) + '°</span><span>' + (r.avgHum != null ? Math.round(r.avgHum) + '%' : '') + '</span></div>';
-      }).join('') : '<p class="hint">No room sensors reporting yet.</p>';
+      renderCommand(a[1]);
       $('#events').innerHTML = a[2].events.map(function (e) { return '<li><time>' + esc(new Date(e.t).toLocaleString([], { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })) + '</time>' + esc(e.msg) + '</li>'; }).join('');
       updateWidgets();
     }).catch(function (e) { toast(e.message); });
@@ -687,9 +801,9 @@
     settingsLoaded = true;
     var s = S.settings, l = s.limits;
     renderWxSetting();
-    $('#setName').value = s.name || ''; $('#setEnforce').checked = s.enforce; $('#setWall').value = s.wallChange;
+    $('#setName').value = s.name || ''; $('#setEnforce').checked = s.enforce; $('#setKeepAuto').checked = s.keepAuto !== false; $('#pinVal').value = s.pin || ''; $('#setWall').value = s.wallChange;
     $('#setRA').checked = s.roomAware.enabled; $('#setMax').value = s.roomAware.maxOffset;
-    $('#setRoom').innerHTML = S.sensors.map(function (r) { return '<option value="' + esc(r.nodeId) + '"' + (String(s.roomAware.roomId) === String(r.nodeId) ? ' selected' : '') + '>' + esc(r.name) + '</option>'; }).join('') || '<option value="">(no sensors yet)</option>';
+    $('#setRoom').innerHTML = '<option value="avg"' + (s.roomAware.roomId === 'avg' ? ' selected' : '') + '>All rooms (average)</option>' + S.sensors.map(function (r) { return '<option value="' + esc(r.nodeId) + '"' + (String(s.roomAware.roomId) === String(r.nodeId) ? ' selected' : '') + '>' + esc(r.name) + '</option>'; }).join('') || '<option value="">(no sensors yet)</option>';
     $('#limHeatMin').value = l.heatMin; $('#limHeatMax').value = l.heatMax; $('#limCoolMin').value = l.coolMin; $('#limCoolMax').value = l.coolMax; $('#limGap').value = l.minGap;
     $('#humMin').value = s.humidity.min; $('#humMax').value = s.humidity.max; $('#setCost').value = s.costPerHour; $('#setTz').value = s.tz;
     var fl = s.filter; $('#fName').value = fl.name; $('#fLast').value = fl.lastChanged || ''; $('#fEvery').value = fl.intervalDays; $('#fLead').value = fl.remindDaysBefore;
@@ -712,13 +826,18 @@
   };
   $('#saveSettings').onclick = function () {
     var body = {
-      name: $('#setName').value.trim(), enforce: $('#setEnforce').checked, wallChange: $('#setWall').value,
+      name: $('#setName').value.trim(), enforce: $('#setEnforce').checked, keepAuto: $('#setKeepAuto').checked, wallChange: $('#setWall').value,
       roomAware: { enabled: $('#setRA').checked, roomId: $('#setRoom').value || null, maxOffset: +$('#setMax').value },
       limits: { heatMin: +$('#limHeatMin').value, heatMax: +$('#limHeatMax').value, coolMin: +$('#limCoolMin').value, coolMax: +$('#limCoolMax').value, minGap: +$('#limGap').value },
       humidity: { min: +$('#humMin').value, max: +$('#humMax').value }, costPerHour: +$('#setCost').value, tz: $('#setTz').value.trim()
     };
     if (S.sensors.length && body.roomAware.enabled && !body.roomAware.roomId) return toast('Pick a room for room-aware');
     api('PUT', '/api/settings', body).then(function () { $('#settingsMsg').textContent = 'Saved'; setTimeout(function () { $('#settingsMsg').textContent = ''; }, 2500); return refresh(); }).catch(function (e) { toast(e.message); });
+  };
+  $('#pinShow').onclick = function () { var i = $('#pinVal'); var show = i.type === 'password'; i.type = show ? 'text' : 'password'; this.textContent = show ? 'Hide' : 'Show'; };
+  $('#pinSave').onclick = function () {
+    var v = $('#pinVal').value.trim();
+    api('PUT', '/api/settings', { pin: v }).then(function (r) { S.settings = r.settings; $('#pinMsg').textContent = v ? 'Saved' : 'Cleared'; setTimeout(function () { $('#pinMsg').textContent = ''; }, 2500); }).catch(function (e) { toast(e.message); });
   };
   function renderWxSetting() {
     var w = S && S.settings && S.settings.weather;
@@ -810,7 +929,8 @@
   // ---- polling
   function renderGlobal() {
     $('#demoBadge').hidden = S.mode !== 'demo'; $('#demoBadge2').hidden = S.mode !== 'demo'; greet();
-    $('#alerts').innerHTML = S.alerts.map(function (a) { return '<div class="alert ' + esc(a.level) + '">' + esc(a.text) + (a.key === 'link' && S.mode === 'live' ? ' <button type="button" class="btn sm" data-reconnect>Reconnect</button>' : '') + '</div>'; }).join('');
+    $('#alerts').innerHTML = S.alerts.map(function (a) { return '<div class="alert ' + esc(a.level) + '">' + esc(a.text) + (a.key === 'link' && S.mode === 'live' ? ' <button type="button" class="btn sm" data-reconnect>Reconnect</button>' : '') + (a.key === 'modeauto' ? ' <button type="button" class="btn sm" data-auto>Switch to Auto</button>' : '') + '</div>'; }).join('');
+    $$('#alerts [data-auto]').forEach(function (b) { b.onclick = function () { setModeAuto(b); }; });
     $$('#alerts [data-reconnect]').forEach(function (b) { b.onclick = function () { reconnect(b); }; });
   }
   function refresh() {

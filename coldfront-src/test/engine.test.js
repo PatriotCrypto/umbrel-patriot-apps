@@ -14,13 +14,14 @@ const T0 = Date.parse('2026-11-03T12:00:00Z');
 class FakeAdapter extends EventEmitter {
   constructor() { super(); this.kind = 'fake'; this.connected = true; this.writes = []; this.th = { nodeId: 2, temp: 68, humidity: 40, mode: 'auto', opState: 'idle', fan: 'auto', heat: 64, cool: 80, lastSeen: T0 }; this.sensors = []; this.fail = false; }
   snapshot() { return { connected: this.connected, kind: 'fake', error: null, thermostat: this.th, sensors: this.sensors }; }
+  async setMode(m) { this.modes = (this.modes || []).concat(m); this.th.mode = m; }
   async setSetpoints(p) { if (this.fail) throw new Error('boom'); this.writes.push(p); if (p.heat != null) this.th.heat = p.heat; if (p.cool != null) this.th.cool = p.cool; }
 }
 
 function setup(over = {}) {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'coldfront-'));
   const store = new Store(dir).load();
-  Object.assign(store.data.settings, { tz: 'America/New_York' }, over);
+  Object.assign(store.data.settings, { tz: 'America/New_York', plan: 'schedule', keepAuto: false }, over);
   let t = T0;
   const clock = { now: () => t, advance: (ms) => { t += ms; } };
   const engine = new Engine(store, { now: clock.now });
@@ -221,4 +222,74 @@ test('setting a hold while Away is on turns Away off so the hold actually applie
   await engine.tick();
   assert.equal(engine.last.desired.heat, 68);
   assert.equal(engine.last.desired.cool, 72);
+});
+
+test('range mode holds the Home low/high all day, ignoring the schedule', async () => {
+  const { engine, adapter, clock } = setup({ plan: 'range', comfort: { home: { heat: 68, cool: 72 }, away: { heat: 62, cool: 80 } } });
+  await engine.tick();
+  assert.deepEqual(adapter.writes, [{ heat: 68, cool: 72 }]);
+  assert.equal(engine.last.desired.label, 'Home');
+  clock.advance(14 * 3600000); // 9 PM: the schedule would have changed things
+  await engine.tick();
+  assert.equal(engine.last.desired.heat, 68);
+  assert.equal(engine.state().next, null);
+});
+
+test('range mode: Away uses the Away range, and turning it off returns to Home', async () => {
+  const { engine, adapter, clock } = setup({ plan: 'range', comfort: { home: { heat: 68, cool: 72 }, away: { heat: 62, cool: 80 } } });
+  await engine.tick();
+  engine.setAway({ on: true });
+  clock.advance(2 * 60000);
+  await engine.tick();
+  assert.deepEqual(adapter.writes.at(-1), { heat: 62, cool: 80 });
+  engine.setAway({ on: false });
+  clock.advance(2 * 60000);
+  await engine.tick();
+  assert.deepEqual(adapter.writes.at(-1), { heat: 68, cool: 72 });
+});
+
+test('a wall change in range mode holds for 4 hours, not forever', async () => {
+  const { engine, adapter, clock, store } = setup({ plan: 'range' });
+  await engine.tick();
+  clock.advance(5 * 60000);
+  adapter.th.heat = 71; adapter.th.cool = 75;
+  await engine.tick();
+  assert.equal(store.data.hold.source, 'wall');
+  assert.equal(new Date(store.data.hold.until).getTime() - clock.now(), 4 * 3600000);
+});
+
+test('keep-Auto puts a thermostat that drifted to Heat back to Auto, a few tries then stops', async () => {
+  const { engine, adapter, clock } = setup({ keepAuto: true });
+  adapter.th.mode = 'heat';
+  adapter.setMode = async function (m) { this.modes = (this.modes || []).concat(m); /* thermostat ignores it */ };
+  for (let i = 0; i < 6; i++) { await engine.tick(); clock.advance(11 * 60000); }
+  assert.equal(adapter.modes.length, 3);
+  assert.ok(engine.alerts(adapter.snapshot(), clock.now()).some((a) => a.key === 'modeauto'));
+});
+
+test('keep-Auto respects a mode picked in the app, and leaves Off alone', async () => {
+  const { engine, adapter, clock } = setup({ keepAuto: true });
+  adapter.th.mode = 'heat';
+  engine.noteModeChoice('heat');
+  await engine.tick();
+  assert.equal(adapter.modes, undefined);
+  adapter.th.mode = 'off'; engine.modeUserUntil = 0;
+  clock.advance(60000); await engine.tick();
+  assert.equal(adapter.modes, undefined);
+});
+
+test('a bedroom sensor that sleeps for a few hours is not flagged, a day of silence is', () => {
+  const { engine, clock } = setup();
+  const snap = { connected: true, kind: 'fake', thermostat: { ...new FakeAdapter().th, lastSeen: clock.now() }, sensors: [{ nodeId: 7, name: 'Bedroom', temp: 70, humidity: 40, battery: 80, lastSeen: clock.now() - 6 * 3600000 }], leaks: [] };
+  assert.ok(!engine.alerts(snap, clock.now()).some((a) => a.key === 'off7'));
+  snap.sensors[0].lastSeen = clock.now() - 20 * 3600000;
+  assert.ok(engine.alerts(snap, clock.now()).some((a) => a.key === 'off7'));
+});
+
+test('room-aware "avg" nudges toward the whole-house average', async () => {
+  const { engine, adapter, clock } = setup({ roomAware: { enabled: true, roomId: 'avg', maxOffset: 3 }, plan: 'range', comfort: { home: { heat: 68, cool: 72 }, away: { heat: 62, cool: 80 } } });
+  adapter.th.temp = 68;
+  adapter.sensors = [{ nodeId: 7, name: 'A', temp: 64, humidity: 40, battery: 90, lastSeen: clock.now() }, { nodeId: 8, name: 'B', temp: 66, humidity: 40, battery: 90, lastSeen: clock.now() }];
+  await engine.tick();
+  assert.ok(engine.last.desired.heat > 68);
 });
