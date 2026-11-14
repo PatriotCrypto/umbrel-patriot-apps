@@ -7,7 +7,7 @@ services:
       APP_PORT: 3000
 
   web:
-    image: ghcr.io/patriotcrypto/disc-ripper:0.4.1@sha256:80da0178a480678a7ca2a9bb8a72ee906bb49931b5d96f783c8e5d0da3ddfc75
+    image: ghcr.io/patriotcrypto/disc-ripper:0.5.0@sha256:ae5a70dc0b04c44612e35a5b303ab9dc86facca50e3852eba306926921b3e844
     restart: on-failure
     stop_grace_period: 1m
     read_only: true

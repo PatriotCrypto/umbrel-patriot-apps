@@ -4,7 +4,7 @@ storage:
   dataRoot: data
 category: media
 name: Disc Ripper
-version: "0.4.2"
+version: "0.5.0"
 tagline: "Pop in a DVD and walk away. It rips, names it for Jellyfin and ejects."
 description: >-
   Plug a USB DVD drive into your Umbrel, put a disc in, and walk away. Disc Ripper notices the disc, works out whether it is a movie
@@ -41,7 +41,7 @@ folderAccess:
         targetPath: /media
         readOnly: false
 releaseNotes: >-
-  Disc Ripper no longer cancels a rip or ejects a disc on its own. If it hits a problem, such as two titles matching the same movie (a disc with an alternate cut), a name it cannot use, or a read or rip error, it keeps the disc in the drive and asks you what to do. Name problems open the normal confirm screen with the longest title ticked. Errors now offer Try again or Eject. Only the Stop button ejects a disc mid-job.
+  New: Disc Ripper remembers where each TV series left off. After you rip a disc, it saves the show, season and next episode, so the next disc is already filled in (for example Parks and Recreation disc 2 starts at the right episode, and rolls into the next season when one ends). Tap a series under Continue a series you are ripping on the confirm screen to switch shows, and use the new Series in progress list to fix a place or forget a show. It still stops and asks you to check before anything rips. A disc with a generic label like DVD now offers the last series instead of guessing a movie.
 submitter: PatriotCrypto
 submission: https://github.com/PatriotCrypto/umbrel-patriot-apps
 dependencies: []
