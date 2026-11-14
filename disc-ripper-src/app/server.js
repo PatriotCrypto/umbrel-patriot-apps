@@ -13,7 +13,7 @@ const { classify } = require('./lib/classify');
 const META = require('./lib/meta');
 const DRV = require('./lib/drive');
 
-const VERSION = '0.4.1';
+const VERSION = '0.5.0';
 const PORT = parseInt(process.env.PORT || '3000', 10);
 const DATA_DIR = path.resolve(process.env.DATA_DIR || '/data');
 const ROOTS = [
@@ -61,6 +61,16 @@ writeMkConf();
 if (savedSettings && !(savedSettings.v >= 2)) { settings.v = 2; settings.auto = true; saveJson(SETTINGS_FILE, settings); }
 const pubSettings = () => ({ ntfy: { on: settings.ntfy.on, server: settings.ntfy.server, topic: settings.ntfy.topic, user: settings.ntfy.user, passSet: !!settings.ntfy.pass, events: settings.ntfy.events }, auto: settings.auto, eject: settings.eject, root: settings.root, movieDir: settings.movieDir, tvDir: settings.tvDir, autoKey: settings.autoKey, keySet: !!settings.key, keyTail: settings.key ? '…' + settings.key.slice(-4) : '' });
 
+// ---------- series in progress ----------
+// memory.series[showId] = { showId, showName, year, poster, season, nextEp, disc, at }: where each TV show was left off.
+const seriesList = () => Object.values(memory.series || {}).sort((a, b) => b.at - a.at).slice(0, 12);
+function rememberSeries(tv, built, disc) {
+  memory.series = memory.series || {};
+  const id = String(tv.showId), old = memory.series[id], nextEp = built.start + built.outs.length;
+  const keep = old && old.season === built.season && old.nextEp > nextEp; // a disc ripped out of order never moves the bookmark backwards
+  memory.series[id] = { showId: id, showName: String(tv.showName || (old && old.showName) || built.name).slice(0, 120), year: String(tv.year || (old && old.year) || '').slice(0, 4),
+    poster: cleanPoster(tv.poster) || (old && old.poster) || '', season: built.season, nextEp: keep ? old.nextEp : nextEp, disc: disc || null, at: Date.now() };
+}
 function addHistory(h) { history.unshift({ id: crypto.randomBytes(5).toString('hex'), at: Date.now(), ...h }); history = history.slice(0, 60); saveJson(HISTORY_FILE, history); }
 
 // ---------- destinations ----------
@@ -307,14 +317,21 @@ async function startingEpisode(showId, seasonFromLabel, disc, nEps) {
 }
 
 async function tvSuggestion(sug, lab, query, titles, top, cands) {
-  const st = await startingEpisode(top ? top.id : 0, lab.season, lab.disc, titles.length);
-  if (!top) {
+  // The label did not name the show (or only says "DVD"): carry on with the series ripped last, but always ask first.
+  const last = !top && (lab.generic || !lab.title) ? seriesList()[0] : null;
+  const use = top || (last && { id: last.showId, title: last.showName, year: last.year, poster: last.poster });
+  const st = await startingEpisode(use ? use.id : 0, lab.season, lab.disc, titles.length);
+  if (!use) {
     sug.tv = { candidates: cands.slice(0, 5), showId: null, showName: N.titleCase(lab.title || ''), year: '', season: lab.season || 1, startEp: 1 };
   } else {
-    sug.tv = { candidates: cands.slice(0, 5), showId: top.id, showName: top.title, year: top.year, season: st.season, startEp: st.start, poster: top.poster || '' };
+    sug.tv = { candidates: cands.slice(0, 5), showId: use.id, showName: use.title, year: use.year, season: st.season, startEp: st.start, poster: use.poster || '' };
   }
   sug.titleIds = titles.map((t) => t.id);
   sug.confident = !!(top && RES.score(query, top.title) >= 0.9 && lab.season && st.sure);
+  if (last) {
+    sug.mustAsk = true; sug.confident = false;
+    sug.reason = `${sug.reason} The disc label doesn't name the show, so this is filled in from the series you ripped last: ${last.showName}. Check the show, season and first episode.`.trim();
+  }
 }
 
 async function identify(job, cls) {
@@ -532,7 +549,7 @@ async function ripPlan(job, plan) {
     }
   } finally { await fsp.rm(tmpBase, { recursive: true, force: true }).catch(() => {}); }
 
-  if (plan.kind === 'tv' && plan.tv.showId) { const nx = { nextEp: built.start + built.outs.length, disc: (job.parsed && job.parsed.disc) || 1 }; memory[`${plan.tv.showId}:${built.season}`] = nx; memory[`last:${plan.tv.showId}`] = { season: built.season, nextEp: nx.nextEp }; saveJson(MEMORY_FILE, memory); }
+  if (plan.kind === 'tv' && plan.tv.showId) { const nx = { nextEp: built.start + built.outs.length, disc: (job.parsed && job.parsed.disc) || 1 }; memory[`${plan.tv.showId}:${built.season}`] = nx; memory[`last:${plan.tv.showId}`] = { season: built.season, nextEp: nx.nextEp }; rememberSeries(plan.tv, built, job.parsed && job.parsed.disc); saveJson(MEMORY_FILE, memory); }
   job.progress = 100;
   if (plan.kind === 'movies') {
     for (let i = built.outs.length - 1; i >= 0; i--) addHistory({ label: job.label, kind: 'movie', name: built.outs[i].movie, status: 'done', files: [job.files[i]].filter(Boolean), poster: cleanPoster((plan.movies[i] || {}).poster), note: i === 0 ? job.autoNote || '' : '' });
@@ -580,7 +597,7 @@ const pubJob = (j) => j && ({
 });
 
 app.get('/api/state', wrap(async (req, res) => {
-  res.json({ version: VERSION, drives: driveStates.map((d) => { const t = trayView(d.dev, d.present); return { ...d, tray: t.open ? 'open' : 'closed', trayKnown: t.known }; }), current: pubJob(current), history: history.slice(0, 25), settings: pubSettings(), roots: await Promise.all(ROOTS.map(rootInfo)) });
+  res.json({ version: VERSION, drives: driveStates.map((d) => { const t = trayView(d.dev, d.present); return { ...d, tray: t.open ? 'open' : 'closed', trayKnown: t.known }; }), current: pubJob(current), history: history.slice(0, 25), series: seriesList(), settings: pubSettings(), roots: await Promise.all(ROOTS.map(rootInfo)) });
 }));
 
 app.post('/api/confirm', wrap(async (req, res) => {
@@ -623,6 +640,32 @@ app.post('/api/history/rename', wrap(async (req, res) => {
   if (moved !== newFile) await fsp.rename(moved, newFile);
   h.name = name; h.files = [path.relative(root.dir, newFile)]; saveJson(HISTORY_FILE, history);
   res.json({ ok: true, name });
+}));
+// where the next disc of a series starts (carries on into the next season when this one is finished)
+app.get('/api/series/next', wrap(async (req, res) => {
+  const s = (memory.series || {})[String(req.query.showId)];
+  if (!s) throw new Error('Unknown series.');
+  const st = await startingEpisode(s.showId, null, null, 0);
+  res.json({ season: st.season, start: st.start });
+}));
+// fix the bookmark by hand
+app.post('/api/series/set', wrap(async (req, res) => {
+  const b = req.body || {}, id = String(b.showId), s = (memory.series || {})[id];
+  if (!s) throw new Error('Unknown series.');
+  const season = parseInt(b.season, 10), nextEp = parseInt(b.nextEp, 10);
+  if (!(season >= 0 && season <= 99) || !(nextEp >= 1 && nextEp <= 999)) throw new Error('Type a season (0 to 99) and an episode number (1 or more).');
+  s.season = season; s.nextEp = nextEp; s.at = Date.now();
+  memory[`last:${id}`] = { season, nextEp }; memory[`${id}:${season}`] = { nextEp, disc: 0 };
+  saveJson(MEMORY_FILE, memory);
+  res.json({ ok: true });
+}));
+app.post('/api/series/forget', wrap(async (req, res) => {
+  const id = String((req.body || {}).showId || '');
+  if (!id || !(memory.series || {})[id]) throw new Error('Unknown series.');
+  delete memory.series[id];
+  for (const k of Object.keys(memory)) if (k === `last:${id}` || k.startsWith(`${id}:`)) delete memory[k];
+  saveJson(MEMORY_FILE, memory);
+  res.json({ ok: true });
 }));
 app.post('/api/history/clear', wrap(async (req, res) => { history = []; saveJson(HISTORY_FILE, history); res.json({ ok: true }); }));
 

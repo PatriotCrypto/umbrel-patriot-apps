@@ -1,6 +1,6 @@
 {
   "name": "disc-ripper",
-  "version": "0.4.1",
+  "version": "0.5.0",
   "private": true,
   "description": "Insert a DVD, get a Jellyfin-ready file on your Umbrel.",
   "license": "MIT",

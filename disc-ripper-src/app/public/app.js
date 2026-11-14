@@ -114,11 +114,33 @@ function renderStatus() {
 function setKind(k) {
   CF.kind = k;
   document.querySelectorAll('#cfKind button').forEach((b) => { b.classList.toggle('on', b.dataset.k === k); b.setAttribute('aria-selected', String(b.dataset.k === k)); });
-  show('cfMovie', k === 'movie'); show('cfTv', k === 'tv');
+  show('cfMovie', k === 'movie'); show('cfTv', k === 'tv'); renderSeriesChips();
   $('cfQLabel').textContent = k === 'tv' ? 'Find the TV show' : k === 'movies' ? 'Look up a movie name (fills the first empty name below)' : 'Find the movie';
   $('cfTitlesLabel').textContent = k === 'tv' ? 'Which titles are episodes? They are numbered in this order.' : k === 'movies' ? 'Tick each movie on the disc and give it a name.' : 'Which title is the movie?';
   $('cfCands').innerHTML = '';
   renderTitles();
+}
+function renderSeriesChips() {
+  const list = (ST && ST.series) || [], box = $('cfSeriesList');
+  show('cfSeries', CF.kind === 'tv' && list.length > 0);
+  box.innerHTML = '';
+  for (const s of list) {
+    const b = document.createElement('button'); b.type = 'button'; b.className = 'cand'; b.dataset.id = s.showId;
+    if (String(CF.showId) === String(s.showId)) b.classList.add('on');
+    const cov = s.poster && String(s.poster).startsWith('/api/poster?u=') ? `<img alt="" src="${esc(s.poster)}">` : '<img alt="">';
+    b.innerHTML = `${cov}<span><b>${esc(s.showName)}${s.year ? ' (' + esc(s.year) + ')' : ''}</b><small>Last ripped: Season ${s.season}, up to episode ${Math.max(0, s.nextEp - 1)}</small></span>`;
+    b.onclick = () => pickSeries(s);
+    box.appendChild(b);
+  }
+}
+async function pickSeries(s) {
+  note('cfErr', '');
+  try {
+    const n = await api(`/api/series/next?showId=${encodeURIComponent(s.showId)}`);
+    CF.showId = s.showId; CF.showName = s.showName; CF.year = s.year || ''; CF.poster = s.poster || '';
+    $('cfSeason').value = n.season; $('cfStart').value = n.start; $('cfQ').value = s.showName;
+    renderSeriesChips(); loadEps();
+  } catch (ex) { note('cfErr', ex.message); }
 }
 function renderTitles() {
   const j = ST.current; if (!j) return;
@@ -244,6 +266,32 @@ function renderHistory() {
   }
 }
 
+function renderSeries() {
+  const list = ST.series || [];
+  show('seriesCard', list.length > 0);
+  $('seriesRows').innerHTML = '';
+  for (const s of list) {
+    const el = document.createElement('div'); el.className = 'hrow';
+    const poster = s.poster && String(s.poster).startsWith('/api/poster?u=') ? s.poster : '';
+    const cov = poster ? `<img alt="" loading="lazy" src="${esc(poster)}">` : '<svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><circle cx="24" cy="24" r="18"/><circle cx="24" cy="24" r="5"/></svg>';
+    el.innerHTML = `<div class="hcov">${cov}</div><div class="hmeta"><b>${esc(s.showName)}${s.year ? ' (' + esc(s.year) + ')' : ''}</b><small>Last ripped: Season ${s.season}, up to episode ${Math.max(0, s.nextEp - 1)}${s.disc ? ' · disc ' + s.disc : ''}</small><small>The next disc starts at episode ${s.nextEp} unless it is a new season.</small></div>`;
+    const row = document.createElement('div'); row.className = 'rn';
+    const fix = document.createElement('button'); fix.type = 'button'; fix.className = 'btn small'; fix.textContent = 'Fix place';
+    fix.addEventListener('click', async () => {
+      const se = prompt(`${s.showName}: which season is next?`, String(s.season)); if (se === null) return;
+      const ep = prompt(`${s.showName}: which episode number does the next disc start at?`, String(s.nextEp)); if (ep === null) return;
+      try { await api('/api/series/set', { method: 'POST', body: { showId: s.showId, season: se, nextEp: ep } }); poll(); } catch (ex) { alert(ex.message); }
+    });
+    const del = document.createElement('button'); del.type = 'button'; del.className = 'btn small'; del.textContent = 'Forget'; del.style.marginLeft = '8px';
+    del.addEventListener('click', async () => {
+      if (!confirm(`Forget where ${s.showName} left off? Your ripped files are not touched.`)) return;
+      try { await api('/api/series/forget', { method: 'POST', body: { showId: s.showId } }); poll(); } catch (ex) { alert(ex.message); }
+    });
+    row.append(fix, del); el.querySelector('.hmeta').appendChild(row);
+    $('seriesRows').appendChild(el);
+  }
+}
+
 $('histClear').addEventListener('click', async () => {
   if (!confirm('Clear the recently ripped list? Your ripped files are not touched.')) return;
   try { await api('/api/history/clear', { method: 'POST' }); poll(); } catch {}
@@ -323,7 +371,7 @@ async function poll() {
     ST = await api('/api/state');
     const usable = ST.roots.find((r) => r.id === ST.settings.root && r.available && r.writable);
     if (!usable) { show('setup'); $('setup').innerHTML = '<b>One quick setup step.</b> This app cannot write to your library yet. In Umbrel, right-click Disc Ripper, choose <b>Settings</b>, then under <b>Storage &gt; Access to your folders</b> pick your Media folder with read and write access, and apply the changes.'; } else show('setup', false);
-    renderStatus(); renderHistory(); renderSettings();
+    renderStatus(); renderHistory(); renderSeries(); renderSettings();
     const j = ST.current;
     if (j && j.stage === 'needs_confirm') { show('confirmCard'); if (cfJob !== j.id) { cfJob = j.id; buildConfirm(j); $('confirmCard').scrollIntoView({ behavior: 'smooth', block: 'start' }); } }
     else { show('confirmCard', false); if (!j || j.id !== cfJob) cfJob = null; }

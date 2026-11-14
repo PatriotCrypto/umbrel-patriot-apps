@@ -71,6 +71,7 @@
       <p class="muted" id="cfWhy"></p>
       <div class="fgrid">
         <div class="seg" id="cfKind" role="tablist"><button type="button" data-k="movie">Movie</button><button type="button" data-k="movies">Several movies</button><button type="button" data-k="tv">TV show</button></div>
+        <div id="cfSeries" class="field" hidden><div class="lab">Continue a series you are ripping</div><div class="cands" id="cfSeriesList"></div></div>
         <div class="field"><label for="cfQ" id="cfQLabel">Find the title</label>
           <form id="cfSearch" class="row"><input id="cfQ" type="search" autocomplete="off" spellcheck="false"><button class="btn" id="cfSearchBtn">Search</button></form>
         </div>
@@ -81,6 +82,14 @@
       </div>
       <div class="row end"><button class="btn" id="cfSkip">Skip this disc</button><button class="btn primary big" id="cfGo">Rip this disc</button></div>
       <div id="cfErr" class="notice err" hidden></div>
+    </div>
+  </section>
+
+  <section class="win" id="seriesCard" hidden>
+    <div class="tb"><span>Series in progress</span></div>
+    <div class="wb">
+      <div id="seriesRows" class="hist"></div>
+      <p class="muted small">Disc Ripper remembers where each show left off, so the next disc starts at the right episode. You still get to check it before anything rips.</p>
     </div>
   </section>
 
